@@ -8,20 +8,18 @@ from dranspose.worker import Worker
 logging.basicConfig(level=logging.DEBUG)
 
 async def main():
-    i1 = Ingester(b'ingest1')
-    w1 = Worker(b'worker1')
-    w2 = Worker(b'worker2')
-    asyncio.create_task(i1.run())
-    asyncio.create_task(w1.run())
-    asyncio.create_task(w2.run())
+    ins = [Ingester('ingest'+str(i), config={"worker_port": 10000+i}) for i in range(1,3)]
+    wos = [Worker('worker'+str(i)) for i in range(1,3)]
+
+    for i in ins+wos:
+        asyncio.create_task(i.run())
 
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)
     await server.serve()
 
-    await w1.close()
-    await w2.close()
-    await i1.close()
+    for i in ins + wos:
+        await i.close()
 
 try:
     asyncio.run(main())

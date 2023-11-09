@@ -13,10 +13,10 @@ class WorkerState:
 
 
 class Worker:
-    def __init__(self, name: bytes, redis_host="localhost", redis_port=6379):
+    def __init__(self, name: str, redis_host="localhost", redis_port=6379):
         self.ctx = zmq.asyncio.Context()
         self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
-        self.state = WorkerState(name)
+        self.state = WorkerState(name.encode("ascii"))
         self._ingesters = {}
 
     async def run(self):
@@ -27,11 +27,11 @@ class Worker:
     async def work(self):
         while True:
             try:
-                sock = list(self._ingesters.values())[0]["socket"]
-                res = await sock.poll()
-                print("awaited poll", res)
-                res = await sock.recv_multipart()
-                print("received work", res)
+                tasks = [a["socket"].recv_multipart() for a in list(self._ingesters.values())]
+                done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                print("done", done, "pending", pending)
+                for res in done:
+                    print("received work", res.result())
             except Exception as e:
                 print("err ", e.__repr__())
                 await asyncio.sleep(2)

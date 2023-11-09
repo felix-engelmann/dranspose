@@ -20,7 +20,7 @@ class IngesterState:
 
 
 class Ingester:
-    def __init__(self, name: bytes, redis_host="localhost", redis_port=6379, config=None):
+    def __init__(self, name: str, redis_host="localhost", redis_port=6379, config=None):
         if config is None:
             config = {}
         self.ctx = zmq.asyncio.Context()
@@ -31,7 +31,7 @@ class Ingester:
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
         self.out_socket.bind(f"tcp://*:{config.get('worker_port', 10000)}")
         self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
-        self.state = IngesterState(name, config.get("worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"))
+        self.state = IngesterState(name.encode("ascii"), config.get("worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"))
 
     async def run(self):
         asyncio.create_task(self.register())
