@@ -1,22 +1,27 @@
 import asyncio
 import logging
-
-from dranspose.controller import Controller
+import uvicorn
+from dranspose.controller import app
 from dranspose.ingester import Ingester
 from dranspose.worker import Worker
 
 logging.basicConfig(level=logging.DEBUG)
 
 async def main():
-    ctrl = Controller()
-    i1 = Ingester("tcp://127.0.0.1:9999", b'ingest1')
-    w1 = Worker("tcp://127.0.0.1:9999", b'worker1')
-    w2 = Worker("tcp://127.0.0.1:9999", b'worker2')
+    i1 = Ingester(b'ingest1')
+    w1 = Worker(b'worker1')
+    w2 = Worker(b'worker2')
     asyncio.create_task(i1.run())
     asyncio.create_task(w1.run())
     asyncio.create_task(w2.run())
-    await ctrl.run()
-    print("done init")
+
+    config = uvicorn.Config(app, port=5000, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+    await w1.close()
+    await w2.close()
+    await i1.close()
 
 try:
     asyncio.run(main())

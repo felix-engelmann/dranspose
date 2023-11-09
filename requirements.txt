@@ -1,1 +1,4 @@
 pyzmq
+redis[hiredis]
+fastapi
+uvicorn

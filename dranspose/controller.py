@@ -4,42 +4,39 @@ import logging
 import time
 from dranspose import protocol
 from dranspose.worker import WorkerState
+import redis.asyncio as redis
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
 
 logger = logging.getLogger(__name__)
 
 
 class Controller:
-    def __init__(self, control_bind="tcp://*:9999"):
+    def __init__(self, redis_host="localhost", redis_port=6379):
         self.ctx = zmq.asyncio.Context()
-        self.ctrl_sock = self.ctx.socket(zmq.ROUTER)
-        self.ctrl_sock.bind(control_bind)
-        self.workers = {}
-        self.ingesters = {}
+        self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
 
     async def run(self):
         logger.debug("started controller run")
-        asyncio.create_task(self.checklive())
         while True:
-            data = await self.ctrl_sock.recv_multipart()
-            logger.debug("received %s", data)
-            if len(data) == 0:
-                continue
-            source = data[0]
-            packet = await protocol.parse(data[1:])
-            if packet["type"] == protocol.Protocol.PONG:
-                packet["data"].seen()
-                self.workers[source] = packet["data"]
+            presence = await self.redis.keys(f"{protocol.PREFIX}:*:*:present")
+            await asyncio.sleep(2)
 
-    async def checklive(self):
-        logger.debug("started checklive")
-        while True:
-            for w in self.workers:
-                if self.workers[w].dead():
-                    del self.workers[w]
-                elif self.workers[w].stale():
-                    await protocol.ping(self.ctrl_sock, self.workers[w].name)
-            await asyncio.sleep(1)
-
-    def __del__(self):
+    async def close(self):
         self.ctx.destroy()
-        logger.info("stopped controlled")
+        await self.redis.close()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load the ML model
+    ctrl = Controller()
+    asyncio.create_task(ctrl.run())
+    yield
+    await ctrl.close()
+    # Clean up the ML models and release the resources
+
+
+app = FastAPI(lifespan=lifespan)
