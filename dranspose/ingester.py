@@ -5,7 +5,7 @@ from dranspose import protocol
 
 logger = logging.getLogger(__name__)
 
-class WorkerState:
+class IngesterState:
     def __init__(self, name):
         self.name = name
         self.last_seen = time.time()
@@ -19,17 +19,13 @@ class WorkerState:
     def stale(self):
         return (time.time() - self.last_seen) > 5
 
-    def update_from_controller(self, new):
-        pass
-
-
-class Worker:
+class Ingester:
     def __init__(self, control_url: str, name: bytes):
         self.ctx = zmq.asyncio.Context()
         self.ctrl_sock = self.ctx.socket(zmq.DEALER)
         self.ctrl_sock.setsockopt(zmq.IDENTITY, name)
         self.ctrl_sock.connect(control_url)
-        self.state = WorkerState(name)
+        self.state = IngesterState(name)
 
     async def run(self):
         await self.register()
