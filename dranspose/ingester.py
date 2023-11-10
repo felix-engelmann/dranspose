@@ -49,13 +49,33 @@ class Ingester:
 
     async def work(self):
         self._logger.info("started ingester work task")
+        lastev = 0
         while True:
-            # print("poke worker 1")
-            # try:
-            #    await self.out_socket.send_multipart([b"worker1", b"hello worker 1"])
-            # except zmq.error.ZMQError:
-            #    print("not reachable, try again")
-            await asyncio.sleep(3)
+            sub = f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}"
+            try:
+                assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
+            except rexceptions.ConnectionError:
+                break
+            if sub not in assignments:
+                continue
+            assignments = assignments[sub][0][0]
+            self._logger.debug("got assignments %s", assignments)
+            workermessages = {}
+            for stream in self.state.streams:
+                if stream in assignments[1]:
+                    workers = json.loads(assignments[1][stream])
+                    print("send data to", workers)
+                    zmqparts = await self.get_frame(stream)
+                    for worker in workers:
+                        if worker not in workermessages:
+                            workermessages[worker] = []
+                        workermessages[worker]+=zmqparts
+            print("workermessages", workermessages)
+
+            lastev = assignments[0]
+
+    async def get_frame(self, stream):
+        raise NotImplemented("get_frame must be implemented")
 
     async def handle_frame(self, frameno, parts):
         pass

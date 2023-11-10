@@ -1,4 +1,6 @@
 import asyncio
+import json
+
 import zmq.asyncio
 import logging
 import time
@@ -85,11 +87,9 @@ class Controller:
                             virt = self.mapping.assign_next(ready[1]["worker"])
                             print("assigned worker to ", virt)
                             for evn in range(event_no, self.mapping.complete_events):
-                                pipe = self.redis.pipeline()
-                                for stream, wrk in self.mapping.get_event_workers(evn).items():
-                                    print("stream", stream, "gets wokers", wrk)
-                                    await pipe.xadd(f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:{stream}", {w: 1 for w in wrk}, id = evn+1)
-                                await pipe.execute()
+                                wrks = self.mapping.get_event_workers(evn)
+                                print("gets wokers", wrks)
+                                await self.redis.xadd(f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}", {s:json.dumps(w) for s,w in wrks.items()}, id = evn+1)
                             event_no = self.mapping.complete_events
                         last = ready[0]
             except rexceptions.ConnectionError as e:
@@ -100,6 +100,8 @@ class Controller:
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
         queues = await self.redis.keys(f"{protocol.PREFIX}:ready:*")
         await self.redis.delete(*queues)
+        assigned = await self.redis.keys(f"{protocol.PREFIX}:assigned:*")
+        await self.redis.delete(*assigned)
         self.ctx.destroy()
         await self.redis.close()
 
