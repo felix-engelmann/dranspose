@@ -6,18 +6,23 @@ import zmq.asyncio
 import logging
 from dranspose import protocol
 import redis.asyncio as redis
+import redis.exceptions as rexceptions
+
 
 logger = logging.getLogger(__name__)
 
 class WorkerState:
     def __init__(self, name):
         self.name = name
+        self.mapping_uuid = None
 
 
 class Worker:
     def __init__(self, name: str, redis_host="localhost", redis_port=6379):
         self.ctx = zmq.asyncio.Context()
         self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
+        if ":" in name:
+            raise Exception("Worker name must not container a :")
         self.state = WorkerState(name)
         self._ingesters: dict[str, Any] = {}
 
@@ -31,7 +36,7 @@ class Worker:
             try:
                 tasks = [a["socket"].recv_multipart() for a in list(self._ingesters.values())]
                 done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                print("done", done, "pending", pending)
+                #print("done", done, "pending", pending)
                 for res in done:
                     print("received work", res.result())
             except Exception as e:
@@ -39,9 +44,22 @@ class Worker:
                 await asyncio.sleep(2)
 
     async def register(self):
+        latest = await self.redis.xrevrange(f"{protocol.PREFIX}:controller:updates", count=1)
+        last = 0
+        if len(latest) > 0:
+            last = latest[0][0]
         while True:
-            await self.redis.setex(f"{protocol.PREFIX}:worker:{self.state.name}:present",10,1)
-            await asyncio.sleep(6)
+            await self.redis.setex(f"{protocol.PREFIX}:worker:{self.state.name}:present", 10, 1)
+            await self.redis.json().set(f"{protocol.PREFIX}:worker:{self.state.name}:config","$", self.state.__dict__)
+            try:
+                update = await self.redis.xread({f"{protocol.PREFIX}:controller:updates":last},block=6000)
+                if f"{protocol.PREFIX}:controller:updates" in update:
+                    update = update[f"{protocol.PREFIX}:controller:updates"][0][-1]
+                    last = update[0]
+                    self.state.mapping_uuid = update[1]['mapping_uuid']
+            except rexceptions.ConnectionError as e:
+                print("closing with", e.__repr__())
+                break
 
     async def manage_ingesters(self):
         while True:
@@ -75,8 +93,6 @@ class Worker:
             await asyncio.sleep(2)
 
     async def close(self):
+        await self.redis.delete(f"{protocol.PREFIX}:worker:{self.state.name}:config")
         await self.redis.aclose()
-
-    def __del__(self):
         self.ctx.destroy()
-        logger.info("stopped worker")

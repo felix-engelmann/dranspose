@@ -2,3 +2,5 @@ pyzmq
 redis[hiredis]
 fastapi
 uvicorn
+numpy
+requests
