@@ -29,12 +29,12 @@ class Worker:
         self.state = WorkerState(name)
         self._ingesters: dict[str, Any] = {}
 
-    async def run(self):
         asyncio.create_task(self.register())
         asyncio.create_task(self.manage_ingesters())
-        asyncio.create_task(self.work())
+        self.work_task = asyncio.create_task(self.work())
 
     async def work(self):
+        logger.info("started work task")
         while True:
             try:
                 tasks = [
@@ -76,6 +76,8 @@ class Worker:
                     newuuid = update[1]["mapping_uuid"]
                     if newuuid != self.state.mapping_uuid:
                         logger.info("resetting config %s", newuuid)
+                        self.work_task.cancel()
+                        self.work_task = asyncio.create_task(self.work())
                         self.state.mapping_uuid = newuuid
             except rexceptions.ConnectionError as e:
                 print("closing with", e.__repr__())

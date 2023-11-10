@@ -46,7 +46,6 @@ class Ingester:
             streams,
         )
 
-    async def run(self):
         asyncio.create_task(self.register())
         asyncio.create_task(self.accept_workers())
         asyncio.create_task(self.work())

@@ -17,9 +17,6 @@ async def main():
     ins.append(DummyEigerIngester())
     wos = [Worker('worker'+str(i)) for i in range(1, 3)]
 
-    for i in ins+wos:
-        asyncio.create_task(i.run())
-
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)
     server_task = asyncio.create_task(server.serve())
