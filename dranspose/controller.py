@@ -18,10 +18,13 @@ class ControllerState:
     def __init__(self):
         self.mapping_uuid = 0
 
+
 class Controller:
     def __init__(self, redis_host="localhost", redis_port=6379):
         self.ctx = zmq.asyncio.Context()
-        self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
+        self.redis = redis.Redis(
+            host=redis_host, port=redis_port, decode_responses=True, protocol=3
+        )
         self.present = []
         self.configs = []
         self.state = ControllerState()
@@ -39,8 +42,13 @@ class Controller:
     async def set_mapping(self):
         self.mapping = Mapping()
         self.state.mapping_uuid = str(self.mapping.uuid)
-        await self.redis.json().set(f"{protocol.PREFIX}:controller:config", "$", self.state.__dict__)
-        await self.redis.xadd(f"{protocol.PREFIX}:controller:updates", {"mapping_uuid": self.state.mapping_uuid})
+        await self.redis.json().set(
+            f"{protocol.PREFIX}:controller:config", "$", self.state.__dict__
+        )
+        await self.redis.xadd(
+            f"{protocol.PREFIX}:controller:updates",
+            {"mapping_uuid": self.state.mapping_uuid},
+        )
 
         self.configs = await self.redis.keys(f"{protocol.PREFIX}:*:*:config")
         if len(self.configs) > 0:
@@ -50,7 +58,6 @@ class Controller:
                 uuids = await self.redis.json().mget(self.configs, "$.mapping_uuid")
         logger.info("new mapping distributed")
 
-
     async def assign_work(self):
         pass
 
@@ -59,6 +66,7 @@ class Controller:
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
         self.ctx.destroy()
         await self.redis.close()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -72,6 +80,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
 
 @app.post("/mapping")
 async def set_mapping():

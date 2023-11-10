@@ -11,6 +11,7 @@ from dranspose import protocol
 
 logger = logging.getLogger(__name__)
 
+
 class IngesterState:
     def __init__(self, name, url, streams):
         self.name = name
@@ -32,10 +33,18 @@ class Ingester:
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 300)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
         self.out_socket.bind(f"tcp://*:{config.get('worker_port', 10000)}")
-        self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
+        self.redis = redis.Redis(
+            host=redis_host, port=redis_port, decode_responses=True, protocol=3
+        )
         streams = []
 
-        self.state = IngesterState(name, config.get("worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"), streams)
+        self.state = IngesterState(
+            name,
+            config.get(
+                "worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"
+            ),
+            streams,
+        )
 
     async def run(self):
         asyncio.create_task(self.register())
@@ -44,10 +53,10 @@ class Ingester:
 
     async def work(self):
         while True:
-            #print("poke worker 1")
-            #try:
+            # print("poke worker 1")
+            # try:
             #    await self.out_socket.send_multipart([b"worker1", b"hello worker 1"])
-            #except zmq.error.ZMQError:
+            # except zmq.error.ZMQError:
             #    print("not reachable, try again")
             await asyncio.sleep(3)
 
@@ -64,19 +73,29 @@ class Ingester:
                 logger.info("new worker connected %s", data[0])
 
     async def register(self):
-        latest = await self.redis.xrevrange(f"{protocol.PREFIX}:controller:updates", count=1)
+        latest = await self.redis.xrevrange(
+            f"{protocol.PREFIX}:controller:updates", count=1
+        )
         last = 0
         if len(latest) > 0:
             last = latest[0][0]
         while True:
-            await self.redis.setex(f"{protocol.PREFIX}:ingester:{self.state.name}:present", 10, 1)
-            await self.redis.json().set(f"{protocol.PREFIX}:ingester:{self.state.name}:config","$", self.state.__dict__)
+            await self.redis.setex(
+                f"{protocol.PREFIX}:ingester:{self.state.name}:present", 10, 1
+            )
+            await self.redis.json().set(
+                f"{protocol.PREFIX}:ingester:{self.state.name}:config",
+                "$",
+                self.state.__dict__,
+            )
             try:
-                update = await self.redis.xread({f"{protocol.PREFIX}:controller:updates":last},block=6000)
+                update = await self.redis.xread(
+                    {f"{protocol.PREFIX}:controller:updates": last}, block=6000
+                )
                 if f"{protocol.PREFIX}:controller:updates" in update:
                     update = update[f"{protocol.PREFIX}:controller:updates"][0][-1]
                     last = update[0]
-                    self.state.mapping_uuid = update[1]['mapping_uuid']
+                    self.state.mapping_uuid = update[1]["mapping_uuid"]
             except rexceptions.ConnectionError as e:
                 print("closing with", e.__repr__())
                 break
