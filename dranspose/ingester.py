@@ -1,7 +1,7 @@
 import asyncio
 import json
 import time
-from typing import Dict
+from typing import Dict, List
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class IngesterState:
-    def __init__(self, name, url, streams):
+    def __init__(self, name: str, url: str, streams: List[str]):
         self.name = name
         self.url = url
         self.streams = streams
@@ -36,7 +36,7 @@ class Ingester:
         self.redis = redis.Redis(
             host=redis_host, port=redis_port, decode_responses=True, protocol=3
         )
-        streams = []
+        streams:List[str] = []
 
         self.state = IngesterState(
             name,
@@ -95,7 +95,10 @@ class Ingester:
                 if f"{protocol.PREFIX}:controller:updates" in update:
                     update = update[f"{protocol.PREFIX}:controller:updates"][0][-1]
                     last = update[0]
-                    self.state.mapping_uuid = update[1]["mapping_uuid"]
+                    newuuid = update[1]["mapping_uuid"]
+                    if newuuid != self.state.mapping_uuid:
+                        logger.info("resetting config to %s", newuuid)
+                        self.state.mapping_uuid = newuuid
             except rexceptions.ConnectionError as e:
                 print("closing with", e.__repr__())
                 break

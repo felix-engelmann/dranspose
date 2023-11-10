@@ -67,7 +67,7 @@ class Controller:
         self.ctx.destroy()
         await self.redis.close()
 
-
+ctrl: Controller
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the ML model

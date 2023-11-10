@@ -75,7 +75,7 @@ class Worker:
                     last = update[0]
                     newuuid = update[1]["mapping_uuid"]
                     if newuuid != self.state.mapping_uuid:
-                        logger.info("resetting config")
+                        logger.info("resetting config %s", newuuid)
                         self.state.mapping_uuid = newuuid
             except rexceptions.ConnectionError as e:
                 print("closing with", e.__repr__())
