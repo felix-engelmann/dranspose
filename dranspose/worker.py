@@ -9,9 +9,6 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 
-logger = logging.getLogger(__name__)
-
-
 class WorkerState:
     def __init__(self, name):
         self.name = name
@@ -20,6 +17,7 @@ class WorkerState:
 
 class Worker:
     def __init__(self, name: str, redis_host="localhost", redis_port=6379):
+        self._logger = logging.getLogger(f"{__name__}+{name}")
         self.ctx = zmq.asyncio.Context()
         self.redis = redis.Redis(
             host=redis_host, port=redis_port, decode_responses=True, protocol=3
@@ -34,7 +32,8 @@ class Worker:
         self.work_task = asyncio.create_task(self.work())
 
     async def work(self):
-        logger.info("started work task")
+        self._logger.info("started work task")
+        await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",{"idle":1, "worker": self.state.name})
         while True:
             try:
                 tasks = [
@@ -75,12 +74,11 @@ class Worker:
                     last = update[0]
                     newuuid = update[1]["mapping_uuid"]
                     if newuuid != self.state.mapping_uuid:
-                        logger.info("resetting config %s", newuuid)
+                        self._logger.info("resetting config %s", newuuid)
                         self.work_task.cancel()
-                        self.work_task = asyncio.create_task(self.work())
                         self.state.mapping_uuid = newuuid
+                        self.work_task = asyncio.create_task(self.work())
             except rexceptions.ConnectionError as e:
-                print("closing with", e.__repr__())
                 break
 
     async def manage_ingesters(self):
@@ -95,7 +93,7 @@ class Worker:
                     iname in self._ingesters
                     and self._ingesters[iname]["config"]["url"] != cfg["url"]
                 ):
-                    logger.warning(
+                    self._logger.warning(
                         "url of ingester changed from %s to %s, disconnecting",
                         self._ingesters[iname]["config"]["url"],
                         cfg["url"],
@@ -104,7 +102,7 @@ class Worker:
                     del self._ingesters[iname]
 
                 if iname not in self._ingesters:
-                    logger.info("adding new ingester %s", iname)
+                    self._logger.info("adding new ingester %s", iname)
                     sock = self.ctx.socket(zmq.DEALER)
                     sock.setsockopt(zmq.IDENTITY, self.state.name.encode("ascii"))
                     try:
@@ -112,10 +110,10 @@ class Worker:
                         await sock.send(b"")
                         self._ingesters[iname] = {"config": cfg, "socket": sock}
                     except KeyError:
-                        logger.error("invalid ingester config %s", cfg)
+                        self._logger.error("invalid ingester config %s", cfg)
                         sock.close()
             for iname in set(self._ingesters.keys()) - set(processed):
-                logger.info("removing stale ingester %s", iname)
+                self._logger.info("removing stale ingester %s", iname)
                 self._ingesters[iname]["socket"].close()
                 del self._ingesters[iname]
             await asyncio.sleep(2)

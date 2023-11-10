@@ -6,6 +6,7 @@ from dranspose import protocol
 from dranspose.mapping import Mapping
 from dranspose.worker import WorkerState
 import redis.asyncio as redis
+import redis.exceptions as rexceptions
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -31,9 +32,12 @@ class Controller:
 
         self.mapping = Mapping()
 
-    async def run(self):
         logger.debug("started controller run")
-        asyncio.create_task(self.assign_work())
+        self.assign_task = asyncio.create_task(self.assign_work())
+
+        asyncio.create_task(self.monitor())
+
+    async def monitor(self):
         while True:
             self.present = await self.redis.keys(f"{protocol.PREFIX}:*:*:present")
             self.configs = await self.redis.keys(f"{protocol.PREFIX}:*:*:config")
@@ -41,6 +45,8 @@ class Controller:
 
     async def set_mapping(self):
         self.mapping = Mapping()
+        self.assign_task.cancel()
+        await self.redis.delete(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}")
         self.state.mapping_uuid = str(self.mapping.uuid)
         await self.redis.json().set(
             f"{protocol.PREFIX}:controller:config", "$", self.state.__dict__
@@ -57,13 +63,26 @@ class Controller:
                 await asyncio.sleep(0.05)
                 uuids = await self.redis.json().mget(self.configs, "$.mapping_uuid")
         logger.info("new mapping distributed")
+        self.assign_task = asyncio.create_task(self.assign_work())
+
 
     async def assign_work(self):
-        pass
+        last = 0
+        while True:
+            try:
+                workers = await self.redis.xread({f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}": last}, block=1000)
+                if f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}" in workers:
+                    for ready in workers[f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}"][0]:
+                        print("got a ready worker", ready)
+                        last = ready[0]
+            except rexceptions.ConnectionError as e:
+                break
 
     async def close(self):
         await self.redis.delete(f"{protocol.PREFIX}:controller:config")
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
+        queues = await self.redis.keys(f"{protocol.PREFIX}:ready:*")
+        await self.redis.delete(*queues)
         self.ctx.destroy()
         await self.redis.close()
 
@@ -73,7 +92,6 @@ async def lifespan(app: FastAPI):
     # Load the ML model
     global ctrl
     ctrl = Controller()
-    asyncio.create_task(ctrl.run())
     yield
     await ctrl.close()
     # Clean up the ML models and release the resources

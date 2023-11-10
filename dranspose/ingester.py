@@ -9,9 +9,6 @@ import zmq.asyncio
 import logging
 from dranspose import protocol
 
-logger = logging.getLogger(__name__)
-
-
 class IngesterState:
     def __init__(self, name: str, url: str, streams: List[str]):
         self.name = name
@@ -19,9 +16,9 @@ class IngesterState:
         self.streams = streams
         self.mapping_uuid = None
 
-
 class Ingester:
     def __init__(self, name: str, redis_host="localhost", redis_port=6379, config=None):
+        self._logger = logging.getLogger(f"{__name__}+{name}")
         if config is None:
             config = {}
         if ":" in name:
@@ -48,9 +45,10 @@ class Ingester:
 
         asyncio.create_task(self.register())
         asyncio.create_task(self.accept_workers())
-        asyncio.create_task(self.work())
+        self.work_task = asyncio.create_task(self.work())
 
     async def work(self):
+        self._logger.info("started ingester work task")
         while True:
             # print("poke worker 1")
             # try:
@@ -69,7 +67,7 @@ class Ingester:
             socks = dict(await poller.poll())
             for sock in socks:
                 data = await sock.recv_multipart()
-                logger.info("new worker connected %s", data[0])
+                self._logger.info("new worker connected %s", data[0])
 
     async def register(self):
         latest = await self.redis.xrevrange(
@@ -96,14 +94,15 @@ class Ingester:
                     last = update[0]
                     newuuid = update[1]["mapping_uuid"]
                     if newuuid != self.state.mapping_uuid:
-                        logger.info("resetting config to %s", newuuid)
+                        self._logger.info("resetting config to %s", newuuid)
+                        self.work_task.cancel()
                         self.state.mapping_uuid = newuuid
+                        self.work_task = asyncio.create_task(self.work())
             except rexceptions.ConnectionError as e:
-                print("closing with", e.__repr__())
                 break
 
     async def close(self):
         await self.redis.delete(f"{protocol.PREFIX}:ingester:{self.state.name}:config")
         await self.redis.aclose()
         self.ctx.destroy(linger=0)
-        logger.info("closed ingester")
+        self._logger.info("closed ingester")
