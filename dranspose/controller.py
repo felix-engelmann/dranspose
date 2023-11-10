@@ -44,10 +44,16 @@ class Controller:
             await asyncio.sleep(2)
 
     async def set_mapping(self):
-        self.mapping = Mapping()
         self.assign_task.cancel()
         await self.redis.delete(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}")
         self.state.mapping_uuid = str(self.mapping.uuid)
+
+        assignments = await self.redis.keys(f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:*")
+        if len(assignments) > 0:
+            await self.redis.delete(*assignments)
+
+        # cleaned up
+        self.mapping = Mapping()
         await self.redis.json().set(
             f"{protocol.PREFIX}:controller:config", "$", self.state.__dict__
         )
@@ -68,12 +74,23 @@ class Controller:
 
     async def assign_work(self):
         last = 0
+        event_no = 0
         while True:
             try:
                 workers = await self.redis.xread({f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}": last}, block=1000)
                 if f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}" in workers:
                     for ready in workers[f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}"][0]:
                         print("got a ready worker", ready)
+                        if "idle" in ready[1]:
+                            virt = self.mapping.assign_next(ready[1]["worker"])
+                            print("assigned worker to ", virt)
+                            for evn in range(event_no, self.mapping.complete_events):
+                                pipe = self.redis.pipeline()
+                                for stream, wrk in self.mapping.get_event_workers(evn).items():
+                                    print("stream", stream, "gets wokers", wrk)
+                                    await pipe.xadd(f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:{stream}", {w: 1 for w in wrk}, id = evn+1)
+                                await pipe.execute()
+                            event_no = self.mapping.complete_events
                         last = ready[0]
             except rexceptions.ConnectionError as e:
                 break
