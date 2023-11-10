@@ -1,5 +1,7 @@
 import asyncio
 import time
+from typing import Any
+
 import zmq.asyncio
 import logging
 from dranspose import protocol
@@ -16,8 +18,8 @@ class Worker:
     def __init__(self, name: str, redis_host="localhost", redis_port=6379):
         self.ctx = zmq.asyncio.Context()
         self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
-        self.state = WorkerState(name.encode("ascii"))
-        self._ingesters = {}
+        self.state = WorkerState(name)
+        self._ingesters: dict[str, Any] = {}
 
     async def run(self):
         asyncio.create_task(self.register())
@@ -38,7 +40,7 @@ class Worker:
 
     async def register(self):
         while True:
-            await self.redis.setex(f"{protocol.PREFIX}:worker:{self.state.name.decode('ascii')}:present",10,1)
+            await self.redis.setex(f"{protocol.PREFIX}:worker:{self.state.name}:present",10,1)
             await asyncio.sleep(6)
 
     async def manage_ingesters(self):
@@ -46,7 +48,7 @@ class Worker:
             configs = await self.redis.keys(f"{protocol.PREFIX}:ingester:*:config")
             processed = []
             for key in configs:
-                cfg = await self.redis.hgetall(key)
+                cfg = await self.redis.json().get(key)
                 iname = key.split(":")[2]
                 processed.append(iname)
                 if iname in self._ingesters and self._ingesters[iname]["config"]["url"] != cfg["url"]:
@@ -58,7 +60,7 @@ class Worker:
                 if iname not in self._ingesters:
                     logger.info("adding new ingester %s", iname)
                     sock = self.ctx.socket(zmq.DEALER)
-                    sock.setsockopt(zmq.IDENTITY, self.state.name)
+                    sock.setsockopt(zmq.IDENTITY, self.state.name.encode("ascii"))
                     try:
                         sock.connect(cfg["url"])
                         await sock.send(b"")

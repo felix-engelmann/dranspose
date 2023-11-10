@@ -1,6 +1,7 @@
 import asyncio
 import json
 import time
+from typing import Dict
 
 import redis.asyncio as redis
 import zmq.asyncio
@@ -10,13 +11,10 @@ from dranspose import protocol
 logger = logging.getLogger(__name__)
 
 class IngesterState:
-    def __init__(self, name, url):
+    def __init__(self, name, url, streams):
         self.name = name
         self.url = url
-
-    def toJSON(self):
-        return json.dumps(self, default=lambda o: o.__dict__,
-                          sort_keys=True, indent=4)
+        self.streams = streams
 
 
 class Ingester:
@@ -31,7 +29,8 @@ class Ingester:
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
         self.out_socket.bind(f"tcp://*:{config.get('worker_port', 10000)}")
         self.redis = redis.Redis(host=redis_host, port=redis_port, decode_responses=True, protocol=3)
-        self.state = IngesterState(name.encode("ascii"), config.get("worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"))
+        streams = config.get("streams",["orca","eiger"])
+        self.state = IngesterState(name, config.get("worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"), streams)
 
     async def run(self):
         asyncio.create_task(self.register())
@@ -52,19 +51,18 @@ class Ingester:
         poller.register(self.out_socket, zmq.POLLIN)
         while True:
             socks = dict(await poller.poll())
-            sock: zmq.asyncio.Socket
             for sock in socks:
                 data = await sock.recv_multipart()
                 logger.info("new worker connected %s", data[0])
 
     async def register(self):
         while True:
-            await self.redis.setex(f"{protocol.PREFIX}:ingester:{self.state.name.decode('ascii')}:present", 10, 1)
-            await self.redis.hset(f"{protocol.PREFIX}:ingester:{self.state.name.decode('ascii')}:config", mapping=self.state.__dict__)
+            await self.redis.setex(f"{protocol.PREFIX}:ingester:{self.state.name}:present", 10, 1)
+            await self.redis.json().set(f"{protocol.PREFIX}:ingester:{self.state.name}:config","$", self.state.__dict__)
             await asyncio.sleep(6)
 
     async def close(self):
-        await self.redis.delete(f"{protocol.PREFIX}:ingester:{self.state.name.decode('ascii')}:config")
+        await self.redis.delete(f"{protocol.PREFIX}:ingester:{self.state.name}:config")
         await self.redis.aclose()
 
     def __del__(self):

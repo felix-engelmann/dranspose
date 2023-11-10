@@ -8,8 +8,9 @@ from dranspose.worker import Worker
 logging.basicConfig(level=logging.DEBUG)
 
 async def main():
-    ins = [Ingester('ingest'+str(i), config={"worker_port": 10000+i}) for i in range(1,3)]
-    wos = [Worker('worker'+str(i)) for i in range(1,3)]
+    iconfs = [{"worker_port":10000, "streams":["orca"]}, {"worker_port":10001, "streams":["alba","eiger"]}]
+    ins = [Ingester('ingest'+str(i+1), config=config) for i,config in enumerate(iconfs)]
+    wos = [Worker('worker'+str(i)) for i in range(1, 3)]
 
     for i in ins+wos:
         asyncio.create_task(i.run())
