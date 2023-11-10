@@ -5,7 +5,8 @@ from typing import List, Dict, Union
 class Mapping:
     def __init__(self):
         self.mapping = {"orca": [[2*i] for i in range(1, 100)],"eiger":[[2*i+1] for i in range(1, 100)],
-                        "alba": [[2*i,2*i+1] for i in range(1, 100)]}
+                        "alba": [[2*i,2*i+1] for i in range(1, 100)],
+                        "slow": [[2*i,2*i+1] for i in range(1, 100)]}
         self.uuid = uuid.uuid4()
         self.assignments = {}
         self.complete_events = 0

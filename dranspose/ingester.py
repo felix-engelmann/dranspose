@@ -71,7 +71,8 @@ class Ingester:
                             workermessages[worker] = []
                         workermessages[worker]+=zmqparts
             print("workermessages", workermessages)
-
+            for worker, message in workermessages.items():
+                await self.out_socket.send_multipart([worker.encode("ascii")]+message)
             lastev = assignments[0]
 
     async def get_frame(self, stream):

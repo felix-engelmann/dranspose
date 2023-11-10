@@ -6,7 +6,7 @@ import uvicorn
 import requests
 from dranspose.controller import app
 from dranspose.ingester import Ingester
-from dranspose.ingesters.dummy_alba import DummyAlbaIngester
+from dranspose.ingesters.dummy_multi import DummyMultiIngester
 from dranspose.ingesters.dummy_eiger import DummyEigerIngester
 from dranspose.ingesters.dummy_orca import DummyOrcaIngester
 from dranspose.worker import Worker
@@ -17,7 +17,7 @@ async def main():
     ins = []
     ins.append(DummyEigerIngester())
     ins.append(DummyOrcaIngester())
-    ins.append(DummyAlbaIngester())
+    ins.append(DummyMultiIngester())
     wos = [Worker('worker'+str(i)) for i in range(1, 3)]
 
     config = uvicorn.Config(app, port=5000, log_level="info")
