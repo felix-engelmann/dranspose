@@ -11,7 +11,7 @@ from dranspose.ingesters.dummy_eiger import DummyEigerIngester
 from dranspose.ingesters.dummy_orca import DummyOrcaIngester
 from dranspose.worker import Worker
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 async def main():
     ins = []

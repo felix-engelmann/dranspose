@@ -57,6 +57,7 @@ class Worker:
         await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",{"state":"idle", "completed":0, "worker": self.state.name})
 
         lastev = 0
+        proced = 0
         while True:
             sub = f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}"
             try:
@@ -86,7 +87,9 @@ class Worker:
             # print("done", done, "pending", pending)
             for res in done:
                 self._logger.debug("received work %s", res.result())
-
+            proced += 1
+            if proced%500 == 0:
+                self._logger.info("processed %d events", proced )
             await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
                                   {"state": "idle", "completed": lastev, "worker": self.state.name})
 

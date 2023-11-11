@@ -64,13 +64,13 @@ class Ingester:
             for stream in self.state.streams:
                 if stream in assignments[1]:
                     workers = json.loads(assignments[1][stream])
-                    print("send data to", workers)
+                    self._logger.debug("send data to %s", workers)
                     zmqparts = await self.get_frame(stream)
                     for worker in workers:
                         if worker not in workermessages:
                             workermessages[worker] = []
                         workermessages[worker]+=zmqparts
-            print("workermessages", workermessages)
+            self._logger.debug("workermessages %s", workermessages)
             for worker, message in workermessages.items():
                 await self.out_socket.send_multipart([worker.encode("ascii")]+message)
             lastev = assignments[0]

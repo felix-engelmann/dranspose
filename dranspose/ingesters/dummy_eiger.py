@@ -11,6 +11,6 @@ class DummyEigerIngester(Ingester):
 
     async def get_frame(self, stream):
         img = np.zeros((4, 4), dtype=np.uint16)
-        print("generated image")
+        #print("generated image")
         parts = [b"header for eiger", zmq.Frame(img.tobytes())]
         return parts

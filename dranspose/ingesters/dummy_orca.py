@@ -11,6 +11,6 @@ class DummyOrcaIngester(Ingester):
 
     async def get_frame(self, stream):
         img = np.zeros((8, 8), dtype=np.uint16)
-        print("generated image")
+        #print("generated image")
         parts = [b"header for orca", zmq.Frame(img.tobytes())]
         return parts
