@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 from typing import Any
 
@@ -53,30 +54,37 @@ class Worker:
     async def work(self):
         self._logger.info("started work task")
 
-        self._stream_map = {s: val["socket"] for ing, val in self._ingesters.items() for s in val["config"]["streams"]}
-        print("stream map", self._stream_map)
-
         await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",{"idle":1, "worker": self.state.name})
 
         lastev = 0
         while True:
+            sub = f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}"
             try:
-                assignments = await self.redis.xread({f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:{stream}":lastev for stream in self._stream_map.keys()}, block=1000)
-                if len(assignments) == 0:
-                    continue
-                self._logger.debug("got assignments %s", assignments)
-                tasks = [
-                    a["socket"].recv_multipart() for a in list(self._ingesters.values())
-                ]
-                done, pending = await asyncio.wait(
-                    tasks, return_when=asyncio.FIRST_COMPLETED
-                )
-                # print("done", done, "pending", pending)
-                for res in done:
-                    print("received work", res.result())
-            except Exception as e:
-                print("err worker ", e.__repr__())
-                await asyncio.sleep(2)
+                assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
+            except rexceptions.ConnectionError:
+                break
+            if sub not in assignments:
+                continue
+            assignments = assignments[sub][0][0]
+            self._logger.debug("got assignments %s", assignments)
+            self._logger.debug("stream map", self._stream_map)
+            ingesterset = set()
+            for stream, jsons in assignments[1].items():
+                workers = json.loads(jsons)
+                if self.state.name in workers:
+                    ingesterset.add(self._stream_map[stream])
+
+            self._logger.debug("receive from ingesters %s", ingesterset)
+
+            lastev = assignments[0]
+
+            tasks = [
+                sock.recv_multipart() for sock in ingesterset
+            ]
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            # print("done", done, "pending", pending)
+            for res in done:
+                self._logger.debug("received work %s", res.result())
 
     async def register(self):
         latest = await self.redis.xrevrange(
@@ -145,6 +153,9 @@ class Worker:
                 self._logger.info("removing stale ingester %s", iname)
                 self._ingesters[iname]["socket"].close()
                 del self._ingesters[iname]
+            self._stream_map = {s: val["socket"] for ing, val in self._ingesters.items() for s in
+                                val["config"]["streams"]}
+
             await asyncio.sleep(2)
 
     async def close(self):
