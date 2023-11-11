@@ -45,11 +45,12 @@ class Ingester:
             streams,
         )
 
-        asyncio.create_task(self.register())
+    async def run(self):
         asyncio.create_task(self.accept_workers())
         self.work_task = asyncio.create_task(self.work())
         self.assign_task = asyncio.create_task(self.manage_assignments())
         self.assignment_queue = asyncio.Queue()
+        await self.register()
 
     async def manage_assignments(self):
         self._logger.info("started ingester manage assign task")
@@ -142,7 +143,9 @@ class Ingester:
                         self.assignment_queue = asyncio.Queue()
                         self.work_task = asyncio.create_task(self.work())
                         self.assign_task = asyncio.create_task(self.manage_assignments())
-            except rexceptions.ConnectionError as e:
+            except rexceptions.ConnectionError:
+                break
+            except asyncio.exceptions.CancelledError:
                 break
 
     async def close(self):

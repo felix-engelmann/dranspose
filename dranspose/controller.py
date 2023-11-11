@@ -1,18 +1,17 @@
 import asyncio
 import json
 
+import uvicorn
 import zmq.asyncio
 import logging
 import time
 from dranspose import protocol
 from dranspose.mapping import Mapping
-from dranspose.worker import WorkerState
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +119,11 @@ class Controller:
         await self.redis.delete(f"{protocol.PREFIX}:controller:config")
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
         queues = await self.redis.keys(f"{protocol.PREFIX}:ready:*")
-        await self.redis.delete(*queues)
+        if len(queues) > 0:
+            await self.redis.delete(*queues)
         assigned = await self.redis.keys(f"{protocol.PREFIX}:assigned:*")
-        await self.redis.delete(*assigned)
+        if len(assigned) > 0:
+            await self.redis.delete(*assigned)
         self.ctx.destroy()
         await self.redis.close()
 

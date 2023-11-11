@@ -28,11 +28,14 @@ class Worker:
         self.state = WorkerState(name)
         self._ingesters: dict[str, Any] = {}
         self._stream_map: dict[str, zmq.Socket] = {}
-        asyncio.create_task(self.register())
+
+    async def run(self):
         asyncio.create_task(self.manage_ingesters())
         self.work_task = asyncio.create_task(self.work())
+        await self.register()
 
     async def manage_assignments(self):
+        last = 0
         while True:
             try:
                 update = await self.redis.xread(
@@ -126,6 +129,8 @@ class Worker:
                         self.work_task = asyncio.create_task(self.work())
             except rexceptions.ConnectionError as e:
                 break
+            except asyncio.exceptions.CancelledError:
+                break
 
     async def manage_ingesters(self):
         while True:
@@ -174,3 +179,4 @@ class Worker:
         await self.redis.delete(f"{protocol.PREFIX}:worker:{self.state.name}:config")
         await self.redis.aclose()
         self.ctx.destroy()
+        self._logger.info("worker closed")

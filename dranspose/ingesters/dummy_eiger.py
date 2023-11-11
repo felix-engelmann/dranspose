@@ -1,3 +1,4 @@
+import asyncio
 from typing import List
 
 import numpy as np
@@ -12,8 +13,9 @@ class DummyEigerIngester(Ingester):
         self.state.streams = ["eiger"]
 
     async def run_source(self, stream):
-        img = np.zeros((4, 4), dtype=np.uint16)
+        img = np.zeros((1000, 1000), dtype=np.uint16)
         # print("generated image")
         parts = [b"header for eiger", zmq.Frame(img.tobytes())]
         while True:
             yield parts
+            #await asyncio.sleep(0.1)

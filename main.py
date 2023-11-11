@@ -1,6 +1,8 @@
+import argparse
 import asyncio
 import logging
 import threading
+from multiprocessing import Process
 
 import uvicorn
 import requests
@@ -36,7 +38,45 @@ async def main():
     for i in ins + wos:
         await i.close()
 
-try:
-    asyncio.run(main())
-except KeyboardInterrupt:
-    print("exiting")
+if __name__ == "__main_":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("exiting")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog='dranspose',
+        description='Transposes Streams')
+
+    parser.add_argument('component', choices=["controller","worker","ingester"])  # positional argument
+    parser.add_argument('-n', '--name')  # option that takes a value
+    parser.add_argument('-c', '--ingestclass')  # option that takes a value
+
+    args = parser.parse_args()
+    print(args)
+    if args.component == "controller":
+        try:
+            config = uvicorn.Config(app, port=5000, log_level="info")
+            server = uvicorn.Server(config)
+            server.run()
+        except KeyboardInterrupt:
+            print("exiting")
+    elif args.component == "ingester":
+        print(args.ingestclass)
+        ing = globals()[args.ingestclass]
+        async def run():
+            i = ing()
+            await i.run()
+            await i.close()
+
+        asyncio.run(run())
+    elif args.component == "worker":
+        print(args.name)
+        async def run():
+            w = Worker(args.name)
+            await w.run()
+            await w.close()
+
+        asyncio.run(run())
