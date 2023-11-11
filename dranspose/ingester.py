@@ -90,11 +90,12 @@ class Ingester:
             for stream, workers in assigned_workers["streams"].items():
                 for worker in workers:
                     if worker not in workermessages:
-                        workermessages[worker] = []
-                    workermessages[worker] += zmqparts[stream]
+                        workermessages[worker] = {"data":[],"header":{"event":assigned_workers["event"],"parts":[]}}
+                    workermessages[worker]["data"] += zmqparts[stream]
+                    workermessages[worker]["header"]["parts"].append({"stream": stream, "length": len(zmqparts[stream])})
             self._logger.debug("workermessages %s", workermessages)
             for worker, message in workermessages.items():
-                await self.out_socket.send_multipart([worker.encode("ascii")]+[f'event no {assigned_workers["event"]}'.encode("ascii")] + message)
+                await self.out_socket.send_multipart([worker.encode("ascii")]+[json.dumps(message["header"]).encode("utf8")] + message["data"])
 
     async def run_source(self, stream):
         raise NotImplemented("get_frame must be implemented")

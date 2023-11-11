@@ -10,7 +10,7 @@ from dranspose.ingester import Ingester
 class DummyEigerIngester(Ingester):
     def __init__(self):
         super().__init__("dummy_ingester", config={"worker_port": 10005})
-        self.state.streams = ["eiger"]
+        self.state.streams = ["eigerdummy"]
 
     async def run_source(self, stream):
         img = np.zeros((1000, 1000), dtype=np.uint16)

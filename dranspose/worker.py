@@ -89,7 +89,7 @@ class Worker:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             # print("done", done, "pending", pending)
             for res in done:
-                self._logger.debug("received work %s", res.result())
+                self._logger.debug("received work %s", res.result()[0])
             proced += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)

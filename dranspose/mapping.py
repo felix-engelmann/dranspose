@@ -4,7 +4,7 @@ from typing import List, Dict, Union
 
 class Mapping:
     def __init__(self):
-        ntrig = 10000
+        ntrig = 10
         self.mapping = {
             #"orca": [[2 * i] for i in range(1, ntrig)],
             "eiger": [[2 * i + 1] for i in range(1, ntrig)],
@@ -50,13 +50,16 @@ class Mapping:
 
     def update_filled(self):
         for evn in range(self.complete_events, self.len()):
+            complete = True
             for v in self.mapping.values():
                 if v[evn] is None:
                     continue
                 for w in v[evn]:
                     if w not in self.assignments:
-                        self.complete_events = max(0, evn)
+                        complete = False
                         return
+            if complete:
+                self.complete_events = max(0, evn+1)
 
     def print(self):
         print(" "*5, end="")
@@ -79,9 +82,12 @@ class Mapping:
 if __name__ == "__main__":
     m = Mapping()
     m.print()
-    for i in range(10):
+    for i in range(5):
+        print(m.complete_events)
         m.assign_next("w1")
         m.assign_next("w2")
+        print(m.complete_events)
+        print("--")
         # m.assign_next("w3")
     print(m.assignments)
     print(m.complete_events)

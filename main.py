@@ -7,20 +7,24 @@ from multiprocessing import Process
 import uvicorn
 import requests
 from dranspose.controller import app
-from dranspose.ingester import Ingester
 from dranspose.ingesters.dummy_multi import DummyMultiIngester
 from dranspose.ingesters.dummy_eiger import DummyEigerIngester
 from dranspose.ingesters.dummy_orca import DummyOrcaIngester
+from dranspose.ingesters.streaming_single import StreamingSingleIngester
 from dranspose.worker import Worker
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 async def main():
     ins = []
-    ins.append(DummyEigerIngester())
-    ins.append(DummyOrcaIngester())
-    ins.append(DummyMultiIngester())
-    wos = [Worker('worker'+str(i)) for i in range(1, 10)]
+    #ins.append(DummyEigerIngester())
+    #ins.append(DummyOrcaIngester())
+    #ins.append(DummyMultiIngester())
+    ins.append(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
+    wos = [Worker('worker'+str(i)) for i in range(1, 3)]
+
+    for i in ins + wos:
+        asyncio.create_task(i.run())
 
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)
@@ -38,19 +42,13 @@ async def main():
     for i in ins + wos:
         await i.close()
 
-if __name__ == "__main_":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("exiting")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog='dranspose',
         description='Transposes Streams')
 
-    parser.add_argument('component', choices=["controller","worker","ingester"])  # positional argument
+    parser.add_argument('component', choices=["controller","worker","ingester","combined"])  # positional argument
     parser.add_argument('-n', '--name')  # option that takes a value
     parser.add_argument('-c', '--ingestclass')  # option that takes a value
 
@@ -80,3 +78,5 @@ if __name__ == "__main__":
             await w.close()
 
         asyncio.run(run())
+    elif args.component == "combined":
+        asyncio.run(main())
