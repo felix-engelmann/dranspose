@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import zmq
 
@@ -9,8 +11,9 @@ class DummyEigerIngester(Ingester):
         super().__init__("dummy_ingester", config={"worker_port": 10005})
         self.state.streams = ["eiger"]
 
-    async def get_frame(self, stream):
+    async def run_source(self, stream):
         img = np.zeros((4, 4), dtype=np.uint16)
         # print("generated image")
         parts = [b"header for eiger", zmq.Frame(img.tobytes())]
-        return parts
+        while True:
+            yield parts

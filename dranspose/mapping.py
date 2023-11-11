@@ -30,6 +30,16 @@ class Mapping:
                         return w
         return None
 
+    def min_workers(self):
+        minimum = 0
+        for evn, i in enumerate(zip(*self.mapping.values())):
+            workers = set()
+            for val in i:
+                if val is not None:
+                    workers.update(val)
+            minimum = max(minimum, len(workers))
+        return minimum
+
     def get_event_workers(self, no) -> Dict[str, List[str]]:
         ret = {}
         for s, v in self.mapping.items():
@@ -78,3 +88,5 @@ if __name__ == "__main__":
 
     print(m.get_event_workers(0))
     m.print()
+
+    print(m.min_workers())

@@ -18,7 +18,7 @@ async def main():
     ins.append(DummyEigerIngester())
     ins.append(DummyOrcaIngester())
     ins.append(DummyMultiIngester())
-    wos = [Worker('worker'+str(i)) for i in range(1, 13)]
+    wos = [Worker('worker'+str(i)) for i in range(1, 10)]
 
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)

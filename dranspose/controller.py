@@ -93,7 +93,7 @@ class Controller:
                         if ready[1]["state"] == "idle":
                             virt = self.mapping.assign_next(ready[1]["worker"])
                             logger.debug(
-                                "assigned worker %s to &s", ready[1]["worker"], virt
+                                "assigned worker %s to %s", ready[1]["worker"], virt
                             )
                             pipe = self.redis.pipeline()
                             for evn in range(event_no, self.mapping.complete_events):
@@ -110,8 +110,8 @@ class Controller:
                                         time.perf_counter() - start,
                                     )
                                     start = time.perf_counter()
-                            event_no = self.mapping.complete_events
                             await pipe.execute()
+                            event_no = self.mapping.complete_events
                         last = ready[0]
             except rexceptions.ConnectionError as e:
                 break

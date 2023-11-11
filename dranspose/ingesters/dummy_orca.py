@@ -9,8 +9,9 @@ class DummyOrcaIngester(Ingester):
         super().__init__("dummy_orca", config={"worker_port": 10006})
         self.state.streams = ["orca"]
 
-    async def get_frame(self, stream):
+    async def run_source(self, stream):
         img = np.zeros((8, 8), dtype=np.uint16)
         # print("generated image")
         parts = [b"header for orca", zmq.Frame(img.tobytes())]
-        return parts
+        while True:
+            yield parts

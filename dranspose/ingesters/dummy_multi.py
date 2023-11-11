@@ -9,7 +9,7 @@ class DummyMultiIngester(Ingester):
         super().__init__("dummy_alba", config={"worker_port": 10007})
         self.state.streams = ["alba", "slow"]
 
-    async def get_frame(self, stream):
+    async def run_source(self, stream):
         if stream == "alba":
             val = np.array([2.4])
             parts = [b"header for alba", val.tobytes()]
@@ -17,4 +17,5 @@ class DummyMultiIngester(Ingester):
             parts = [b"slow header", b"const"]
         else:
             raise Exception("stream not handled by this ingester")
-        return parts
+        while True:
+            yield parts
