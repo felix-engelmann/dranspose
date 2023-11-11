@@ -33,10 +33,10 @@ class Controller:
 
         self.mapping = Mapping()
 
+    async def run(self):
         logger.debug("started controller run")
         self.assign_task = asyncio.create_task(self.assign_work())
-
-        asyncio.create_task(self.monitor())
+        await self.monitor()
 
     async def monitor(self):
         while True:
@@ -125,7 +125,7 @@ class Controller:
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
         self.ctx.destroy()
-        await self.redis.close()
+        await self.redis.aclose()
 
 
 ctrl: Controller
@@ -136,7 +136,9 @@ async def lifespan(app: FastAPI):
     # Load the ML model
     global ctrl
     ctrl = Controller()
+    run_task = asyncio.create_task(ctrl.run())
     yield
+    run_task.cancel()
     await ctrl.close()
     # Clean up the ML models and release the resources
 

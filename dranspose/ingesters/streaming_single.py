@@ -14,6 +14,7 @@ class StreamingSingleIngester(Ingester):
         self.in_socket.connect(connect_url)
 
     async def run_source(self, stream):
+        hdr = None
         while True:
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)
@@ -21,12 +22,13 @@ class StreamingSingleIngester(Ingester):
             self._logger.debug("received frame with header %s", header)
             if header['htype'] == "header":
                 self._logger.info("start of new sequence %s", header)
+                hdr = parts[0]
                 break
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
             header = json.loads(parts[0].bytes)
             if header['htype'] == 'image':
-                yield parts
+                yield [hdr]+parts
             if header['htype'] == 'series_end':
                 break
         while True:
