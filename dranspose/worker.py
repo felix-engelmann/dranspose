@@ -31,7 +31,7 @@ class Worker:
         asyncio.create_task(self.register())
         asyncio.create_task(self.manage_ingesters())
         self.work_task = asyncio.create_task(self.work())
-        
+
     async def manage_assignments(self):
         while True:
             try:

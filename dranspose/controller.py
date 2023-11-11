@@ -95,10 +95,11 @@ class Controller:
                             logger.debug(
                                 "assigned worker %s to &s", ready[1]["worker"], virt
                             )
+                            pipe = self.redis.pipeline()
                             for evn in range(event_no, self.mapping.complete_events):
                                 wrks = self.mapping.get_event_workers(evn)
                                 logger.debug("send out assignment %s", wrks)
-                                await self.redis.xadd(
+                                await pipe.xadd(
                                     f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}",
                                     {s: json.dumps(w) for s, w in wrks.items()},
                                     id=evn + 1,
@@ -110,6 +111,7 @@ class Controller:
                                     )
                                     start = time.perf_counter()
                             event_no = self.mapping.complete_events
+                            await pipe.execute()
                         last = ready[0]
             except rexceptions.ConnectionError as e:
                 break
