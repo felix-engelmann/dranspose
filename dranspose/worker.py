@@ -31,8 +31,7 @@ class Worker:
         asyncio.create_task(self.register())
         asyncio.create_task(self.manage_ingesters())
         self.work_task = asyncio.create_task(self.work())
-        self.eventqueue = asyncio.Queue()
-
+        
     async def manage_assignments(self):
         while True:
             try:
@@ -54,7 +53,10 @@ class Worker:
     async def work(self):
         self._logger.info("started work task")
 
-        await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",{"state":"idle", "completed":0, "worker": self.state.name})
+        await self.redis.xadd(
+            f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
+            {"state": "idle", "completed": 0, "worker": self.state.name},
+        )
 
         lastev = 0
         proced = 0
@@ -80,18 +82,18 @@ class Worker:
             lastev = assignments[0]
             if len(ingesterset) == 0:
                 continue
-            tasks = [
-                sock.recv_multipart() for sock in ingesterset
-            ]
+            tasks = [sock.recv_multipart() for sock in ingesterset]
             done, pending = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             # print("done", done, "pending", pending)
             for res in done:
                 self._logger.debug("received work %s", res.result())
             proced += 1
-            if proced%500 == 0:
-                self._logger.info("processed %d events", proced )
-            await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
-                                  {"state": "idle", "completed": lastev, "worker": self.state.name})
+            if proced % 500 == 0:
+                self._logger.info("processed %d events", proced)
+            await self.redis.xadd(
+                f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
+                {"state": "idle", "completed": lastev, "worker": self.state.name},
+            )
 
     async def register(self):
         latest = await self.redis.xrevrange(
@@ -160,8 +162,11 @@ class Worker:
                 self._logger.info("removing stale ingester %s", iname)
                 self._ingesters[iname]["socket"].close()
                 del self._ingesters[iname]
-            self._stream_map = {s: val["socket"] for ing, val in self._ingesters.items() for s in
-                                val["config"]["streams"]}
+            self._stream_map = {
+                s: val["socket"]
+                for ing, val in self._ingesters.items()
+                for s in val["config"]["streams"]
+            }
 
             await asyncio.sleep(2)
 

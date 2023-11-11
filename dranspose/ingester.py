@@ -9,12 +9,14 @@ import zmq.asyncio
 import logging
 from dranspose import protocol
 
+
 class IngesterState:
     def __init__(self, name: str, url: str, streams: List[str]):
         self.name = name
         self.url = url
         self.streams = streams
         self.mapping_uuid = None
+
 
 class Ingester:
     def __init__(self, name: str, redis_host="localhost", redis_port=6379, config=None):
@@ -33,7 +35,7 @@ class Ingester:
         self.redis = redis.Redis(
             host=redis_host, port=redis_port, decode_responses=True, protocol=3
         )
-        streams:List[str] = []
+        streams: List[str] = []
 
         self.state = IngesterState(
             name,
@@ -69,10 +71,10 @@ class Ingester:
                     for worker in workers:
                         if worker not in workermessages:
                             workermessages[worker] = []
-                        workermessages[worker]+=zmqparts
+                        workermessages[worker] += zmqparts
             self._logger.debug("workermessages %s", workermessages)
             for worker, message in workermessages.items():
-                await self.out_socket.send_multipart([worker.encode("ascii")]+message)
+                await self.out_socket.send_multipart([worker.encode("ascii")] + message)
             lastev = assignments[0]
 
     async def get_frame(self, stream):

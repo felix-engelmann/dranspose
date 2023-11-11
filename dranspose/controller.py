@@ -50,7 +50,9 @@ class Controller:
         await self.redis.delete(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}")
         self.state.mapping_uuid = str(self.mapping.uuid)
 
-        assignments = await self.redis.keys(f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:*")
+        assignments = await self.redis.keys(
+            f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:*"
+        )
         if len(assignments) > 0:
             await self.redis.delete(*assignments)
 
@@ -73,26 +75,39 @@ class Controller:
         logger.info("new mapping distributed")
         self.assign_task = asyncio.create_task(self.assign_work())
 
-
     async def assign_work(self):
         last = 0
         event_no = 0
         start = time.perf_counter()
         while True:
             try:
-                workers = await self.redis.xread({f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}": last}, block=1000)
+                workers = await self.redis.xread(
+                    {f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}": last},
+                    block=1000,
+                )
                 if f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}" in workers:
-                    for ready in workers[f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}"][0]:
+                    for ready in workers[
+                        f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}"
+                    ][0]:
                         logger.debug("got a ready worker %s", ready)
                         if ready[1]["state"] == "idle":
                             virt = self.mapping.assign_next(ready[1]["worker"])
-                            logger.debug("assigned worker %s to &s",ready[1]["worker"], virt)
+                            logger.debug(
+                                "assigned worker %s to &s", ready[1]["worker"], virt
+                            )
                             for evn in range(event_no, self.mapping.complete_events):
                                 wrks = self.mapping.get_event_workers(evn)
                                 logger.debug("send out assignment %s", wrks)
-                                await self.redis.xadd(f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}", {s:json.dumps(w) for s,w in wrks.items()}, id = evn+1)
+                                await self.redis.xadd(
+                                    f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}",
+                                    {s: json.dumps(w) for s, w in wrks.items()},
+                                    id=evn + 1,
+                                )
                                 if evn % 1000 == 0:
-                                    logger.info("1000 events in %lf", time.perf_counter() - start)
+                                    logger.info(
+                                        "1000 events in %lf",
+                                        time.perf_counter() - start,
+                                    )
                                     start = time.perf_counter()
                             event_no = self.mapping.complete_events
                         last = ready[0]
@@ -109,7 +124,10 @@ class Controller:
         self.ctx.destroy()
         await self.redis.close()
 
+
 ctrl: Controller
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the ML model
