@@ -83,7 +83,7 @@ class Controller:
                 if f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}" in workers:
                     for ready in workers[f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}"][0]:
                         print("got a ready worker", ready)
-                        if "idle" in ready[1]:
+                        if ready[1]["state"] == "idle":
                             virt = self.mapping.assign_next(ready[1]["worker"])
                             print("assigned worker to ", virt)
                             for evn in range(event_no, self.mapping.complete_events):

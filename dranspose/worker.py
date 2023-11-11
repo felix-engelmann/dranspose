@@ -54,7 +54,7 @@ class Worker:
     async def work(self):
         self._logger.info("started work task")
 
-        await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",{"idle":1, "worker": self.state.name})
+        await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",{"state":"idle", "completed":0, "worker": self.state.name})
 
         lastev = 0
         while True:
@@ -77,7 +77,8 @@ class Worker:
             self._logger.debug("receive from ingesters %s", ingesterset)
 
             lastev = assignments[0]
-
+            if len(ingesterset) == 0:
+                continue
             tasks = [
                 sock.recv_multipart() for sock in ingesterset
             ]
@@ -85,6 +86,9 @@ class Worker:
             # print("done", done, "pending", pending)
             for res in done:
                 self._logger.debug("received work %s", res.result())
+
+            await self.redis.xadd(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
+                                  {"state": "idle", "completed": lastev, "worker": self.state.name})
 
     async def register(self):
         latest = await self.redis.xrevrange(
