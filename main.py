@@ -19,7 +19,7 @@ async def main():
     ins = []
     #ins.append(DummyEigerIngester())
     #ins.append(DummyOrcaIngester())
-    #ins.append(DummyMultiIngester())
+    ins.append(DummyMultiIngester())
     ins.append(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
     wos = [Worker('worker'+str(i)) for i in range(1, 3)]
 
@@ -33,7 +33,7 @@ async def main():
     await asyncio.sleep(5)
 
     def req():
-        return requests.post("http://localhost:5000/mapping")
+        return requests.post("http://localhost:5000/api/v1/mapping")
 
     threading.Thread(target=req).start()
 

@@ -146,6 +146,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.post("/mapping")
+@app.get("/api/v1/streams")
+async def get_streams():
+    if len(ctrl.configs) > 0:
+        streams = await ctrl.redis.json().mget(ctrl.configs, "$.streams")
+        return [x for s in streams if len(s) > 0 for x in s[0]]
+
+@app.post("/api/v1/mapping")
 async def set_mapping():
     await ctrl.set_mapping()
