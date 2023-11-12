@@ -36,7 +36,10 @@ async def main():
     await asyncio.sleep(5)
 
     def req():
-        return requests.post("http://localhost:5000/api/v1/mapping")
+        ret = requests.post("http://localhost:5000/api/v1/mapping",
+                             json={"eiger": [[3], [5], [7], [9], [11], [13], [15], [17], [19]], 
+                                   "slow": [None, None, [1006], None, None, [1012], None, None, [1018]]})
+        print("requests returned", ret.content)
 
     threading.Thread(target=req).start()
 

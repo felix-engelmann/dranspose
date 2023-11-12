@@ -1,16 +1,22 @@
+import json
 import uuid
 from typing import List, Dict, Union
 
 
 class Mapping:
-    def __init__(self):
-        ntrig = 10
-        self.mapping = {
+    def __init__(self, m):
+        #ntrig = 10
+        #self.mapping = {
             # "orca": [[2 * i] for i in range(1, ntrig)],
-            "eiger": [[2 * i + 1] for i in range(1, ntrig)],
-            # "slow": [[1000+2 * i] if i%3 == 0 else None for i in range(1, ntrig)],
+        #    "eiger": [[2 * i + 1] for i in range(1, ntrig)],
+        #    "slow": [[1000+2 * i] if i%3 == 0 else None for i in range(1, ntrig)],
             # "alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
-        }
+        #}
+
+        if len(set(map(len, m.values()))) != 1:
+            raise Exception("length not equal: ", list(map(len, m.values())))
+
+        self.mapping = m
         self.uuid = uuid.uuid4()
         self.assignments = {}
         self.complete_events = 0
@@ -96,3 +102,5 @@ if __name__ == "__main__":
     m.print()
 
     print(m.min_workers())
+
+    print(json.dumps(m.mapping))

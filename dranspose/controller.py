@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Dict, List
 
 import uvicorn
 import zmq.asyncio
@@ -31,7 +32,7 @@ class Controller:
         self.configs = []
         self.state = ControllerState()
 
-        self.mapping = Mapping()
+        self.mapping = Mapping({"":[]})
 
     async def run(self):
         logger.debug("started controller run")
@@ -44,7 +45,7 @@ class Controller:
             self.configs = await self.redis.keys(f"{protocol.PREFIX}:*:*:config")
             await asyncio.sleep(2)
 
-    async def set_mapping(self):
+    async def set_mapping(self, m):
         self.assign_task.cancel()
         await self.redis.delete(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}")
         self.state.mapping_uuid = str(self.mapping.uuid)
@@ -56,7 +57,7 @@ class Controller:
             await self.redis.delete(*assignments)
 
         # cleaned up
-        self.mapping = Mapping()
+        self.mapping = m
         await self.redis.json().set(
             f"{protocol.PREFIX}:controller:config", "$", self.state.__dict__
         )
@@ -115,6 +116,13 @@ class Controller:
             except rexceptions.ConnectionError as e:
                 break
 
+    async def get_streams(self):
+        if len(ctrl.configs) > 0:
+            streams = await ctrl.redis.json().mget(ctrl.configs, "$.streams")
+            return [x for s in streams if len(s) > 0 for x in s[0]]
+        else:
+            return []
+
     async def close(self):
         await self.redis.delete(f"{protocol.PREFIX}:controller:config")
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
@@ -148,11 +156,20 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/api/v1/streams")
 async def get_streams():
-    if len(ctrl.configs) > 0:
-        streams = await ctrl.redis.json().mget(ctrl.configs, "$.streams")
-        return [x for s in streams if len(s) > 0 for x in s[0]]
+    return await ctrl.get_streams()
 
 
 @app.post("/api/v1/mapping")
-async def set_mapping():
-    await ctrl.set_mapping()
+async def set_mapping(mapping: Dict[str, List[List[int]|None]]):
+    try:
+        streams = await ctrl.get_streams()
+        if set(mapping.keys()) - set(streams) != set():
+            return f"streams {set(mapping.keys()) - set(streams)} not available"
+        m = Mapping(mapping)
+        avail_workers = await ctrl.redis.keys(f"{protocol.PREFIX}:worker:*:config")
+        if len(avail_workers) < m.min_workers():
+            return f"only {len(avail_workers)} workers available, but {m.min_workers()} required"
+        await ctrl.set_mapping(m)
+        return m.uuid
+    except Exception as e:
+        return e.__repr__()
