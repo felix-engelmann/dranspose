@@ -1,8 +1,0 @@
-pyzmq
-redis[hiredis]
-fastapi
-uvicorn
-numpy
-requests
-pytest
-pytest-asyncio

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dranspose"
+authors = [
+  { name="Felix Engelmann", email="felix-github@nlogn.org" },
+]
+description = "A stream matrix transposition framework"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pyzmq",
+    "redis[hiredis]",
+    "fastapi",
+    "uvicorn",
+    "numpy",
+    "requests",
+]
+dynamic = ["version"]
+
+[tool.setuptools.packages.find]
+include = ["dranspose*"]  # package names should match these glob patterns (["*"] by default)
+exclude = ["tests*"]  # exclude packages matching these glob patterns (empty by default)
+#namespaces = false
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+]
+
+[tool.setuptools_scm]
+
+[project.urls]
+"Homepage" = "https://github.com/felix-engelmann/dranspose"
+"Bug Tracker" = "https://github.com/felix-engelmann/dranspose/issues"

@@ -3,3 +3,6 @@
 .pyre_configuration
 .pyre
 __pycache__
+scratch
+*.egg-info
+dist
