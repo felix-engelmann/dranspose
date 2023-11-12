@@ -24,13 +24,13 @@ class Worker:
             host=redis_host, port=redis_port, decode_responses=True, protocol=3
         )
         if ":" in name:
-            raise Exception("Worker name must not container a :")
+            raise Exception("Worker name must not contain a :")
         self.state = WorkerState(name)
         self._ingesters: dict[str, Any] = {}
         self._stream_map: dict[str, zmq.Socket] = {}
 
     async def run(self):
-        asyncio.create_task(self.manage_ingesters())
+        self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
         self.work_task = asyncio.create_task(self.work())
         await self.register()
 
@@ -176,6 +176,7 @@ class Worker:
             await asyncio.sleep(2)
 
     async def close(self):
+        self.manage_ingester_task.cancel()
         await self.redis.delete(f"{protocol.PREFIX}:worker:{self.state.name}:config")
         await self.redis.aclose()
         self.ctx.destroy()

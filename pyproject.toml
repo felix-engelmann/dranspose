@@ -36,6 +36,9 @@ test = [
     "pytest-asyncio",
 ]
 
+[project.scripts]
+dranspose = "dranspose.cli:run"
+
 [tool.setuptools_scm]
 
 [project.urls]

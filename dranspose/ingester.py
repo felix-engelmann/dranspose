@@ -46,7 +46,7 @@ class Ingester:
         )
 
     async def run(self):
-        asyncio.create_task(self.accept_workers())
+        self.accept_task = asyncio.create_task(self.accept_workers())
         self.work_task = asyncio.create_task(self.work())
         self.assign_task = asyncio.create_task(self.manage_assignments())
         self.assignment_queue = asyncio.Queue()
@@ -164,6 +164,8 @@ class Ingester:
                 break
 
     async def close(self):
+        self.accept_task.cancel()
+        self.work_task.cancel()
         await self.redis.delete(f"{protocol.PREFIX}:ingester:{self.state.name}:config")
         await self.redis.aclose()
         self.ctx.destroy(linger=0)
