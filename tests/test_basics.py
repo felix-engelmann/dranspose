@@ -6,9 +6,11 @@ import uvicorn
 
 from dranspose.controller import app
 
+
 @pytest.mark.asyncio
 async def test_simple():
     await asyncio.sleep(0.5)
+
 
 @pytest.mark.asyncio
 async def test_controller():

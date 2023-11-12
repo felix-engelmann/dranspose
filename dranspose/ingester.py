@@ -66,7 +66,10 @@ class Ingester:
             assignment_evs = assignments[sub][0]
             self._logger.debug("got assignments %s", assignment_evs)
             for assignment in assignment_evs:
-                assigned_workers = {"event":int(assignment[0].split("-")[0]),"streams":{}}
+                assigned_workers = {
+                    "event": int(assignment[0].split("-")[0]),
+                    "streams": {},
+                }
                 for stream in self.state.streams:
                     if stream in assignment[1]:
                         workers = json.loads(assignment[1][stream])
@@ -86,16 +89,25 @@ class Ingester:
                 zmqyields.append(anext(sourcegens[stream]))
                 streams.append(stream)
             zmqstreams = await asyncio.gather(*zmqyields)
-            zmqparts = {stream:zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
+            zmqparts = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
             for stream, workers in assigned_workers["streams"].items():
                 for worker in workers:
                     if worker not in workermessages:
-                        workermessages[worker] = {"data":[],"header":{"event":assigned_workers["event"],"parts":[]}}
+                        workermessages[worker] = {
+                            "data": [],
+                            "header": {"event": assigned_workers["event"], "parts": []},
+                        }
                     workermessages[worker]["data"] += zmqparts[stream]
-                    workermessages[worker]["header"]["parts"].append({"stream": stream, "length": len(zmqparts[stream])})
+                    workermessages[worker]["header"]["parts"].append(
+                        {"stream": stream, "length": len(zmqparts[stream])}
+                    )
             self._logger.debug("workermessages %s", workermessages)
             for worker, message in workermessages.items():
-                await self.out_socket.send_multipart([worker.encode("ascii")]+[json.dumps(message["header"]).encode("utf8")] + message["data"])
+                await self.out_socket.send_multipart(
+                    [worker.encode("ascii")]
+                    + [json.dumps(message["header"]).encode("utf8")]
+                    + message["data"]
+                )
 
     async def run_source(self, stream):
         raise NotImplemented("get_frame must be implemented")
@@ -143,7 +155,9 @@ class Ingester:
                         self.state.mapping_uuid = newuuid
                         self.assignment_queue = asyncio.Queue()
                         self.work_task = asyncio.create_task(self.work())
-                        self.assign_task = asyncio.create_task(self.manage_assignments())
+                        self.assign_task = asyncio.create_task(
+                            self.manage_assignments()
+                        )
             except rexceptions.ConnectionError:
                 break
             except asyncio.exceptions.CancelledError:

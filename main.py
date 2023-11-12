@@ -15,13 +15,16 @@ from dranspose.worker import Worker
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 async def main():
     ins = []
-    #ins.append(DummyEigerIngester())
-    #ins.append(DummyOrcaIngester())
+    # ins.append(DummyEigerIngester())
+    # ins.append(DummyOrcaIngester())
     ins.append(DummyMultiIngester())
-    ins.append(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
-    wos = [Worker('worker'+str(i)) for i in range(1, 3)]
+    ins.append(
+        StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger")
+    )
+    wos = [Worker("worker" + str(i)) for i in range(1, 3)]
 
     for i in ins + wos:
         asyncio.create_task(i.run())
@@ -44,13 +47,13 @@ async def main():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        prog='dranspose',
-        description='Transposes Streams')
+    parser = argparse.ArgumentParser(prog="dranspose", description="Transposes Streams")
 
-    parser.add_argument('component', choices=["controller","worker","ingester","combined"])  # positional argument
-    parser.add_argument('-n', '--name')  # option that takes a value
-    parser.add_argument('-c', '--ingestclass')  # option that takes a value
+    parser.add_argument(
+        "component", choices=["controller", "worker", "ingester", "combined"]
+    )  # positional argument
+    parser.add_argument("-n", "--name")  # option that takes a value
+    parser.add_argument("-c", "--ingestclass")  # option that takes a value
 
     args = parser.parse_args()
     print(args)
@@ -64,6 +67,7 @@ if __name__ == "__main__":
     elif args.component == "ingester":
         print(args.ingestclass)
         ing = globals()[args.ingestclass]
+
         async def run():
             i = ing()
             await i.run()
@@ -72,6 +76,7 @@ if __name__ == "__main__":
         asyncio.run(run())
     elif args.component == "worker":
         print(args.name)
+
         async def run():
             w = Worker(args.name)
             await w.run()

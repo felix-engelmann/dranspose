@@ -6,10 +6,10 @@ class Mapping:
     def __init__(self):
         ntrig = 10
         self.mapping = {
-            #"orca": [[2 * i] for i in range(1, ntrig)],
+            # "orca": [[2 * i] for i in range(1, ntrig)],
             "eiger": [[2 * i + 1] for i in range(1, ntrig)],
-            #"slow": [[1000+2 * i] if i%3 == 0 else None for i in range(1, ntrig)],
-            #"alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
+            # "slow": [[1000+2 * i] if i%3 == 0 else None for i in range(1, ntrig)],
+            # "alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
         }
         self.uuid = uuid.uuid4()
         self.assignments = {}
@@ -59,10 +59,10 @@ class Mapping:
                         complete = False
                         return
             if complete:
-                self.complete_events = max(0, evn+1)
+                self.complete_events = max(0, evn + 1)
 
     def print(self):
-        print(" "*5, end="")
+        print(" " * 5, end="")
         for i in self.mapping:
             print(i.rjust(20), end="")
         print("")

@@ -20,16 +20,16 @@ class StreamingSingleIngester(Ingester):
             parts = await self.in_socket.recv_multipart(copy=False)
             header = json.loads(parts[0].bytes)
             self._logger.debug("received frame with header %s", header)
-            if header['htype'] == "header":
+            if header["htype"] == "header":
                 self._logger.info("start of new sequence %s", header)
                 hdr = parts[0]
                 break
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
             header = json.loads(parts[0].bytes)
-            if header['htype'] == 'image':
-                yield [hdr]+parts
-            if header['htype'] == 'series_end':
+            if header["htype"] == "image":
+                yield [hdr] + parts
+            if header["htype"] == "series_end":
                 break
         while True:
             self._logger.debug("discarding messages until next run")

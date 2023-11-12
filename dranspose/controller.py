@@ -152,6 +152,7 @@ async def get_streams():
         streams = await ctrl.redis.json().mget(ctrl.configs, "$.streams")
         return [x for s in streams if len(s) > 0 for x in s[0]]
 
+
 @app.post("/api/v1/mapping")
 async def set_mapping():
     await ctrl.set_mapping()

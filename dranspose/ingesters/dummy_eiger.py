@@ -18,4 +18,4 @@ class DummyEigerIngester(Ingester):
         parts = [b"header for eiger", zmq.Frame(img.tobytes())]
         while True:
             yield parts
-            #await asyncio.sleep(0.1)
+            # await asyncio.sleep(0.1)
