@@ -1,12 +1,15 @@
 import asyncio
-import threading
+import logging
+import random
 import time
 import aiohttp
 
 import pytest
 import pytest_asyncio
-import requests
+import numpy as np
 import uvicorn
+import zmq.asyncio
+import zmq
 
 from dranspose.controller import app
 from dranspose.ingesters.streaming_single import StreamingSingleIngester
@@ -21,7 +24,7 @@ async def test_simple():
 
 @pytest_asyncio.fixture()
 async def controller():
-    config = uvicorn.Config(app, port=5000, log_level="info")
+    config = uvicorn.Config(app, port=5000, log_level="debug")
     server = uvicorn.Server(config)
     server_task = asyncio.create_task(server.serve())
     while server.started is False:
@@ -109,4 +112,36 @@ async def test_map(controller, create_worker, create_ingester):
     keys = await r.keys("dranspose:*")
     present_keys = {f'dranspose:assigned:{uuid}',f'dranspose:ready:{uuid}'}
     assert present_keys - set(keys) == set()
+
+    context = zmq.asyncio.Context()
+    socket = context.socket(zmq.PUSH)
+    socket.bind('tcp://*:9999')
+    await socket.send_json({'htype': 'header'})
+    width = 1475
+    height = 831
+    for _ in range(9):
+        img = np.zeros((width, height), dtype=np.uint16)
+        for _ in range(20):
+            img[random.randint(0, width - 1)][random.randint(0, height - 1)] = random.randint(0, 10)
+        frame = zmq.Frame(img, copy=False)
+
+        await socket.send_json({'htype': 'image',
+                              'shape': img.shape,
+                              'type': 'uint16',
+                              'compression': 'none',
+                              }, flags=zmq.SNDMORE)
+        await socket.send(frame, copy=False)
+        time.sleep(0.1)
+    await socket.send_json({'htype': 'series_end'})
+
+    readies = await r.xread({f'dranspose:ready:{uuid}': 0})
+    while f'dranspose:ready:{uuid}' not in readies or len(readies[f'dranspose:ready:{uuid}'][0]) < 9+3:
+        await asyncio.sleep(0.5)
+        readies = await r.xread({f'dranspose:ready:{uuid}': 0})
+
+    context.destroy()
+
+    readies = await r.xread({f'dranspose:ready:{uuid}': 0, f'dranspose:assigned:{uuid}':0})
+    print("readies", readies)
+
     await r.aclose()
