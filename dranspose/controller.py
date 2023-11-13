@@ -29,6 +29,7 @@ class Controller:
         self.mapping = Mapping({"":[]})
 
         self.completed = {}
+        self.completed_events = []
 
     async def run(self):
         logger.debug("started controller run")
@@ -85,9 +86,13 @@ class Controller:
                         if ready[1]["state"] == "idle":
                             virt = self.mapping.assign_next(ready[1]["worker"])
                             if "new" not in ready[1]:
-                                if int(ready[1]["completed"]) not in self.completed:
-                                    self.completed[int(ready[1]["completed"])] = []
-                                self.completed[int(ready[1]["completed"])].append(ready[1]["worker"])
+                                compev = int(ready[1]["completed"])
+                                if compev not in self.completed:
+                                    self.completed[compev] = []
+                                self.completed[compev].append(ready[1]["worker"])
+                                if (set([x for stream in self.mapping.get_event_workers(compev-1).values() for x in stream]) ==
+                                        set(self.completed[compev])):
+                                    self.completed_events.append(compev)
                             logger.debug(
                                 "assigned worker %s to %s", ready[1]["worker"], virt
                             )
@@ -158,8 +163,8 @@ async def get_status():
     return {"work_completed": ctrl.completed,
             "last_assigned": ctrl.mapping.complete_events,
             "assignment": ctrl.mapping.assignments,
-            "work_done_until": 0,
-            "finished":len(ctrl.completed) == ctrl.mapping.len()}
+            "completed_events": ctrl.completed_events,
+            "finished": len(ctrl.completed_events) == ctrl.mapping.len()}
 
 @app.post("/api/v1/mapping")
 async def set_mapping(mapping: Dict[str, List[List[int]|None]]):

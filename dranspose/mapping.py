@@ -86,7 +86,11 @@ class Mapping:
 
 
 if __name__ == "__main__":
-    m = Mapping()
+    ntrig = 10
+    m = Mapping({"eiger": [[2*i] for i in range(1, ntrig)],
+                                   "orca" : [[2*i+1] for i in range(1, ntrig)],
+                                   "alba" : [[2*i, 2*i+1] for i in range(1, ntrig)],
+                                   })
     m.print()
     for i in range(5):
         print(m.complete_events)
@@ -98,7 +102,8 @@ if __name__ == "__main__":
     print(m.assignments)
     print(m.complete_events)
 
-    print(m.get_event_workers(0))
+    print("evworkers", m.get_event_workers(0))
+    print("evworkers", set([x for stream in  m.get_event_workers(0).values() for x in stream]))
     m.print()
 
     print(m.min_workers())
