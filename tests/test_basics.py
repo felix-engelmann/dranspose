@@ -141,7 +141,7 @@ async def stream_alba():
     yield _make_alba
 
 @pytest.mark.asyncio
-async def est_services(controller, create_worker, create_ingester):
+async def test_services(controller, create_worker, create_ingester):
     print(controller)
 
     await create_worker("w1")
@@ -165,13 +165,14 @@ async def test_map(controller, create_worker, create_ingester, stream_eiger, str
     await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
     await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9998", name="orca", worker_port=10011))
     await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9997", name="alba", worker_port=10012))
+    await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9996", name="slow", worker_port=10013))
 
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get('http://localhost:5000/api/v1/streams')
         content = await st.json()
-        while {"eiger", "orca", "alba"} - set(content) != set():
+        while {"eiger", "orca", "alba","slow"} - set(content) != set():
             await asyncio.sleep(0.3)
             st = await session.get('http://localhost:5000/api/v1/streams')
             content = await st.json()
@@ -183,7 +184,7 @@ async def test_map(controller, create_worker, create_ingester, stream_eiger, str
                              json={"eiger": [[2*i] for i in range(1, ntrig)],
                                    "orca" : [[2*i+1] for i in range(1, ntrig)],
                                    "alba" : [[2*i, 2*i+1] for i in range(1, ntrig)],
-                                   #"slow": [None, None, [1006], None, None, [1012], None, None, [1018]]
+                                   "slow": [[2*i, 2*i+1] if i%4 == 0 else None for i in range(1, ntrig)],
                                    })
         assert resp.status == 200
         uuid = await resp.json()
@@ -199,6 +200,7 @@ async def test_map(controller, create_worker, create_ingester, stream_eiger, str
     asyncio.create_task(stream_eiger(context,9999, ntrig-1))
     asyncio.create_task(stream_orca(context,9998, ntrig-1))
     asyncio.create_task(stream_alba(context,9997, ntrig-1))
+    asyncio.create_task(stream_alba(context,9996, ntrig//4))
 
     async with aiohttp.ClientSession() as session:
         st = await session.get('http://localhost:5000/api/v1/status')
@@ -213,4 +215,3 @@ async def test_map(controller, create_worker, create_ingester, stream_eiger, str
     await r.aclose()
 
     print(content)
-    assert False
