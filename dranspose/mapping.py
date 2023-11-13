@@ -17,7 +17,7 @@ class Mapping:
             raise Exception("length not equal: ", list(map(len, m.values())))
 
         self.mapping = m
-        self.uuid = uuid.uuid4()
+        self.uuid = str(uuid.uuid4())
         self.assignments = {}
         self.complete_events = 0
 

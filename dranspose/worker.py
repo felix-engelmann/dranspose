@@ -14,6 +14,7 @@ class WorkerState:
     def __init__(self, name):
         self.name = name
         self.mapping_uuid = None
+        self.ingesters = []
 
 
 class Worker:
@@ -78,8 +79,10 @@ class Worker:
             for stream, jsons in assignments[1].items():
                 workers = json.loads(jsons)
                 if self.state.name in workers:
-                    ingesterset.add(self._stream_map[stream])
-
+                    try:
+                        ingesterset.add(self._stream_map[stream])
+                    except KeyError:
+                        self._logger.error("ingester for stream %s not connected, available: %s", stream, self._ingesters)
             self._logger.debug("receive from ingesters %s", ingesterset)
 
             lastev = assignments[0]
@@ -172,6 +175,7 @@ class Worker:
                 for ing, val in self._ingesters.items()
                 for s in val["config"]["streams"]
             }
+            self.state.ingesters = list(self._ingesters.keys())
 
             await asyncio.sleep(2)
 

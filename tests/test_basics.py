@@ -1,8 +1,11 @@
 import asyncio
+import threading
 import time
+import aiohttp
 
 import pytest
 import pytest_asyncio
+import requests
 import uvicorn
 
 from dranspose.controller import app
@@ -75,3 +78,35 @@ async def test_services(controller, create_worker, create_ingester):
     assert present_keys-set(keys) == set()
     await r.aclose()
 
+@pytest.mark.asyncio
+async def test_map(controller, create_worker, create_ingester):
+
+    await create_worker("w1")
+    await create_worker("w2")
+    await create_worker("w3")
+    await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
+
+    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get('http://localhost:5000/api/v1/streams')
+        content = await st.json()
+        while "eiger" not in content:
+            await asyncio.sleep(0.3)
+            st = await session.get('http://localhost:5000/api/v1/streams')
+            content = await st.json()
+
+
+        print("startup done")
+        resp = await session.post("http://localhost:5000/api/v1/mapping",
+                             json={"eiger": [[3], [5], [7], [9], [11], [13], [15], [17], [19]],
+                                   #"slow": [None, None, [1006], None, None, [1012], None, None, [1018]]
+                                   })
+        uuid = await resp.json()
+
+    updates = await r.xread({'dranspose:controller:updates':0})
+    print("updates", updates)
+    keys = await r.keys("dranspose:*")
+    present_keys = {f'dranspose:assigned:{uuid}',f'dranspose:ready:{uuid}'}
+    assert present_keys - set(keys) == set()
+    await r.aclose()

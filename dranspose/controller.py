@@ -17,11 +17,6 @@ from fastapi import FastAPI
 logger = logging.getLogger(__name__)
 
 
-class ControllerState:
-    def __init__(self):
-        self.mapping_uuid = 0
-
-
 class Controller:
     def __init__(self, redis_host="localhost", redis_port=6379):
         self.ctx = zmq.asyncio.Context()
@@ -30,7 +25,6 @@ class Controller:
         )
         self.present = []
         self.configs = []
-        self.state = ControllerState()
 
         self.mapping = Mapping({"":[]})
 
@@ -47,29 +41,25 @@ class Controller:
 
     async def set_mapping(self, m):
         self.assign_task.cancel()
-        await self.redis.delete(f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}")
-        self.state.mapping_uuid = str(self.mapping.uuid)
+        await self.redis.delete(f"{protocol.PREFIX}:ready:{self.mapping.uuid}")
 
         assignments = await self.redis.keys(
-            f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}:*"
+            f"{protocol.PREFIX}:assigned:{self.mapping.uuid}:*"
         )
         if len(assignments) > 0:
             await self.redis.delete(*assignments)
 
         # cleaned up
         self.mapping = m
-        await self.redis.json().set(
-            f"{protocol.PREFIX}:controller:config", "$", self.state.__dict__
-        )
         await self.redis.xadd(
             f"{protocol.PREFIX}:controller:updates",
-            {"mapping_uuid": self.state.mapping_uuid},
+            {"mapping_uuid": self.mapping.uuid},
         )
 
         self.configs = await self.redis.keys(f"{protocol.PREFIX}:*:*:config")
         if len(self.configs) > 0:
             uuids = await self.redis.json().mget(self.configs, "$.mapping_uuid")
-            while set([u[0] for u in uuids]) != {self.state.mapping_uuid}:
+            while set([u[0] for u in uuids]) != {self.mapping.uuid}:
                 await asyncio.sleep(0.05)
                 uuids = await self.redis.json().mget(self.configs, "$.mapping_uuid")
         logger.info("new mapping distributed")
@@ -82,12 +72,12 @@ class Controller:
         while True:
             try:
                 workers = await self.redis.xread(
-                    {f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}": last},
+                    {f"{protocol.PREFIX}:ready:{self.mapping.uuid}": last},
                     block=1000,
                 )
-                if f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}" in workers:
+                if f"{protocol.PREFIX}:ready:{self.mapping.uuid}" in workers:
                     for ready in workers[
-                        f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}"
+                        f"{protocol.PREFIX}:ready:{self.mapping.uuid}"
                     ][0]:
                         logger.debug("got a ready worker %s", ready)
                         if ready[1]["state"] == "idle":
@@ -100,7 +90,7 @@ class Controller:
                                 wrks = self.mapping.get_event_workers(evn)
                                 logger.debug("send out assignment %s", wrks)
                                 await pipe.xadd(
-                                    f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}",
+                                    f"{protocol.PREFIX}:assigned:{self.mapping.uuid}",
                                     {s: json.dumps(w) for s, w in wrks.items()},
                                     id=evn + 1,
                                 )
@@ -124,7 +114,6 @@ class Controller:
             return []
 
     async def close(self):
-        await self.redis.delete(f"{protocol.PREFIX}:controller:config")
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
         queues = await self.redis.keys(f"{protocol.PREFIX}:ready:*")
         if len(queues) > 0:
