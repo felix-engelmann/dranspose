@@ -59,7 +59,7 @@ class Worker:
 
         await self.redis.xadd(
             f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
-            {"state": "idle", "completed": 0, "worker": self.state.name},
+            {"state": "idle", "completed": 0, "new": 1, "worker": self.state.name},
         )
 
         lastev = 0
@@ -98,7 +98,7 @@ class Worker:
                 self._logger.info("processed %d events", proced)
             await self.redis.xadd(
                 f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
-                {"state": "idle", "completed": lastev, "worker": self.state.name},
+                {"state": "idle", "completed": int(lastev.split("-")[0]), "worker": self.state.name},
             )
 
     async def register(self):

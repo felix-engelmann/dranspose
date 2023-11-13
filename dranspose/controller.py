@@ -28,6 +28,8 @@ class Controller:
 
         self.mapping = Mapping({"":[]})
 
+        self.completed = {}
+
     async def run(self):
         logger.debug("started controller run")
         self.assign_task = asyncio.create_task(self.assign_work())
@@ -82,6 +84,10 @@ class Controller:
                         logger.debug("got a ready worker %s", ready)
                         if ready[1]["state"] == "idle":
                             virt = self.mapping.assign_next(ready[1]["worker"])
+                            if "new" not in ready[1]:
+                                if int(ready[1]["completed"]) not in self.completed:
+                                    self.completed[int(ready[1]["completed"])] = []
+                                self.completed[int(ready[1]["completed"])].append(ready[1]["worker"])
                             logger.debug(
                                 "assigned worker %s to %s", ready[1]["worker"], virt
                             )
@@ -147,6 +153,13 @@ app = FastAPI(lifespan=lifespan)
 async def get_streams():
     return await ctrl.get_streams()
 
+@app.get("/api/v1/status")
+async def get_status():
+    return {"work_completed": ctrl.completed,
+            "last_assigned": ctrl.mapping.complete_events,
+            "assignment": ctrl.mapping.assignments,
+            "work_done_until": 0,
+            "finished":len(ctrl.completed) == ctrl.mapping.len()}
 
 @app.post("/api/v1/mapping")
 async def set_mapping(mapping: Dict[str, List[List[int]|None]]):

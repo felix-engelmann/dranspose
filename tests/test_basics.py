@@ -3,6 +3,7 @@ import logging
 import random
 import time
 import aiohttp
+import numpy
 
 import pytest
 import pytest_asyncio
@@ -65,8 +66,82 @@ async def create_ingester():
         await inst.close()
         task.cancel()
 
+
+@pytest_asyncio.fixture
+async def stream_eiger():
+    async def _make_eiger(ctx, port, nframes):
+        socket = ctx.socket(zmq.PUSH)
+        socket.bind(f'tcp://*:{port}')
+        await socket.send_json({'htype': 'header'})
+        width = 1475
+        height = 831
+        for _ in range(nframes):
+            img = np.zeros((width, height), dtype=np.uint16)
+            for _ in range(20):
+                img[random.randint(0, width - 1)][random.randint(0, height - 1)] = random.randint(0, 10)
+            frame = zmq.Frame(img, copy=False)
+
+            await socket.send_json({'htype': 'image',
+                                    'shape': img.shape,
+                                    'type': 'uint16',
+                                    'compression': 'none',
+                                    }, flags=zmq.SNDMORE)
+            await socket.send(frame, copy=False)
+            time.sleep(0.1)
+        await socket.send_json({'htype': 'series_end'})
+        socket.close()
+
+    yield _make_eiger
+
+@pytest_asyncio.fixture
+async def stream_orca():
+    async def _make_orca(ctx, port, nframes):
+        socket = ctx.socket(zmq.PUSH)
+        socket.bind(f'tcp://*:{port}')
+        await socket.send_json({'htype': 'header'})
+        width = 2000
+        height = 4000
+        for _ in range(nframes):
+            img = np.zeros((width, height), dtype=np.uint16)
+            for _ in range(20):
+                img[random.randint(0, width - 1)][random.randint(0, height - 1)] = random.randint(0, 10)
+            frame = zmq.Frame(img, copy=False)
+
+            await socket.send_json({'htype': 'image',
+                                    'shape': img.shape,
+                                    'type': 'uint16',
+                                    'compression': 'none',
+                                    }, flags=zmq.SNDMORE)
+            await socket.send(frame, copy=False)
+            time.sleep(0.1)
+        await socket.send_json({'htype': 'series_end'})
+        socket.close()
+
+    yield _make_orca
+
+@pytest_asyncio.fixture
+async def stream_alba():
+    async def _make_alba(ctx, port, nframes):
+        socket = ctx.socket(zmq.PUSH)
+        socket.bind(f'tcp://*:{port}')
+        await socket.send_json({'htype': 'header'})
+        val = np.zeros((0,), dtype=numpy.float64)
+        frame = zmq.Frame(val, copy=False)
+        for _ in range(nframes):
+            await socket.send_json({'htype': 'image',
+                                    'shape': val.shape,
+                                    'type': 'float64',
+                                    'compression': 'none',
+                                    }, flags=zmq.SNDMORE)
+            await socket.send(frame, copy=False)
+            time.sleep(0.1)
+        await socket.send_json({'htype': 'series_end'})
+        socket.close()
+
+    yield _make_alba
+
 @pytest.mark.asyncio
-async def test_services(controller, create_worker, create_ingester):
+async def est_services(controller, create_worker, create_ingester):
     print(controller)
 
     await create_worker("w1")
@@ -82,29 +157,35 @@ async def test_services(controller, create_worker, create_ingester):
     await r.aclose()
 
 @pytest.mark.asyncio
-async def test_map(controller, create_worker, create_ingester):
+async def test_map(controller, create_worker, create_ingester, stream_eiger, stream_orca, stream_alba):
 
     await create_worker("w1")
     await create_worker("w2")
     await create_worker("w3")
     await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
+    await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9998", name="orca", worker_port=10011))
+    await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9997", name="alba", worker_port=10012))
 
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get('http://localhost:5000/api/v1/streams')
         content = await st.json()
-        while "eiger" not in content:
+        while {"eiger", "orca", "alba"} - set(content) != set():
             await asyncio.sleep(0.3)
             st = await session.get('http://localhost:5000/api/v1/streams')
             content = await st.json()
 
 
         print("startup done")
+        ntrig = 10
         resp = await session.post("http://localhost:5000/api/v1/mapping",
-                             json={"eiger": [[3], [5], [7], [9], [11], [13], [15], [17], [19]],
+                             json={"eiger": [[2*i] for i in range(1, ntrig)],
+                                   "orca" : [[2*i+1] for i in range(1, ntrig)],
+                                   "alba" : [[2*i, 2*i+1] for i in range(1, ntrig)],
                                    #"slow": [None, None, [1006], None, None, [1012], None, None, [1018]]
                                    })
+        assert resp.status == 200
         uuid = await resp.json()
 
     updates = await r.xread({'dranspose:controller:updates':0})
@@ -114,34 +195,22 @@ async def test_map(controller, create_worker, create_ingester):
     assert present_keys - set(keys) == set()
 
     context = zmq.asyncio.Context()
-    socket = context.socket(zmq.PUSH)
-    socket.bind('tcp://*:9999')
-    await socket.send_json({'htype': 'header'})
-    width = 1475
-    height = 831
-    for _ in range(9):
-        img = np.zeros((width, height), dtype=np.uint16)
-        for _ in range(20):
-            img[random.randint(0, width - 1)][random.randint(0, height - 1)] = random.randint(0, 10)
-        frame = zmq.Frame(img, copy=False)
 
-        await socket.send_json({'htype': 'image',
-                              'shape': img.shape,
-                              'type': 'uint16',
-                              'compression': 'none',
-                              }, flags=zmq.SNDMORE)
-        await socket.send(frame, copy=False)
-        time.sleep(0.1)
-    await socket.send_json({'htype': 'series_end'})
+    asyncio.create_task(stream_eiger(context,9999, ntrig-1))
+    asyncio.create_task(stream_orca(context,9998, ntrig-1))
+    asyncio.create_task(stream_alba(context,9997, ntrig-1))
 
-    readies = await r.xread({f'dranspose:ready:{uuid}': 0})
-    while f'dranspose:ready:{uuid}' not in readies or len(readies[f'dranspose:ready:{uuid}'][0]) < 9+3:
-        await asyncio.sleep(0.5)
-        readies = await r.xread({f'dranspose:ready:{uuid}': 0})
+    async with aiohttp.ClientSession() as session:
+        st = await session.get('http://localhost:5000/api/v1/status')
+        content = await st.json()
+        while not content["finished"]:
+            await asyncio.sleep(0.3)
+            st = await session.get('http://localhost:5000/api/v1/status')
+            content = await st.json()
 
     context.destroy()
 
-    readies = await r.xread({f'dranspose:ready:{uuid}': 0, f'dranspose:assigned:{uuid}':0})
-    print("readies", readies)
-
     await r.aclose()
+
+    print(content)
+    assert False
