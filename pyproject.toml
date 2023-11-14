@@ -34,6 +34,7 @@ exclude = ["tests*"]  # exclude packages matching these glob patterns (empty by 
 test = [
     "pytest",
     "pytest-asyncio",
+    "aiohttp",
 ]
 
 [project.scripts]

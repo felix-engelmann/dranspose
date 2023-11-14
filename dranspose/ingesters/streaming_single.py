@@ -7,8 +7,11 @@ from dranspose.ingester import Ingester
 
 
 class StreamingSingleIngester(Ingester):
-    def __init__(self, name, connect_url, worker_port=10010):
-        super().__init__(f"{name}_ingester", config={"worker_port": worker_port})
+    def __init__(self, name, connect_url, worker_port=10010, **kwargs):
+        config = {"worker_port": worker_port}
+        if kwargs.get("worker_url") is not None:
+            config["worker_url"] = kwargs["worker_url"]
+        super().__init__(f"{name}_ingester", config=config, **kwargs)
         self.state.streams = [name]
         self.in_socket = self.ctx.socket(zmq.PULL)
         self.in_socket.connect(connect_url)

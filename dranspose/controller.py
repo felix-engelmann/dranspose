@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from typing import Dict, List
 
 import uvicorn
@@ -143,7 +144,7 @@ ctrl: Controller
 async def lifespan(app: FastAPI):
     # Load the ML model
     global ctrl
-    ctrl = Controller()
+    ctrl = Controller(redis_host=os.getenv("REDIS_HOST","localhost"), redis_port=os.getenv("REDIS_PORT",6379))
     run_task = asyncio.create_task(ctrl.run())
     yield
     run_task.cancel()

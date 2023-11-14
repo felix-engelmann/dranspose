@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import os
 
 import uvicorn
 
@@ -48,7 +49,9 @@ def run():
         ing = globals()[args.ingestclass]
 
         async def run():
-            i = ing()
+            i = ing(redis_host=os.getenv("REDIS_HOST","localhost"),
+                    redis_port=os.getenv("REDIS_PORT",6379),
+                    worker_url=os.getenv("WORKER_URL", None))
             await i.run()
             await i.close()
 
@@ -57,7 +60,9 @@ def run():
         print(args.name)
 
         async def run():
-            w = Worker(args.name)
+            w = Worker(args.name,
+                       redis_host=os.getenv("REDIS_HOST","localhost"),
+                       redis_port=os.getenv("REDIS_PORT",6379))
             await w.run()
             await w.close()
 
