@@ -1,0 +1,6 @@
+include:
+  - project: 'kits-maxiv/cfg-maxiv-gitlabci'
+    file: '/Docker.gitlab-ci.yml'
+
+variables:
+  DOCKER_REGISTRY: "harbor.maxiv.lu.se/daq"
