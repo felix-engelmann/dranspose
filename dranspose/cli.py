@@ -34,6 +34,7 @@ def run():
     )  # positional argument
     parser.add_argument("-n", "--name")  # option that takes a value
     parser.add_argument("-c", "--ingestclass")  # option that takes a value
+    parser.add_argument("-u", "--connect_url")  # option that takes a value
 
     args = parser.parse_args()
     print(args)
@@ -49,7 +50,8 @@ def run():
         ing = globals()[args.ingestclass]
 
         async def run():
-            i = ing(redis_host=os.getenv("REDIS_HOST","localhost"),
+            i = ing(args.name, args.connect_url,
+                    redis_host=os.getenv("REDIS_HOST","localhost"),
                     redis_port=os.getenv("REDIS_PORT",6379),
                     worker_url=os.getenv("WORKER_URL", None))
             await i.run()

@@ -19,7 +19,7 @@ class IngesterState:
 
 
 class Ingester:
-    def __init__(self, name: str, redis_host="localhost", redis_port=6379, config=None):
+    def __init__(self, name: str, redis_host="localhost", redis_port=6379, config=None, **kwargs):
         self._logger = logging.getLogger(f"{__name__}+{name}")
         if config is None:
             config = {}
