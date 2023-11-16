@@ -1,13 +1,18 @@
 import pickle
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import NewType, Literal
+from typing import NewType, Literal, Annotated
 
-from pydantic import AnyUrl, UUID4, BaseModel, validate_call
+from pydantic import AnyUrl, UUID4, BaseModel, validate_call, UrlConstraints
 
 import zmq
 from functools import cache
 
+from pydantic_core import Url
+
+ZmqUrl = Annotated[
+    Url, UrlConstraints(allowed_schemes=["tcp"])
+]
 
 class RedisKeys:
     PREFIX = "dranspose"
@@ -42,6 +47,7 @@ class ProtocolException(Exception):
 
 Stream = NewType("Stream", str)
 WorkerName = NewType("WorkerName", str)
+IngesterName = NewType("WorkerName", str)
 
 
 class ControllerUpdate(BaseModel):
@@ -75,8 +81,8 @@ class WorkerUpdate(BaseModel):
 
 
 class IngesterState(BaseModel):
-    name: str
-    url: AnyUrl
+    name: IngesterName
+    url: ZmqUrl
     mapping_uuid: UUID4 | None = None
     streams: list[Stream] = []
 

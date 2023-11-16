@@ -13,8 +13,8 @@ import zmq.asyncio
 import zmq
 
 from dranspose.controller import app
-from dranspose.ingesters.streaming_single import StreamingSingleIngester
-from dranspose.protocol import EnsembleState, RedisKeys
+from dranspose.ingesters.streaming_single import StreamingSingleIngester, StreamingSingleSettings
+from dranspose.protocol import EnsembleState, RedisKeys, IngesterName, Stream
 from dranspose.worker import Worker
 
 import redis.asyncio as redis
@@ -162,7 +162,7 @@ async def stream_alba():
 async def test_simple(controller, create_worker, create_ingester, stream_eiger):
     await create_worker("w1")
     await create_ingester(
-        StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger")
+        StreamingSingleIngester(name=Stream("eiger"), settings=StreamingSingleSettings(upstream_url="tcp://localhost:9999"))
     )
 
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
@@ -223,21 +223,27 @@ async def test_map(
     await create_worker("w2")
     await create_worker("w3")
     await create_ingester(
-        StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger")
+        StreamingSingleIngester(name=Stream("eiger"), settings=StreamingSingleSettings(upstream_url="tcp://localhost:9999"))
     )
     await create_ingester(
         StreamingSingleIngester(
-            connect_url="tcp://localhost:9998", name="orca", worker_port=10011
+            name=Stream("orca"),
+            settings=StreamingSingleSettings(upstream_url="tcp://localhost:9998",
+                                             worker_url="tcp://localhost:10011")
         )
     )
     await create_ingester(
         StreamingSingleIngester(
-            connect_url="tcp://localhost:9997", name="alba", worker_port=10012
+            name=Stream("alba"),
+            settings = StreamingSingleSettings(upstream_url="tcp://localhost:9997",
+                                               worker_url="tcp://localhost:10012")
         )
     )
     await create_ingester(
         StreamingSingleIngester(
-            connect_url="tcp://localhost:9996", name="slow", worker_port=10013
+            name=Stream("slow"),
+            settings = StreamingSingleSettings(upstream_url="tcp://localhost:9996",
+                                               worker_url="tcp://localhost:10013")
         )
     )
 

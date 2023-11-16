@@ -12,7 +12,7 @@ from dranspose import protocol
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
-from dranspose.distributed import DistributedService
+from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.protocol import (
     WorkerState,
     RedisKeys,
@@ -25,19 +25,22 @@ from dranspose.protocol import (
 
 class ConnectedIngester(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
     socket: zmq.asyncio.Socket
     config: IngesterState
 
+class WorkerSettings(DistributedSettings):
+    pass
 
 class Worker(DistributedService):
-    def __init__(self, name: WorkerName, redis_host="localhost", redis_port=6379):
-        super().__init__()
-        self._logger = logging.getLogger(f"{__name__}+{name}")
+    def __init__(self, name: WorkerName, settings: WorkerSettings = None):
+        self._worker_settings = settings
+        if self._worker_settings is None:
+            self._worker_settings = WorkerSettings()
+
+        state = WorkerState(name=name)
+        super().__init__(state, self._worker_settings)
         self.ctx = zmq.asyncio.Context()
-        if ":" in name:
-            raise Exception("Worker name must not contain a :")
-        self.state = WorkerState(name=name)
+
         self._ingesters: dict[str, ConnectedIngester] = {}
         self._stream_map: dict[str, zmq.Socket] = {}
 

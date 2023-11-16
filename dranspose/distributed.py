@@ -1,3 +1,5 @@
+import abc
+import logging
 from typing import Literal
 
 import redis.asyncio as redis
@@ -8,26 +10,32 @@ from dranspose.protocol import (
     RedisKeys,
     ControllerUpdate,
     IngesterState,
-    WorkerState,
+    WorkerState, WorkerName, IngesterName,
 )
 import redis.exceptions as rexceptions
 import asyncio
 
 
-class Settings(BaseSettings):
+class DistributedSettings(BaseSettings):
     redis_dsn: RedisDsn = Field(
         'redis://localhost:6379/0',
         validation_alias=AliasChoices('service_redis_dsn', 'redis_url')
     )
 
 
-class DistributedService:
-    def __init__(self):
-        self.settings = Settings()
-        print("self.settings", self.settings)
-        self.redis = redis.from_url(f"{self.settings.redis_dsn}?decode_responses=True&protocol=3")
-        self.state = None
-        self._logger = None
+class DistributedService(abc.ABC):
+    def __init__(self, state: WorkerState|IngesterState, settings: DistributedSettings = None):
+
+        self._distributed_settings = settings
+        if self._distributed_settings is None:
+            self._distributed_settings = DistributedSettings()
+
+        self.state: WorkerState | IngesterState
+        if ":" in state.name:
+            raise Exception("Worker name must not contain a :")
+        self.state = state
+        self.redis = redis.from_url(f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3")
+        self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
 
     async def register(self) -> None:
         latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
@@ -63,5 +71,6 @@ class DistributedService:
             except asyncio.exceptions.CancelledError:
                 break
 
+    @abc.abstractmethod
     async def restart_work(self, new_uuid: UUID4):
         raise NotImplemented("restart work needs to be implemented")

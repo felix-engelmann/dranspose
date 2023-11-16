@@ -1,22 +1,27 @@
 import json
-from typing import AsyncIterator
+from typing import AsyncIterator, Annotated
 
 import numpy as np
 import zmq
 
-from dranspose.ingester import Ingester
-from dranspose.protocol import Stream
+from dranspose.ingester import Ingester, IngesterSettings
+from dranspose.protocol import Stream, ZmqUrl
+
+
+class StreamingSingleSettings(IngesterSettings):
+    upstream_url: ZmqUrl
 
 
 class StreamingSingleIngester(Ingester):
-    def __init__(self, name, connect_url, worker_port=10010, **kwargs):
-        config = {"worker_port": worker_port}
-        if kwargs.get("worker_url") is not None:
-            config["worker_url"] = kwargs["worker_url"]
-        super().__init__(f"{name}_ingester", config=config, **kwargs)
+    def __init__(self, name: Stream, settings: StreamingSingleSettings = None):
+        self._streaming_single_settings = settings
+        if self._streaming_single_settings is None:
+            self._streaming_single_settings = StreamingSingleSettings()
+
+        super().__init__(f"{name}_ingester", settings=self._streaming_single_settings)
         self.state.streams = [name]
         self.in_socket = self.ctx.socket(zmq.PULL)
-        self.in_socket.connect(connect_url)
+        self.in_socket.connect(str(self._streaming_single_settings.upstream_url))
 
     async def run_source(self, stream: Stream) -> AsyncIterator[list[bytes | zmq.Frame]]:
         hdr = None

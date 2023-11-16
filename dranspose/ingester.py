@@ -9,36 +9,38 @@ import logging
 
 from pydantic import UUID4
 
-from dranspose.distributed import DistributedService
-from dranspose.protocol import IngesterState, Stream, RedisKeys, WorkAssignment
+from dranspose.distributed import DistributedService, DistributedSettings
+from dranspose.protocol import IngesterState, Stream, RedisKeys, WorkAssignment, IngesterName, ZmqUrl
 
+
+class IngesterSettings(DistributedSettings):
+    worker_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
 
 class Ingester(DistributedService):
     def __init__(
-        self, name: str, redis_host="localhost", redis_port=6379, config=None, **kwargs
+        self, name: IngesterName,
+        settings: IngesterSettings = None
     ):
-        super().__init__()
-        self._logger = logging.getLogger(f"{__name__}+{name}")
-        if config is None:
-            config = {}
-        if ":" in name:
-            raise Exception("Worker name must not container a :")
+        self._ingester_settings = settings
+        if self._ingester_settings is None:
+            self._ingester_settings = IngesterSettings()
+        streams: list[Stream] = []
+        state = IngesterState(
+            name=name,
+            url=self._ingester_settings.worker_url,
+            streams=streams,
+        )
+
+        super().__init__(state=state, settings=self._ingester_settings)
+
         self.ctx = zmq.asyncio.Context()
         self.out_socket = self.ctx.socket(zmq.ROUTER)
         self.out_socket.setsockopt(zmq.ROUTER_MANDATORY, 1)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE, 1)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 300)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
-        self.out_socket.bind(f"tcp://*:{config.get('worker_port', 10000)}")
-        streams: list[Stream] = []
+        self.out_socket.bind(f"tcp://*:{self._ingester_settings.worker_url.port}")
 
-        self.state = IngesterState(
-            name=name,
-            url=config.get(
-                "worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"
-            ),
-            streams=streams,
-        )
 
     async def run(self) -> None:
         self.accept_task = asyncio.create_task(self.accept_workers())
