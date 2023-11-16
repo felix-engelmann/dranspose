@@ -45,7 +45,7 @@ class ProtocolException(Exception):
     pass
 
 
-Stream = NewType("Stream", str)
+StreamName = NewType("Stream", str)
 WorkerName = NewType("WorkerName", str)
 IngesterName = NewType("WorkerName", str)
 
@@ -56,9 +56,9 @@ class ControllerUpdate(BaseModel):
 
 class WorkAssignment(BaseModel):
     event_number: int
-    assignments: dict[Stream, list[WorkerName]]
+    assignments: dict[StreamName, list[WorkerName]]
 
-    def get_workers_for_streams(self, streams: list[Stream]) -> "WorkAssignment":
+    def get_workers_for_streams(self, streams: list[StreamName]) -> "WorkAssignment":
         ret = WorkAssignment(event_number=self.event_number, assignments={})
         for stream in streams:
             if stream in self.assignments:
@@ -84,7 +84,7 @@ class IngesterState(BaseModel):
     name: IngesterName
     url: ZmqUrl
     mapping_uuid: UUID4 | None = None
-    streams: list[Stream] = []
+    streams: list[StreamName] = []
 
 
 class WorkerState(BaseModel):
@@ -97,7 +97,7 @@ class EnsembleState(BaseModel):
     ingesters: list[IngesterState]
     workers: list[WorkerState]
 
-    def get_streams(self) -> list[Stream]:
+    def get_streams(self) -> list[StreamName]:
         ingester_streams = set([s for i in self.ingesters for s in i.streams])
         worker_streams = [
             set([s for i in w.ingesters for s in i.streams]) for w in self.workers

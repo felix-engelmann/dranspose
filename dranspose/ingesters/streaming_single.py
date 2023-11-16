@@ -5,7 +5,7 @@ import numpy as np
 import zmq
 
 from dranspose.ingester import Ingester, IngesterSettings
-from dranspose.protocol import Stream, ZmqUrl
+from dranspose.protocol import StreamName, ZmqUrl
 
 
 class StreamingSingleSettings(IngesterSettings):
@@ -13,7 +13,7 @@ class StreamingSingleSettings(IngesterSettings):
 
 
 class StreamingSingleIngester(Ingester):
-    def __init__(self, name: Stream, settings: StreamingSingleSettings = None):
+    def __init__(self, name: StreamName, settings: StreamingSingleSettings = None):
         self._streaming_single_settings = settings
         if self._streaming_single_settings is None:
             self._streaming_single_settings = StreamingSingleSettings()
@@ -23,7 +23,7 @@ class StreamingSingleIngester(Ingester):
         self.in_socket = self.ctx.socket(zmq.PULL)
         self.in_socket.connect(str(self._streaming_single_settings.upstream_url))
 
-    async def run_source(self, stream: Stream) -> AsyncIterator[list[bytes | zmq.Frame]]:
+    async def run_source(self, stream: StreamName) -> AsyncIterator[list[bytes | zmq.Frame]]:
         hdr = None
         while True:
             self._logger.debug("clear up insocket")

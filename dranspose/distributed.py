@@ -34,6 +34,7 @@ class DistributedService(abc.ABC):
         if ":" in state.name:
             raise Exception("Worker name must not contain a :")
         self.state = state
+        # TODO: check for already existing query string
         self.redis = redis.from_url(f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3")
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
 

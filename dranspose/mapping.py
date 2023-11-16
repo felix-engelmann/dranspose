@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import List, Dict, Union
 
-from dranspose.protocol import WorkAssignment, Stream
+from dranspose.protocol import WorkAssignment, StreamName
 
 
 class Mapping:

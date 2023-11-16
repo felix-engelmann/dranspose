@@ -5,14 +5,16 @@ import os
 import uvicorn
 
 from dranspose.controller import app
-from dranspose.ingesters.streaming_single import StreamingSingleIngester
+from dranspose.ingester import Ingester
+from dranspose.ingesters.streaming_single import StreamingSingleIngester, StreamingSingleSettings
+from dranspose.protocol import StreamName
 from dranspose.worker import Worker
 
 
 async def main():
     ins = []
     ins.append(
-        StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger")
+        StreamingSingleIngester(name=StreamName("eiger"), settings=StreamingSingleSettings(upstream_url="tcp://localhost:9999"))
     )
     wos = [Worker("worker" + str(i)) for i in range(1, 3)]
 
@@ -53,11 +55,8 @@ def run():
 
         async def run():
             i = ing(
-                args.name,
-                args.connect_url,
-                redis_host=os.getenv("REDIS_HOST", "localhost"),
-                redis_port=os.getenv("REDIS_PORT", 6379),
-                worker_url=os.getenv("WORKER_URL", None),
+                name=args.name,
+                settings=StreamingSingleSettings(upstream_url=args.connect_url)
             )
             await i.run()
             await i.close()
@@ -67,11 +66,7 @@ def run():
         print(args.name)
 
         async def run():
-            w = Worker(
-                args.name,
-                redis_host=os.getenv("REDIS_HOST", "localhost"),
-                redis_port=os.getenv("REDIS_PORT", 6379),
-            )
+            w = Worker(args.name)
             await w.run()
             await w.close()
 

@@ -11,6 +11,7 @@ import time
 from pydantic import BaseModel
 
 from dranspose import protocol
+from dranspose.distributed import DistributedSettings
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
@@ -30,13 +31,16 @@ from dranspose.protocol import (
 
 logger = logging.getLogger(__name__)
 
+class ControllerSettings(DistributedSettings):
+    pass
 
 class Controller:
-    def __init__(self, redis_host="localhost", redis_port=6379):
-        self.redis = redis.Redis(
-            host=redis_host, port=redis_port, decode_responses=True, protocol=3
-        )
+    def __init__(self, settings: ControllerSettings = None):
+        self.settings = settings
+        if self.settings is None:
+            self.settings = ControllerSettings()
 
+        self.redis = redis.from_url(f"{self.settings.redis_dsn}?decode_responses=True&protocol=3")
         self.mapping = Mapping({"": []})
         self.completed = {}
         self.completed_events = []
@@ -155,10 +159,7 @@ ctrl: Controller
 async def lifespan(app: FastAPI):
     # Load the ML model
     global ctrl
-    ctrl = Controller(
-        redis_host=os.getenv("REDIS_HOST", "localhost"),
-        redis_port=os.getenv("REDIS_PORT", 6379),
-    )
+    ctrl = Controller()
     run_task = asyncio.create_task(ctrl.run())
     yield
     run_task.cancel()

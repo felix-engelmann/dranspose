@@ -10,7 +10,7 @@ import logging
 from pydantic import UUID4
 
 from dranspose.distributed import DistributedService, DistributedSettings
-from dranspose.protocol import IngesterState, Stream, RedisKeys, WorkAssignment, IngesterName, ZmqUrl
+from dranspose.protocol import IngesterState, StreamName, RedisKeys, WorkAssignment, IngesterName, ZmqUrl
 
 
 class IngesterSettings(DistributedSettings):
@@ -24,7 +24,7 @@ class Ingester(DistributedService):
         self._ingester_settings = settings
         if self._ingester_settings is None:
             self._ingester_settings = IngesterSettings()
-        streams: list[Stream] = []
+        streams: list[StreamName] = []
         state = IngesterState(
             name=name,
             url=self._ingester_settings.worker_url,
@@ -83,12 +83,12 @@ class Ingester(DistributedService):
             work_assignment: WorkAssignment = await self.assignment_queue.get()
             workermessages = {}
             zmqyields: list[Coroutine] = []
-            streams: list[Stream] = []
+            streams: list[StreamName] = []
             for stream in work_assignment.assignments:
                 zmqyields.append(anext(sourcegens[stream]))
                 streams.append(stream)
             zmqstreams: list[list[bytes | zmq.Frame]] = await asyncio.gather(*zmqyields)
-            zmqparts: dict[Stream, list[bytes | zmq.Frame]] = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
+            zmqparts: dict[StreamName, list[bytes | zmq.Frame]] = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
             for stream, workers in work_assignment.assignments.items():
                 for worker in workers:
                     if worker not in workermessages:
