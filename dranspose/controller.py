@@ -83,41 +83,42 @@ class Controller:
                     {RedisKeys.ready(self.mapping.uuid): last},
                     block=1000,
                 )
+                logger.debug("ready returned: %s", workers)
                 if RedisKeys.ready(self.mapping.uuid) in workers:
                     for ready in workers[
                         RedisKeys.ready(self.mapping.uuid)
                     ][0]:
-                        update = WorkerUpdate.model_validate(ready[1])
+                        update = WorkerUpdate.model_validate_json(ready[1]["data"])
                         logger.debug("got a ready worker %s", update)
                         if update.state == WorkerStateEnum.IDLE:
                             virt = self.mapping.assign_next(update.worker)
-                            if not update.is_new:
+                            if not update.new:
                                 compev = update.completed
                                 if compev not in self.completed:
                                     self.completed[compev] = []
                                 self.completed[compev].append(update.worker)
-                                if (set([x for stream in self.mapping.get_event_workers(compev-1).values() for x in stream]) ==
-                                        set(self.completed[compev])):
+                                logger.debug("added completed to set %s", self.completed)
+                                wa = self.mapping.get_event_workers(compev-1)
+                                if wa.get_all_workers() == set(self.completed[compev]):
                                     self.completed_events.append(compev)
                             logger.debug(
                                 "assigned worker %s to %s", update.worker, virt
                             )
-                            pipe = self.redis.pipeline()
-                            for evn in range(event_no, self.mapping.complete_events):
-                                wrks = self.mapping.get_event_workers(evn)
-                                logger.debug("send out assignment %s", wrks)
-                                await pipe.xadd(
-                                    RedisKeys.assigned(self.mapping.uuid),
-                                    {s: json.dumps(w) for s, w in wrks.items()},
-                                    id=evn + 1,
-                                )
-                                if evn % 1000 == 0:
-                                    logger.info(
-                                        "1000 events in %lf",
-                                        time.perf_counter() - start,
+                            async with self.redis.pipeline() as pipe:
+                                for evn in range(event_no, self.mapping.complete_events):
+                                    wrks = self.mapping.get_event_workers(evn)
+                                    await pipe.xadd(
+                                        RedisKeys.assigned(self.mapping.uuid),
+                                        {"data": wrks.model_dump_json()},
+                                        id=evn + 1,
                                     )
-                                    start = time.perf_counter()
-                            await pipe.execute()
+                                    if evn % 1000 == 0:
+                                        logger.info(
+                                            "1000 events in %lf",
+                                            time.perf_counter() - start,
+                                        )
+                                        start = time.perf_counter()
+                                await pipe.execute()
                             event_no = self.mapping.complete_events
                         last = ready[0]
             except rexceptions.ConnectionError as e:

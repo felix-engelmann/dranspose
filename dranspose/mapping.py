@@ -2,6 +2,8 @@ import json
 import uuid
 from typing import List, Dict, Union
 
+from dranspose.protocol import WorkAssignment, Stream
+
 
 class Mapping:
     def __init__(self, m):
@@ -46,13 +48,13 @@ class Mapping:
             minimum = max(minimum, len(workers))
         return minimum
 
-    def get_event_workers(self, no) -> Dict[str, List[str]]:
+    def get_event_workers(self, no) -> WorkAssignment: # Dict[Stream, List[str]]:
         ret = {}
         for s, v in self.mapping.items():
             if v[no] is None:
                 continue
             ret[s] = [self.assignments[x] for x in v[no]]
-        return ret
+        return WorkAssignment(event_number = no, assignments=ret)
 
     def update_filled(self):
         for evn in range(self.complete_events, self.len()):

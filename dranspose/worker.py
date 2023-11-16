@@ -13,7 +13,7 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService
-from dranspose.protocol import WorkerState, RedisKeys, IngesterState, WorkerUpdate, WorkerStateEnum
+from dranspose.protocol import WorkerState, RedisKeys, IngesterState, WorkerUpdate, WorkerStateEnum, WorkAssignment
 
 
 class ConnectedIngester(BaseModel):
@@ -46,12 +46,14 @@ class Worker(DistributedService):
         self._logger.info("started work task")
 
         await self.redis.xadd(
-            f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
-            WorkerUpdate(state=WorkerStateEnum.IDLE,
+            RedisKeys.ready(self.state.mapping_uuid),
+            {"data": WorkerUpdate(state=WorkerStateEnum.IDLE,
                          new=True,
                          completed=0,
-                         worker=self.state.name).model_dump(mode="json")
+                         worker=self.state.name).model_dump_json()}
         )
+
+        self._logger.info("registered ready message")
 
         lastev = 0
         proced = 0
@@ -66,9 +68,9 @@ class Worker(DistributedService):
             assignments = assignments[sub][0][0]
             self._logger.debug("got assignments %s", assignments)
             self._logger.debug("stream map %s", self._stream_map)
+            work_assignment = WorkAssignment.model_validate_json(assignments[1]["data"])
             ingesterset = set()
-            for stream, jsons in assignments[1].items():
-                workers = json.loads(jsons)
+            for stream, workers in work_assignment.assignments.items():
                 if self.state.name in workers:
                     try:
                         ingesterset.add(self._stream_map[stream])
@@ -88,8 +90,10 @@ class Worker(DistributedService):
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)
             await self.redis.xadd(
-                f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
-                {"state": "idle", "completed": int(lastev.split("-")[0]), "worker": self.state.name},
+                RedisKeys.ready(self.state.mapping_uuid),
+                {"data": WorkerUpdate(state=WorkerStateEnum.IDLE,
+                                      completed=int(lastev.split("-")[0]),
+                                      worker=self.state.name).model_dump_json()}
             )
 
     async def restart_work(self, new_uuid: UUID4):

@@ -10,7 +10,7 @@ import logging
 from pydantic import UUID4
 
 from dranspose.distributed import DistributedService
-from dranspose.protocol import IngesterState, PREFIX, Stream, RedisKeys
+from dranspose.protocol import IngesterState, PREFIX, Stream, RedisKeys, WorkAssignment
 
 
 class Ingester(DistributedService):
@@ -72,36 +72,30 @@ class Ingester(DistributedService):
             assignment_evs = assignments[sub][0]
             self._logger.debug("got assignments %s", assignment_evs)
             for assignment in assignment_evs:
-                assigned_workers = {
-                    "event": int(assignment[0].split("-")[0]),
-                    "streams": {},
-                }
-                for stream in self.state.streams:
-                    if stream in assignment[1]:
-                        workers = json.loads(assignment[1][stream])
-                        assigned_workers["streams"][stream] = workers
-                await self.assignment_queue.put(assigned_workers)
+                wa = WorkAssignment.model_validate_json(assignment[1]["data"])
+                mywa = wa.get_workers_for_streams(self.state.streams)
+                await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
 
     async def work(self):
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
         while True:
-            assigned_workers = await self.assignment_queue.get()
+            work_assignment: WorkAssignment = await self.assignment_queue.get()
             workermessages = {}
             zmqyields = []
             streams = []
-            for stream in assigned_workers["streams"]:
+            for stream in work_assignment.assignments:
                 zmqyields.append(anext(sourcegens[stream]))
                 streams.append(stream)
             zmqstreams = await asyncio.gather(*zmqyields)
             zmqparts = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
-            for stream, workers in assigned_workers["streams"].items():
+            for stream, workers in work_assignment.assignments.items():
                 for worker in workers:
                     if worker not in workermessages:
                         workermessages[worker] = {
                             "data": [],
-                            "header": {"event": assigned_workers["event"], "parts": []},
+                            "header": {"event": work_assignment.event_number, "parts": []},
                         }
                     workermessages[worker]["data"] += zmqparts[stream]
                     workermessages[worker]["header"]["parts"].append(
@@ -114,6 +108,7 @@ class Ingester(DistributedService):
                     + [json.dumps(message["header"]).encode("utf8")]
                     + message["data"]
                 )
+                self._logger.debug("sent message to worker %s", worker)
 
     async def run_source(self, stream):
         raise NotImplemented("get_frame must be implemented")
