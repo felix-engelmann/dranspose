@@ -1,6 +1,5 @@
 import asyncio
 import json
-import uuid
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -10,7 +9,7 @@ import logging
 from pydantic import UUID4
 
 from dranspose.distributed import DistributedService
-from dranspose.protocol import IngesterState, PREFIX, Stream, RedisKeys, WorkAssignment
+from dranspose.protocol import IngesterState, Stream, RedisKeys, WorkAssignment
 
 
 class Ingester(DistributedService):
@@ -128,7 +127,7 @@ class Ingester(DistributedService):
     async def close(self):
         self.accept_task.cancel()
         self.work_task.cancel()
-        await self.redis.delete(f"{PREFIX}:ingester:{self.state.name}:config")
+        await self.redis.delete(RedisKeys.config("ingester", self.state.name))
         await self.redis.aclose()
         self.ctx.destroy(linger=0)
         self._logger.info("closed ingester")

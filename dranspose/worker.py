@@ -165,7 +165,7 @@ class Worker(DistributedService):
 
     async def close(self):
         self.manage_ingester_task.cancel()
-        await self.redis.delete(f"{protocol.PREFIX}:worker:{self.state.name}:config")
+        await self.redis.delete(RedisKeys.config("worker", self.state.name))
         await self.redis.aclose()
         self.ctx.destroy()
         self._logger.info("worker closed")

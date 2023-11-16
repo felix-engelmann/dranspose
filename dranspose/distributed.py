@@ -3,7 +3,6 @@ from typing import Literal
 from pydantic import UUID4
 
 from dranspose.protocol import (
-    PREFIX,
     RedisKeys,
     ControllerUpdate,
     IngesterState,

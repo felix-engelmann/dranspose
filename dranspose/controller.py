@@ -193,9 +193,8 @@ async def set_mapping(mapping: Dict[str, List[List[int] | None]]):
             f"streams {set(mapping.keys()) - set(config.get_streams())} not available"
         )
     m = Mapping(mapping)
-    avail_workers = await ctrl.redis.keys(f"{protocol.PREFIX}:worker:*:config")
-    if len(avail_workers) < m.min_workers():
-        return f"only {len(avail_workers)} workers available, but {m.min_workers()} required"
+    if len(config.workers) < m.min_workers():
+        return f"only {len(config.workers)} workers available, but {m.min_workers()} required"
     await ctrl.set_mapping(m)
     return m.uuid
     # except Exception as e:

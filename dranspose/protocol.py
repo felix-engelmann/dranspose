@@ -98,6 +98,3 @@ class EnsembleState(BaseModel):
         ]
 
         return list(ingester_streams.intersection(*worker_streams))
-
-
-PREFIX = RedisKeys.PREFIX  # deprecated
