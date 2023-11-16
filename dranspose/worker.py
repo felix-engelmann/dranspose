@@ -19,7 +19,7 @@ from dranspose.protocol import (
     IngesterState,
     WorkerUpdate,
     WorkerStateEnum,
-    WorkAssignment,
+    WorkAssignment, WorkerName,
 )
 
 
@@ -31,7 +31,7 @@ class ConnectedIngester(BaseModel):
 
 
 class Worker(DistributedService):
-    def __init__(self, name: str, redis_host="localhost", redis_port=6379):
+    def __init__(self, name: WorkerName, redis_host="localhost", redis_port=6379):
         super().__init__()
         self._logger = logging.getLogger(f"{__name__}+{name}")
         self.ctx = zmq.asyncio.Context()

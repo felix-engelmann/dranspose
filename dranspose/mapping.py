@@ -38,7 +38,7 @@ class Mapping:
                         return w
         return None
 
-    def min_workers(self):
+    def min_workers(self) -> int:
         minimum = 0
         for evn, i in enumerate(zip(*self.mapping.values())):
             workers = set()
@@ -108,10 +108,6 @@ if __name__ == "__main__":
     print(m.complete_events)
 
     print("evworkers", m.get_event_workers(0))
-    print(
-        "evworkers",
-        set([x for stream in m.get_event_workers(0).values() for x in stream]),
-    )
     m.print()
 
     print(m.min_workers())

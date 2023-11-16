@@ -15,8 +15,8 @@ class RedisKeys:
     @staticmethod
     @cache
     @validate_call
-    def config(typ: Literal["ingester", "worker"] = None, instance: str = None) -> str:
-        return f"{RedisKeys.PREFIX}:{typ or '*'}:{instance or '*'}:config"
+    def config(typ: Literal["ingester", "worker", "*"] = "*", instance = "*") -> str:
+        return f"{RedisKeys.PREFIX}:{typ}:{instance}:config"
 
     @staticmethod
     @cache

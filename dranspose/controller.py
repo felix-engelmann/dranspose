@@ -197,5 +197,3 @@ async def set_mapping(mapping: Dict[str, List[List[int] | None]]):
         return f"only {len(config.workers)} workers available, but {m.min_workers()} required"
     await ctrl.set_mapping(m)
     return m.uuid
-    # except Exception as e:
-    #    return e.__repr__()

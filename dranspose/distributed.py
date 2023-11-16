@@ -1,6 +1,7 @@
 from typing import Literal
 
-from pydantic import UUID4
+from pydantic import UUID4, AliasChoices, Field, RedisDsn
+from pydantic_settings import BaseSettings
 
 from dranspose.protocol import (
     RedisKeys,
@@ -12,13 +13,22 @@ import redis.exceptions as rexceptions
 import asyncio
 
 
+class Settings(BaseSettings):
+    redis_dsn: RedisDsn = Field(
+        'redis://localhost:6379/0',
+        validation_alias=AliasChoices('service_redis_dsn', 'redis_url')
+    )
+
+
 class DistributedService:
     def __init__(self):
+        self.settings = Settings()
+        print("self.settings", self.settings)
         self.redis = None
         self.state = None
         self._logger = None
 
-    async def register(self):
+    async def register(self) -> None:
         latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
         last = 0
         if len(latest) > 0:
@@ -53,4 +63,4 @@ class DistributedService:
                 break
 
     async def restart_work(self, new_uuid: UUID4):
-        raise NotImplemented()
+        raise NotImplemented("restart work needs to be implemented")

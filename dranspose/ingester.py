@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Coroutine
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -42,14 +43,14 @@ class Ingester(DistributedService):
             streams=streams,
         )
 
-    async def run(self):
+    async def run(self) -> None:
         self.accept_task = asyncio.create_task(self.accept_workers())
         self.work_task = asyncio.create_task(self.work())
         self.assign_task = asyncio.create_task(self.manage_assignments())
-        self.assignment_queue = asyncio.Queue()
+        self.assignment_queue: asyncio.Queue[WorkAssignment] = asyncio.Queue()
         await self.register()
 
-    async def restart_work(self, new_uuid: UUID4):
+    async def restart_work(self, new_uuid: UUID4) -> None:
         self.work_task.cancel()
         self.assign_task.cancel()
         self.state.mapping_uuid = new_uuid
@@ -57,7 +58,7 @@ class Ingester(DistributedService):
         self.work_task = asyncio.create_task(self.work())
         self.assign_task = asyncio.create_task(self.manage_assignments())
 
-    async def manage_assignments(self):
+    async def manage_assignments(self) -> None:
         self._logger.info("started ingester manage assign task")
         lastev = 0
         while True:
@@ -76,19 +77,19 @@ class Ingester(DistributedService):
                 await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
 
-    async def work(self):
+    async def work(self) -> None:
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
         while True:
             work_assignment: WorkAssignment = await self.assignment_queue.get()
             workermessages = {}
-            zmqyields = []
-            streams = []
+            zmqyields: list[Coroutine] = []
+            streams: list[Stream] = []
             for stream in work_assignment.assignments:
                 zmqyields.append(anext(sourcegens[stream]))
                 streams.append(stream)
-            zmqstreams = await asyncio.gather(*zmqyields)
-            zmqparts = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
+            zmqstreams: list[list[bytes | zmq.Frame]] = await asyncio.gather(*zmqyields)
+            zmqparts: dict[Stream, list[bytes | zmq.Frame]] = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
             for stream, workers in work_assignment.assignments.items():
                 for worker in workers:
                     if worker not in workermessages:
@@ -115,7 +116,7 @@ class Ingester(DistributedService):
     async def run_source(self, stream):
         raise NotImplemented("get_frame must be implemented")
 
-    async def accept_workers(self):
+    async def accept_workers(self) -> None:
         poller = zmq.asyncio.Poller()
         poller.register(self.out_socket, zmq.POLLIN)
         while True:
@@ -124,7 +125,7 @@ class Ingester(DistributedService):
                 data = await sock.recv_multipart()
                 self._logger.info("new worker connected %s", data[0])
 
-    async def close(self):
+    async def close(self) -> None:
         self.accept_task.cancel()
         self.work_task.cancel()
         await self.redis.delete(RedisKeys.config("ingester", self.state.name))

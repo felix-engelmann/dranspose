@@ -1,9 +1,11 @@
 import json
+from typing import AsyncIterator
 
 import numpy as np
 import zmq
 
 from dranspose.ingester import Ingester
+from dranspose.protocol import Stream
 
 
 class StreamingSingleIngester(Ingester):
@@ -16,7 +18,7 @@ class StreamingSingleIngester(Ingester):
         self.in_socket = self.ctx.socket(zmq.PULL)
         self.in_socket.connect(connect_url)
 
-    async def run_source(self, stream):
+    async def run_source(self, stream: Stream) -> AsyncIterator[list[bytes | zmq.Frame]]:
         hdr = None
         while True:
             self._logger.debug("clear up insocket")
