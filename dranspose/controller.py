@@ -7,6 +7,9 @@ import uvicorn
 import zmq.asyncio
 import logging
 import time
+
+from pydantic import BaseModel
+
 from dranspose import protocol
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
@@ -15,58 +18,58 @@ import redis.exceptions as rexceptions
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-logger = logging.getLogger(__name__)
+from dranspose.protocol import IngesterState, WorkerState, RedisKeys, ControllerUpdate, EnsembleState
 
+logger = logging.getLogger(__name__)
 
 class Controller:
     def __init__(self, redis_host="localhost", redis_port=6379):
-        self.ctx = zmq.asyncio.Context()
         self.redis = redis.Redis(
             host=redis_host, port=redis_port, decode_responses=True, protocol=3
         )
-        self.present = []
-        self.configs = []
 
         self.mapping = Mapping({"":[]})
-
         self.completed = {}
         self.completed_events = []
+        self.assign_task = None
 
     async def run(self):
         logger.debug("started controller run")
         self.assign_task = asyncio.create_task(self.assign_work())
-        await self.monitor()
 
-    async def monitor(self):
-        while True:
-            self.present = await self.redis.keys(f"{protocol.PREFIX}:*:*:present")
-            self.configs = await self.redis.keys(f"{protocol.PREFIX}:*:*:config")
-            await asyncio.sleep(2)
+    async def get_configs(self) -> EnsembleState:
+        async with self.redis.pipeline() as pipe:
+            await pipe.keys(RedisKeys.config("ingester"))
+            await pipe.keys(RedisKeys.config("worker"))
+            ingester_keys, worker_keys = await pipe.execute()
+        async with self.redis.pipeline() as pipe:
+            await pipe.mget(ingester_keys)
+            await pipe.mget(worker_keys)
+            ingester_json, worker_json = await pipe.execute()
+
+        ingesters = [IngesterState.model_validate_json(i) for i in ingester_json]
+        workers = [WorkerState.model_validate_json(w) for w in worker_json]
+        return EnsembleState(ingesters=ingesters, workers=workers)
 
     async def set_mapping(self, m):
         self.assign_task.cancel()
-        await self.redis.delete(f"{protocol.PREFIX}:ready:{self.mapping.uuid}")
-
-        assignments = await self.redis.keys(
-            f"{protocol.PREFIX}:assigned:{self.mapping.uuid}:*"
-        )
-        if len(assignments) > 0:
-            await self.redis.delete(*assignments)
+        await self.redis.delete(RedisKeys.ready(self.mapping.uuid))
+        await self.redis.delete(RedisKeys.assigned(self.mapping.uuid))
 
         # cleaned up
         self.mapping = m
+
+        cupd = ControllerUpdate(mapping_uuid=self.mapping.uuid)
         await self.redis.xadd(
-            f"{protocol.PREFIX}:controller:updates",
-            {"mapping_uuid": self.mapping.uuid},
+            RedisKeys.updates(),
+            json.loads(cupd.model_dump_json()),
         )
 
-        self.configs = await self.redis.keys(f"{protocol.PREFIX}:*:*:config")
-        if len(self.configs) > 0:
-            uuids = await self.redis.json().mget(self.configs, "$.mapping_uuid")
-            while set([u[0] for u in uuids]) != {self.mapping.uuid}:
-                await asyncio.sleep(0.05)
-                uuids = await self.redis.json().mget(self.configs, "$.mapping_uuid")
-        logger.info("new mapping distributed")
+        cfgs= await self.get_configs()
+        while set([u.mapping_uuid for u in cfgs.ingesters]+[u.mapping_uuid for u in cfgs.workers]) != {self.mapping.uuid}:
+            await asyncio.sleep(0.1)
+            cfgi, cfgw = await self.get_configs()
+        logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
 
     async def assign_work(self):
@@ -118,12 +121,6 @@ class Controller:
             except rexceptions.ConnectionError as e:
                 break
 
-    async def get_streams(self):
-        if len(ctrl.configs) > 0:
-            streams = await ctrl.redis.json().mget(ctrl.configs, "$.streams")
-            return [x for s in streams if len(s) > 0 for x in s[0]]
-        else:
-            return []
 
     async def close(self):
         await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
@@ -133,7 +130,6 @@ class Controller:
         assigned = await self.redis.keys(f"{protocol.PREFIX}:assigned:*")
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
-        self.ctx.destroy()
         await self.redis.aclose()
 
 
@@ -155,9 +151,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.get("/api/v1/streams")
-async def get_streams():
-    return await ctrl.get_streams()
+@app.get("/api/v1/config")
+async def get_configs():
+    return await ctrl.get_configs()
 
 @app.get("/api/v1/status")
 async def get_status():
@@ -169,15 +165,14 @@ async def get_status():
 
 @app.post("/api/v1/mapping")
 async def set_mapping(mapping: Dict[str, List[List[int]|None]]):
-    try:
-        streams = await ctrl.get_streams()
-        if set(mapping.keys()) - set(streams) != set():
-            return f"streams {set(mapping.keys()) - set(streams)} not available"
-        m = Mapping(mapping)
-        avail_workers = await ctrl.redis.keys(f"{protocol.PREFIX}:worker:*:config")
-        if len(avail_workers) < m.min_workers():
-            return f"only {len(avail_workers)} workers available, but {m.min_workers()} required"
-        await ctrl.set_mapping(m)
-        return m.uuid
-    except Exception as e:
-        return e.__repr__()
+    config = await ctrl.get_configs()
+    if set(mapping.keys()) - set(config.get_streams()) != set():
+        return f"streams {set(mapping.keys()) - set(config.get_streams())} not available"
+    m = Mapping(mapping)
+    avail_workers = await ctrl.redis.keys(f"{protocol.PREFIX}:worker:*:config")
+    if len(avail_workers) < m.min_workers():
+        return f"only {len(avail_workers)} workers available, but {m.min_workers()} required"
+    await ctrl.set_mapping(m)
+    return m.uuid
+    #except Exception as e:
+    #    return e.__repr__()

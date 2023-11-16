@@ -14,14 +14,11 @@ import zmq
 
 from dranspose.controller import app
 from dranspose.ingesters.streaming_single import StreamingSingleIngester
+from dranspose.protocol import EnsembleState, RedisKeys
 from dranspose.worker import Worker
 
 import redis.asyncio as redis
 
-
-@pytest.mark.asyncio
-async def test_simple():
-    await asyncio.sleep(0.5)
 
 @pytest_asyncio.fixture()
 async def controller():
@@ -170,12 +167,13 @@ async def test_map(controller, create_worker, create_ingester, stream_eiger, str
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get('http://localhost:5000/api/v1/streams')
-        content = await st.json()
-        while {"eiger", "orca", "alba","slow"} - set(content) != set():
+        st = await session.get('http://localhost:5000/api/v1/config')
+        state = EnsembleState.model_validate(await st.json())
+        print("content", state.ingesters)
+        while {"eiger", "orca", "alba","slow"} - set(state.get_streams()) != set():
             await asyncio.sleep(0.3)
-            st = await session.get('http://localhost:5000/api/v1/streams')
-            content = await st.json()
+            st = await session.get('http://localhost:5000/api/v1/config')
+            state = EnsembleState.model_validate(await st.json())
 
 
         print("startup done")
@@ -189,10 +187,13 @@ async def test_map(controller, create_worker, create_ingester, stream_eiger, str
         assert resp.status == 200
         uuid = await resp.json()
 
-    updates = await r.xread({'dranspose:controller:updates':0})
+    print("uuid", uuid, type(uuid))
+    updates = await r.xread({RedisKeys.updates():0})
     print("updates", updates)
     keys = await r.keys("dranspose:*")
+    print("keys", keys)
     present_keys = {f'dranspose:assigned:{uuid}',f'dranspose:ready:{uuid}'}
+    print("presentkeys", present_keys)
     assert present_keys - set(keys) == set()
 
     context = zmq.asyncio.Context()
