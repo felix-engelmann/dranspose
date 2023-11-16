@@ -30,9 +30,6 @@ class Ingester(DistributedService):
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 300)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
         self.out_socket.bind(f"tcp://*:{config.get('worker_port', 10000)}")
-        self.redis = redis.Redis(
-            host=redis_host, port=redis_port, decode_responses=True, protocol=3
-        )
         streams: list[Stream] = []
 
         self.state = IngesterState(

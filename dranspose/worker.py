@@ -35,9 +35,6 @@ class Worker(DistributedService):
         super().__init__()
         self._logger = logging.getLogger(f"{__name__}+{name}")
         self.ctx = zmq.asyncio.Context()
-        self.redis = redis.Redis(
-            host=redis_host, port=redis_port, decode_responses=True, protocol=3
-        )
         if ":" in name:
             raise Exception("Worker name must not contain a :")
         self.state = WorkerState(name=name)

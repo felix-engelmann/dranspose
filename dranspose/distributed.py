@@ -1,5 +1,6 @@
 from typing import Literal
 
+import redis.asyncio as redis
 from pydantic import UUID4, AliasChoices, Field, RedisDsn
 from pydantic_settings import BaseSettings
 
@@ -24,7 +25,7 @@ class DistributedService:
     def __init__(self):
         self.settings = Settings()
         print("self.settings", self.settings)
-        self.redis = None
+        self.redis = redis.from_url(f"{self.settings.redis_dsn}?decode_responses=True&protocol=3")
         self.state = None
         self._logger = None
 
