@@ -1,32 +1,38 @@
 import pickle
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import NewType, Literal
 
 from pydantic import AnyUrl, UUID4, BaseModel, validate_call
 
 import zmq
-from serde import serde
+from functools import cache
+
 
 
 class RedisKeys:
     PREFIX = "dranspose"
 
     @staticmethod
+    @cache
     @validate_call
     def config(typ: Literal["ingester", "worker"] = None, instance: str = None) -> str:
         return f"{RedisKeys.PREFIX}:{typ or '*'}:{instance or '*'}:config"
 
     @staticmethod
+    @cache
     @validate_call
-    def ready(uuid: UUID4 = None) -> str:
+    def ready(uuid: UUID4 | Literal["*"] | None = None) -> str:
         return f"{RedisKeys.PREFIX}:ready:{uuid}"
 
     @staticmethod
+    @cache
     @validate_call
-    def assigned(uuid: UUID4 = None) -> str:
+    def assigned(uuid: UUID4 | Literal["*"] | None = None) -> str:
         return f"{RedisKeys.PREFIX}:assigned:{uuid}"
 
     @staticmethod
+    @cache
     def updates() -> str:
         return f"{RedisKeys.PREFIX}:controller:updates"
 
@@ -37,6 +43,21 @@ Stream = NewType("Stream", str)
 
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
+
+
+class WorkerStateEnum(Enum):
+    IDLE = "idle"
+
+
+class WorkerUpdate(BaseModel):
+    state: WorkerStateEnum
+    completed: int
+    worker: str
+    new: int = 0
+
+    @property
+    def is_new(self) -> bool:
+        return bool(self.new)
 
 class IngesterState(BaseModel):
     name: str

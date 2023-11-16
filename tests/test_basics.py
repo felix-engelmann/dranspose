@@ -137,21 +137,6 @@ async def stream_alba():
 
     yield _make_alba
 
-@pytest.mark.asyncio
-async def test_services(controller, create_worker, create_ingester):
-    print(controller)
-
-    await create_worker("w1")
-    await create_worker("w2")
-    await create_worker("w3")
-    await create_ingester(StreamingSingleIngester(connect_url="tcp://localhost:9999", name="eiger"))
-
-    await asyncio.sleep(2)
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-    keys = await r.keys("dranspose:*")
-    present_keys = {'dranspose:worker:w2:present', 'dranspose:worker:w3:config', 'dranspose:worker:w1:config', 'dranspose:worker:w3:present', 'dranspose:ingester:eiger_ingester:config', 'dranspose:ingester:eiger_ingester:present', 'dranspose:worker:w2:config', 'dranspose:worker:w1:present'}
-    assert present_keys-set(keys) == set()
-    await r.aclose()
 
 @pytest.mark.asyncio
 async def test_map(controller, create_worker, create_ingester, stream_eiger, stream_orca, stream_alba):

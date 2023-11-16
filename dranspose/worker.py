@@ -13,7 +13,8 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService
-from dranspose.protocol import WorkerState, RedisKeys, IngesterState
+from dranspose.protocol import WorkerState, RedisKeys, IngesterState, WorkerUpdate, WorkerStateEnum
+
 
 class ConnectedIngester(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -46,13 +47,16 @@ class Worker(DistributedService):
 
         await self.redis.xadd(
             f"{protocol.PREFIX}:ready:{self.state.mapping_uuid}",
-            {"state": "idle", "completed": 0, "new": 1, "worker": self.state.name},
+            WorkerUpdate(state=WorkerStateEnum.IDLE,
+                         new=True,
+                         completed=0,
+                         worker=self.state.name).model_dump(mode="json")
         )
 
         lastev = 0
         proced = 0
         while True:
-            sub = f"{protocol.PREFIX}:assigned:{self.state.mapping_uuid}"
+            sub = RedisKeys.assigned(self.state.mapping_uuid)
             try:
                 assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
             except rexceptions.ConnectionError:

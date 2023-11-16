@@ -18,7 +18,8 @@ import redis.exceptions as rexceptions
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from dranspose.protocol import IngesterState, WorkerState, RedisKeys, ControllerUpdate, EnsembleState
+from dranspose.protocol import IngesterState, WorkerState, RedisKeys, ControllerUpdate, EnsembleState, WorkerUpdate, \
+    WorkerStateEnum
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +63,13 @@ class Controller:
         cupd = ControllerUpdate(mapping_uuid=self.mapping.uuid)
         await self.redis.xadd(
             RedisKeys.updates(),
-            json.loads(cupd.model_dump_json()),
+            cupd.model_dump(mode="json"),
         )
 
         cfgs= await self.get_configs()
         while set([u.mapping_uuid for u in cfgs.ingesters]+[u.mapping_uuid for u in cfgs.workers]) != {self.mapping.uuid}:
             await asyncio.sleep(0.1)
-            cfgi, cfgw = await self.get_configs()
+            cfgs = await self.get_configs()
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
 
@@ -79,33 +80,34 @@ class Controller:
         while True:
             try:
                 workers = await self.redis.xread(
-                    {f"{protocol.PREFIX}:ready:{self.mapping.uuid}": last},
+                    {RedisKeys.ready(self.mapping.uuid): last},
                     block=1000,
                 )
-                if f"{protocol.PREFIX}:ready:{self.mapping.uuid}" in workers:
+                if RedisKeys.ready(self.mapping.uuid) in workers:
                     for ready in workers[
-                        f"{protocol.PREFIX}:ready:{self.mapping.uuid}"
+                        RedisKeys.ready(self.mapping.uuid)
                     ][0]:
-                        logger.debug("got a ready worker %s", ready)
-                        if ready[1]["state"] == "idle":
-                            virt = self.mapping.assign_next(ready[1]["worker"])
-                            if "new" not in ready[1]:
-                                compev = int(ready[1]["completed"])
+                        update = WorkerUpdate.model_validate(ready[1])
+                        logger.debug("got a ready worker %s", update)
+                        if update.state == WorkerStateEnum.IDLE:
+                            virt = self.mapping.assign_next(update.worker)
+                            if not update.is_new:
+                                compev = update.completed
                                 if compev not in self.completed:
                                     self.completed[compev] = []
-                                self.completed[compev].append(ready[1]["worker"])
+                                self.completed[compev].append(update.worker)
                                 if (set([x for stream in self.mapping.get_event_workers(compev-1).values() for x in stream]) ==
                                         set(self.completed[compev])):
                                     self.completed_events.append(compev)
                             logger.debug(
-                                "assigned worker %s to %s", ready[1]["worker"], virt
+                                "assigned worker %s to %s", update.worker, virt
                             )
                             pipe = self.redis.pipeline()
                             for evn in range(event_no, self.mapping.complete_events):
                                 wrks = self.mapping.get_event_workers(evn)
                                 logger.debug("send out assignment %s", wrks)
                                 await pipe.xadd(
-                                    f"{protocol.PREFIX}:assigned:{self.mapping.uuid}",
+                                    RedisKeys.assigned(self.mapping.uuid),
                                     {s: json.dumps(w) for s, w in wrks.items()},
                                     id=evn + 1,
                                 )
@@ -123,11 +125,11 @@ class Controller:
 
 
     async def close(self):
-        await self.redis.delete(f"{protocol.PREFIX}:controller:updates")
-        queues = await self.redis.keys(f"{protocol.PREFIX}:ready:*")
+        await self.redis.delete(RedisKeys.updates())
+        queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
             await self.redis.delete(*queues)
-        assigned = await self.redis.keys(f"{protocol.PREFIX}:assigned:*")
+        assigned = await self.redis.keys(RedisKeys.assigned("*"))
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
         await self.redis.aclose()

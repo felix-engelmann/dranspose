@@ -10,7 +10,7 @@ import logging
 from pydantic import UUID4
 
 from dranspose.distributed import DistributedService
-from dranspose.protocol import IngesterState, PREFIX, Stream
+from dranspose.protocol import IngesterState, PREFIX, Stream, RedisKeys
 
 
 class Ingester(DistributedService):
@@ -62,7 +62,7 @@ class Ingester(DistributedService):
         self._logger.info("started ingester manage assign task")
         lastev = 0
         while True:
-            sub = f"{PREFIX}:assigned:{self.state.mapping_uuid}"
+            sub = RedisKeys.assigned(self.state.mapping_uuid)
             try:
                 assignments = await self.redis.xread({sub: lastev}, block=1000)
             except rexceptions.ConnectionError:
