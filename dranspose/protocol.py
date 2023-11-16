@@ -9,7 +9,6 @@ import zmq
 from functools import cache
 
 
-
 class RedisKeys:
     PREFIX = "dranspose"
 
@@ -36,14 +35,18 @@ class RedisKeys:
     def updates() -> str:
         return f"{RedisKeys.PREFIX}:controller:updates"
 
+
 class ProtocolException(Exception):
     pass
+
 
 Stream = NewType("Stream", str)
 WorkerName = NewType("WorkerName", str)
 
+
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
+
 
 class WorkAssignment(BaseModel):
     event_number: int
@@ -59,6 +62,7 @@ class WorkAssignment(BaseModel):
     def get_all_workers(self) -> set[WorkerName]:
         return set([x for stream in self.assignments.values() for x in stream])
 
+
 class WorkerStateEnum(Enum):
     IDLE = "idle"
 
@@ -68,6 +72,7 @@ class WorkerUpdate(BaseModel):
     completed: int
     worker: WorkerName
     new: bool = False
+
 
 class IngesterState(BaseModel):
     name: str
@@ -88,9 +93,11 @@ class EnsembleState(BaseModel):
 
     def get_streams(self) -> list[Stream]:
         ingester_streams = set([s for i in self.ingesters for s in i.streams])
-        worker_streams = [set([s for i in w.ingesters for s in i.streams]) for w in self.workers]
+        worker_streams = [
+            set([s for i in w.ingesters for s in i.streams]) for w in self.workers
+        ]
 
         return list(ingester_streams.intersection(*worker_streams))
 
 
-PREFIX = RedisKeys.PREFIX # deprecated
+PREFIX = RedisKeys.PREFIX  # deprecated

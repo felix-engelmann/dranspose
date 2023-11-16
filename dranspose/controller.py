@@ -18,10 +18,18 @@ import redis.exceptions as rexceptions
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from dranspose.protocol import IngesterState, WorkerState, RedisKeys, ControllerUpdate, EnsembleState, WorkerUpdate, \
-    WorkerStateEnum
+from dranspose.protocol import (
+    IngesterState,
+    WorkerState,
+    RedisKeys,
+    ControllerUpdate,
+    EnsembleState,
+    WorkerUpdate,
+    WorkerStateEnum,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class Controller:
     def __init__(self, redis_host="localhost", redis_port=6379):
@@ -29,7 +37,7 @@ class Controller:
             host=redis_host, port=redis_port, decode_responses=True, protocol=3
         )
 
-        self.mapping = Mapping({"":[]})
+        self.mapping = Mapping({"": []})
         self.completed = {}
         self.completed_events = []
         self.assign_task = None
@@ -66,8 +74,11 @@ class Controller:
             cupd.model_dump(mode="json"),
         )
 
-        cfgs= await self.get_configs()
-        while set([u.mapping_uuid for u in cfgs.ingesters]+[u.mapping_uuid for u in cfgs.workers]) != {self.mapping.uuid}:
+        cfgs = await self.get_configs()
+        while set(
+            [u.mapping_uuid for u in cfgs.ingesters]
+            + [u.mapping_uuid for u in cfgs.workers]
+        ) != {self.mapping.uuid}:
             await asyncio.sleep(0.1)
             cfgs = await self.get_configs()
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
@@ -85,9 +96,7 @@ class Controller:
                 )
                 logger.debug("ready returned: %s", workers)
                 if RedisKeys.ready(self.mapping.uuid) in workers:
-                    for ready in workers[
-                        RedisKeys.ready(self.mapping.uuid)
-                    ][0]:
+                    for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
                         update = WorkerUpdate.model_validate_json(ready[1]["data"])
                         logger.debug("got a ready worker %s", update)
                         if update.state == WorkerStateEnum.IDLE:
@@ -97,15 +106,19 @@ class Controller:
                                 if compev not in self.completed:
                                     self.completed[compev] = []
                                 self.completed[compev].append(update.worker)
-                                logger.debug("added completed to set %s", self.completed)
-                                wa = self.mapping.get_event_workers(compev-1)
+                                logger.debug(
+                                    "added completed to set %s", self.completed
+                                )
+                                wa = self.mapping.get_event_workers(compev - 1)
                                 if wa.get_all_workers() == set(self.completed[compev]):
                                     self.completed_events.append(compev)
                             logger.debug(
                                 "assigned worker %s to %s", update.worker, virt
                             )
                             async with self.redis.pipeline() as pipe:
-                                for evn in range(event_no, self.mapping.complete_events):
+                                for evn in range(
+                                    event_no, self.mapping.complete_events
+                                ):
                                     wrks = self.mapping.get_event_workers(evn)
                                     await pipe.xadd(
                                         RedisKeys.assigned(self.mapping.uuid),
@@ -123,7 +136,6 @@ class Controller:
                         last = ready[0]
             except rexceptions.ConnectionError as e:
                 break
-
 
     async def close(self):
         await self.redis.delete(RedisKeys.updates())
@@ -143,7 +155,10 @@ ctrl: Controller
 async def lifespan(app: FastAPI):
     # Load the ML model
     global ctrl
-    ctrl = Controller(redis_host=os.getenv("REDIS_HOST","localhost"), redis_port=os.getenv("REDIS_PORT",6379))
+    ctrl = Controller(
+        redis_host=os.getenv("REDIS_HOST", "localhost"),
+        redis_port=os.getenv("REDIS_PORT", 6379),
+    )
     run_task = asyncio.create_task(ctrl.run())
     yield
     run_task.cancel()
@@ -158,24 +173,30 @@ app = FastAPI(lifespan=lifespan)
 async def get_configs():
     return await ctrl.get_configs()
 
+
 @app.get("/api/v1/status")
 async def get_status():
-    return {"work_completed": ctrl.completed,
-            "last_assigned": ctrl.mapping.complete_events,
-            "assignment": ctrl.mapping.assignments,
-            "completed_events": ctrl.completed_events,
-            "finished": len(ctrl.completed_events) == ctrl.mapping.len()}
+    return {
+        "work_completed": ctrl.completed,
+        "last_assigned": ctrl.mapping.complete_events,
+        "assignment": ctrl.mapping.assignments,
+        "completed_events": ctrl.completed_events,
+        "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
+    }
+
 
 @app.post("/api/v1/mapping")
-async def set_mapping(mapping: Dict[str, List[List[int]|None]]):
+async def set_mapping(mapping: Dict[str, List[List[int] | None]]):
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():
-        return f"streams {set(mapping.keys()) - set(config.get_streams())} not available"
+        return (
+            f"streams {set(mapping.keys()) - set(config.get_streams())} not available"
+        )
     m = Mapping(mapping)
     avail_workers = await ctrl.redis.keys(f"{protocol.PREFIX}:worker:*:config")
     if len(avail_workers) < m.min_workers():
         return f"only {len(avail_workers)} workers available, but {m.min_workers()} required"
     await ctrl.set_mapping(m)
     return m.uuid
-    #except Exception as e:
+    # except Exception as e:
     #    return e.__repr__()

@@ -14,7 +14,9 @@ from dranspose.protocol import IngesterState, PREFIX, Stream, RedisKeys, WorkAss
 
 
 class Ingester(DistributedService):
-    def __init__(self, name: str, redis_host="localhost", redis_port=6379, config=None, **kwargs):
+    def __init__(
+        self, name: str, redis_host="localhost", redis_port=6379, config=None, **kwargs
+    ):
         super().__init__()
         self._logger = logging.getLogger(f"{__name__}+{name}")
         if config is None:
@@ -34,11 +36,11 @@ class Ingester(DistributedService):
         streams: list[Stream] = []
 
         self.state = IngesterState(
-            name = name,
-            url = config.get(
+            name=name,
+            url=config.get(
                 "worker_url", f"tcp://localhost:{config.get('worker_port', 10000)}"
             ),
-            streams = streams
+            streams=streams,
         )
 
     async def run(self):
@@ -54,9 +56,7 @@ class Ingester(DistributedService):
         self.state.mapping_uuid = new_uuid
         self.assignment_queue = asyncio.Queue()
         self.work_task = asyncio.create_task(self.work())
-        self.assign_task = asyncio.create_task(
-            self.manage_assignments()
-        )
+        self.assign_task = asyncio.create_task(self.manage_assignments())
 
     async def manage_assignments(self):
         self._logger.info("started ingester manage assign task")
@@ -95,7 +95,10 @@ class Ingester(DistributedService):
                     if worker not in workermessages:
                         workermessages[worker] = {
                             "data": [],
-                            "header": {"event": work_assignment.event_number, "parts": []},
+                            "header": {
+                                "event": work_assignment.event_number,
+                                "parts": [],
+                            },
                         }
                     workermessages[worker]["data"] += zmqparts[stream]
                     workermessages[worker]["header"]["parts"].append(
@@ -121,7 +124,6 @@ class Ingester(DistributedService):
             for sock in socks:
                 data = await sock.recv_multipart()
                 self._logger.info("new worker connected %s", data[0])
-
 
     async def close(self):
         self.accept_task.cancel()

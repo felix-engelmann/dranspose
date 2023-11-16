@@ -7,13 +7,13 @@ from dranspose.protocol import WorkAssignment, Stream
 
 class Mapping:
     def __init__(self, m):
-        #ntrig = 10
-        #self.mapping = {
-            # "orca": [[2 * i] for i in range(1, ntrig)],
+        # ntrig = 10
+        # self.mapping = {
+        # "orca": [[2 * i] for i in range(1, ntrig)],
         #    "eiger": [[2 * i + 1] for i in range(1, ntrig)],
         #    "slow": [[1000+2 * i] if i%3 == 0 else None for i in range(1, ntrig)],
-            # "alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
-        #}
+        # "alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
+        # }
 
         if len(set(map(len, m.values()))) != 1:
             raise Exception("length not equal: ", list(map(len, m.values())))
@@ -48,13 +48,13 @@ class Mapping:
             minimum = max(minimum, len(workers))
         return minimum
 
-    def get_event_workers(self, no) -> WorkAssignment: # Dict[Stream, List[str]]:
+    def get_event_workers(self, no) -> WorkAssignment:  # Dict[Stream, List[str]]:
         ret = {}
         for s, v in self.mapping.items():
             if v[no] is None:
                 continue
             ret[s] = [self.assignments[x] for x in v[no]]
-        return WorkAssignment(event_number = no, assignments=ret)
+        return WorkAssignment(event_number=no, assignments=ret)
 
     def update_filled(self):
         for evn in range(self.complete_events, self.len()):
@@ -89,10 +89,13 @@ class Mapping:
 
 if __name__ == "__main__":
     ntrig = 10
-    m = Mapping({"eiger": [[2*i] for i in range(1, ntrig)],
-                                   "orca" : [[2*i+1] for i in range(1, ntrig)],
-                                   "alba" : [[2*i, 2*i+1] for i in range(1, ntrig)],
-                                   })
+    m = Mapping(
+        {
+            "eiger": [[2 * i] for i in range(1, ntrig)],
+            "orca": [[2 * i + 1] for i in range(1, ntrig)],
+            "alba": [[2 * i, 2 * i + 1] for i in range(1, ntrig)],
+        }
+    )
     m.print()
     for i in range(5):
         print(m.complete_events)
@@ -105,7 +108,10 @@ if __name__ == "__main__":
     print(m.complete_events)
 
     print("evworkers", m.get_event_workers(0))
-    print("evworkers", set([x for stream in  m.get_event_workers(0).values() for x in stream]))
+    print(
+        "evworkers",
+        set([x for stream in m.get_event_workers(0).values() for x in stream]),
+    )
     m.print()
 
     print(m.min_workers())

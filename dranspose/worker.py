@@ -13,7 +13,14 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService
-from dranspose.protocol import WorkerState, RedisKeys, IngesterState, WorkerUpdate, WorkerStateEnum, WorkAssignment
+from dranspose.protocol import (
+    WorkerState,
+    RedisKeys,
+    IngesterState,
+    WorkerUpdate,
+    WorkerStateEnum,
+    WorkAssignment,
+)
 
 
 class ConnectedIngester(BaseModel):
@@ -47,10 +54,14 @@ class Worker(DistributedService):
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
-            {"data": WorkerUpdate(state=WorkerStateEnum.IDLE,
-                         new=True,
-                         completed=0,
-                         worker=self.state.name).model_dump_json()}
+            {
+                "data": WorkerUpdate(
+                    state=WorkerStateEnum.IDLE,
+                    new=True,
+                    completed=0,
+                    worker=self.state.name,
+                ).model_dump_json()
+            },
         )
 
         self._logger.info("registered ready message")
@@ -75,7 +86,11 @@ class Worker(DistributedService):
                     try:
                         ingesterset.add(self._stream_map[stream])
                     except KeyError:
-                        self._logger.error("ingester for stream %s not connected, available: %s", stream, self._ingesters)
+                        self._logger.error(
+                            "ingester for stream %s not connected, available: %s",
+                            stream,
+                            self._ingesters,
+                        )
             self._logger.debug("receive from ingesters %s", ingesterset)
 
             lastev = assignments[0]
@@ -91,9 +106,13 @@ class Worker(DistributedService):
                 self._logger.info("processed %d events", proced)
             await self.redis.xadd(
                 RedisKeys.ready(self.state.mapping_uuid),
-                {"data": WorkerUpdate(state=WorkerStateEnum.IDLE,
-                                      completed=int(lastev.split("-")[0]),
-                                      worker=self.state.name).model_dump_json()}
+                {
+                    "data": WorkerUpdate(
+                        state=WorkerStateEnum.IDLE,
+                        completed=int(lastev.split("-")[0]),
+                        worker=self.state.name,
+                    ).model_dump_json()
+                },
             )
 
     async def restart_work(self, new_uuid: UUID4):
@@ -101,7 +120,6 @@ class Worker(DistributedService):
         self.work_task.cancel()
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
-
 
     async def manage_ingesters(self):
         while True:
