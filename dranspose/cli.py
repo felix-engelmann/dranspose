@@ -1,6 +1,9 @@
 import argparse
 import asyncio
 import os
+import random
+import socket
+import string
 
 import uvicorn
 from pydantic_core import Url
@@ -70,10 +73,13 @@ def run() -> None:
 
         asyncio.run(run())
     elif args.component == "worker":
-        print(args.name)
-
+        name = args.name
+        if not name:
+            randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
+            name = "Worker-{}-{}".format(socket.gethostname(), randid).encode("ascii")
+        print("worker name:", name)
         async def run() -> None:
-            w = Worker(args.name)
+            w = Worker(name)
             await w.run()
             await w.close()
 
