@@ -19,7 +19,7 @@ from dranspose.protocol import (
     IngesterState,
     WorkerUpdate,
     WorkerStateEnum,
-    WorkAssignment, WorkerName,
+    WorkAssignment, WorkerName, EventNumber, IngesterName, StreamName,
 )
 
 
@@ -42,8 +42,8 @@ class Worker(DistributedService):
         self.state: WorkerState
         self.ctx = zmq.asyncio.Context()
 
-        self._ingesters: dict[str, ConnectedIngester] = {}
-        self._stream_map: dict[str, zmq.Socket] = {}
+        self._ingesters: dict[IngesterName, ConnectedIngester] = {}
+        self._stream_map: dict[StreamName, zmq.Socket] = {}
 
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
@@ -59,7 +59,7 @@ class Worker(DistributedService):
                 "data": WorkerUpdate(
                     state=WorkerStateEnum.IDLE,
                     new=True,
-                    completed=0,
+                    completed=EventNumber(0),
                     worker=self.state.name,
                 ).model_dump_json()
             },

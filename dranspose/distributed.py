@@ -71,7 +71,3 @@ class DistributedService(abc.ABC):
                 break
             except asyncio.exceptions.CancelledError:
                 break
-
-    @abc.abstractmethod
-    async def restart_work(self, new_uuid: UUID4) -> None:
-        raise NotImplemented("restart work needs to be implemented")

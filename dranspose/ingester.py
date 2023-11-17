@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Coroutine
+from typing import Coroutine, AsyncGenerator
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -113,8 +113,8 @@ class Ingester(DistributedService):
                 )
                 self._logger.debug("sent message to worker %s", worker)
 
-    async def run_source(self, stream):
-        raise NotImplemented("get_frame must be implemented")
+    #async def run_source(self, stream: StreamName) -> AsyncGenerator[list[zmq.Frame], None]:
+    #    raise NotImplemented("get_frame must be implemented")
 
     async def accept_workers(self) -> None:
         poller = zmq.asyncio.Poller()

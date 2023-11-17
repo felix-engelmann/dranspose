@@ -15,7 +15,7 @@ class Mapping:
         # "alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
         # }
 
-        if len(set(map(len, m.values()))) != 1:
+        if len(set(map(len, m.values()))) > 1:
             raise Exception("length not equal: ", list(map(len, m.values())))
 
         self.mapping = m
@@ -70,9 +70,11 @@ class Mapping:
 
     def print(self) -> None:
         print(" " * 5, end="")
-        for i in self.mapping:
-            print(i.rjust(20), end="")
+        for name in self.mapping:
+            print(name.rjust(20), end="")
         print("")
+        evn: int
+        i: tuple[List[VirtualWorker] | None]
         for evn, i in enumerate(zip(*self.mapping.values())):
             print(str(evn + 1).rjust(5), end="")
             for val in i:
