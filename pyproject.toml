@@ -46,3 +46,6 @@ dranspose = "dranspose.cli:run"
 [project.urls]
 "Homepage" = "https://github.com/felix-engelmann/dranspose"
 "Bug Tracker" = "https://github.com/felix-engelmann/dranspose/issues"
+
+[mypy]
+plugins = "pydantic.mypy"

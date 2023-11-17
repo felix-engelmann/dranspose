@@ -24,16 +24,15 @@ class DistributedSettings(BaseSettings):
 
 
 class DistributedService(abc.ABC):
-    def __init__(self, state: WorkerState|IngesterState, settings: DistributedSettings = None):
+    def __init__(self, state: WorkerState|IngesterState, settings: DistributedSettings | None = None):
 
         self._distributed_settings = settings
         if self._distributed_settings is None:
             self._distributed_settings = DistributedSettings()
 
-        self.state: WorkerState | IngesterState
+        self.state: WorkerState | IngesterState = state
         if ":" in state.name:
             raise Exception("Worker name must not contain a :")
-        self.state = state
         # TODO: check for already existing query string
         self.redis = redis.from_url(f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3")
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")

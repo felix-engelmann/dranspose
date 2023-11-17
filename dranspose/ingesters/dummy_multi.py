@@ -1,12 +1,14 @@
 import numpy as np
 import zmq
+from pydantic_core import Url
 
-from dranspose.ingester import Ingester
+from dranspose.ingester import Ingester, IngesterSettings
+from dranspose.protocol import IngesterName
 
 
 class DummyMultiIngester(Ingester):
     def __init__(self):
-        super().__init__("dummy_alba", config={"worker_port": 10007})
+        super().__init__(IngesterName("dummy_alba"), IngesterSettings(worker_url=Url("tcp://localhost:10007")))
         self.state.streams = ["alba", "slow"]
 
     async def run_source(self, stream):

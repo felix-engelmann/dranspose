@@ -45,9 +45,9 @@ class ProtocolException(Exception):
     pass
 
 
-StreamName = NewType("Stream", str)
+StreamName = NewType("StreamName", str)
 WorkerName = NewType("WorkerName", str)
-IngesterName = NewType("WorkerName", str)
+IngesterName = NewType("IngesterName", str)
 
 
 class ControllerUpdate(BaseModel):

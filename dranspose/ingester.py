@@ -19,7 +19,7 @@ class IngesterSettings(DistributedSettings):
 class Ingester(DistributedService):
     def __init__(
         self, name: IngesterName,
-        settings: IngesterSettings = None
+        settings: IngesterSettings | None = None
     ):
         self._ingester_settings = settings
         if self._ingester_settings is None:
@@ -32,6 +32,7 @@ class Ingester(DistributedService):
         )
 
         super().__init__(state=state, settings=self._ingester_settings)
+        self.state: IngesterState
 
         self.ctx = zmq.asyncio.Context()
         self.out_socket = self.ctx.socket(zmq.ROUTER)

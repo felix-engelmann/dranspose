@@ -32,13 +32,14 @@ class WorkerSettings(DistributedSettings):
     pass
 
 class Worker(DistributedService):
-    def __init__(self, name: WorkerName, settings: WorkerSettings = None):
+    def __init__(self, name: WorkerName, settings: WorkerSettings | None = None):
         self._worker_settings = settings
         if self._worker_settings is None:
             self._worker_settings = WorkerSettings()
 
         state = WorkerState(name=name)
         super().__init__(state, self._worker_settings)
+        self.state: WorkerState
         self.ctx = zmq.asyncio.Context()
 
         self._ingesters: dict[str, ConnectedIngester] = {}
@@ -66,7 +67,7 @@ class Worker(DistributedService):
 
         self._logger.info("registered ready message")
 
-        lastev = 0
+        lastev = "0"
         proced = 0
         while True:
             sub = RedisKeys.assigned(self.state.mapping_uuid)

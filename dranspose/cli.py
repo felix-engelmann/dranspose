@@ -3,20 +3,21 @@ import asyncio
 import os
 
 import uvicorn
+from pydantic_core import Url
 
 from dranspose.controller import app
 from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import StreamingSingleIngester, StreamingSingleSettings
-from dranspose.protocol import StreamName
+from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker
 
 
 async def main():
     ins = []
     ins.append(
-        StreamingSingleIngester(name=StreamName("eiger"), settings=StreamingSingleSettings(upstream_url="tcp://localhost:9999"))
+        StreamingSingleIngester(name=StreamName("eiger"), settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")))
     )
-    wos = [Worker("worker" + str(i)) for i in range(1, 3)]
+    wos = [Worker(WorkerName("worker" + str(i))) for i in range(1, 3)]
 
     for i in ins + wos:
         asyncio.create_task(i.run())

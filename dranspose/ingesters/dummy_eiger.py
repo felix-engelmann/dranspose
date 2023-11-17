@@ -3,13 +3,15 @@ from typing import List
 
 import numpy as np
 import zmq
+from pydantic_core import Url
 
-from dranspose.ingester import Ingester
+from dranspose.ingester import Ingester, IngesterSettings
+from dranspose.protocol import IngesterName
 
 
 class DummyEigerIngester(Ingester):
     def __init__(self):
-        super().__init__("dummy_ingester", config={"worker_port": 10005})
+        super().__init__(IngesterName("dummy_ingester"), IngesterSettings(worker_url=Url("tcp://localhost:10005")))
         self.state.streams = ["eigerdummy"]
 
     async def run_source(self, stream):

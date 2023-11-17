@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from asyncio import Task
 from typing import Dict, List
 
 import uvicorn
@@ -26,7 +27,7 @@ from dranspose.protocol import (
     ControllerUpdate,
     EnsembleState,
     WorkerUpdate,
-    WorkerStateEnum,
+    WorkerStateEnum, WorkerName,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,16 +36,16 @@ class ControllerSettings(DistributedSettings):
     pass
 
 class Controller:
-    def __init__(self, settings: ControllerSettings = None):
+    def __init__(self, settings: ControllerSettings | None = None):
         self.settings = settings
         if self.settings is None:
             self.settings = ControllerSettings()
 
         self.redis = redis.from_url(f"{self.settings.redis_dsn}?decode_responses=True&protocol=3")
         self.mapping = Mapping({"": []})
-        self.completed = {}
-        self.completed_events = []
-        self.assign_task = None
+        self.completed: dict[int, list[WorkerName]] = {}
+        self.completed_events: list[int] = []
+        self.assign_task: Task
 
     async def run(self):
         logger.debug("started controller run")
