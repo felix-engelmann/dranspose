@@ -3,7 +3,7 @@ from typing import AsyncGenerator
 
 import zmq
 
-from dranspose.data.protocol import Stream1Packet, SeriesStart, SeriesData, SeriesEnd
+from dranspose.data.stream1 import Stream1Packet, SeriesStart, SeriesData, SeriesEnd
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl, IngesterName
 
