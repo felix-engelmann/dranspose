@@ -22,7 +22,8 @@ dependencies = [
     "uvicorn",
     "numpy",
     "requests",
-    "pydantic"
+    "pydantic",
+    "pydantic-settings"
 ]
 dynamic = ["version"]
 
