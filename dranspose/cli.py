@@ -7,7 +7,10 @@ from pydantic_core import Url
 
 from dranspose.controller import app
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_single import StreamingSingleIngester, StreamingSingleSettings
+from dranspose.ingesters.streaming_single import (
+    StreamingSingleIngester,
+    StreamingSingleSettings,
+)
 from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker
 
@@ -15,7 +18,10 @@ from dranspose.worker import Worker
 async def main() -> None:
     ins = []
     ins.append(
-        StreamingSingleIngester(name=StreamName("eiger"), settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")))
+        StreamingSingleIngester(
+            name=StreamName("eiger"),
+            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
+        )
     )
     wos = [Worker(WorkerName("worker" + str(i))) for i in range(1, 3)]
 
@@ -57,7 +63,7 @@ def run() -> None:
         async def run() -> None:
             i = ing(
                 name=args.name,
-                settings=StreamingSingleSettings(upstream_url=args.connect_url)
+                settings=StreamingSingleSettings(upstream_url=args.connect_url),
             )
             await i.run()
             await i.close()

@@ -11,7 +11,9 @@ from dranspose.protocol import (
     RedisKeys,
     ControllerUpdate,
     IngesterState,
-    WorkerState, WorkerName, IngesterName,
+    WorkerState,
+    WorkerName,
+    IngesterName,
 )
 import redis.exceptions as rexceptions
 import asyncio
@@ -19,14 +21,17 @@ import asyncio
 
 class DistributedSettings(BaseSettings):
     redis_dsn: RedisDsn = Field(
-        Url('redis://localhost:6379/0'),
-        validation_alias=AliasChoices('service_redis_dsn', 'redis_url')
+        Url("redis://localhost:6379/0"),
+        validation_alias=AliasChoices("service_redis_dsn", "redis_url"),
     )
 
 
 class DistributedService(abc.ABC):
-    def __init__(self, state: WorkerState|IngesterState, settings: DistributedSettings | None = None):
-
+    def __init__(
+        self,
+        state: WorkerState | IngesterState,
+        settings: DistributedSettings | None = None,
+    ):
         self._distributed_settings = settings
         if self._distributed_settings is None:
             self._distributed_settings = DistributedSettings()
@@ -35,7 +40,9 @@ class DistributedService(abc.ABC):
         if ":" in state.name:
             raise Exception("Worker name must not contain a :")
         # TODO: check for already existing query string
-        self.redis = redis.from_url(f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3")
+        self.redis = redis.from_url(
+            f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3"
+        )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
 
     async def register(self) -> None:

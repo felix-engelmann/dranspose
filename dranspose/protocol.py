@@ -10,9 +10,7 @@ from functools import cache
 
 from pydantic_core import Url
 
-ZmqUrl = Annotated[
-    Url, UrlConstraints(allowed_schemes=["tcp"])
-]
+ZmqUrl = Annotated[Url, UrlConstraints(allowed_schemes=["tcp"])]
 
 StreamName = NewType("StreamName", str)
 WorkerName = NewType("WorkerName", str)
@@ -20,13 +18,17 @@ IngesterName = NewType("IngesterName", str)
 VirtualWorker = NewType("VirtualWorker", int)
 EventNumber = NewType("EventNumber", int)
 
+
 class RedisKeys:
     PREFIX = "dranspose"
 
     @staticmethod
     @cache
     @validate_call
-    def config(typ: Literal["ingester", "worker", "*"] = "*", instance: IngesterName | WorkerName | Literal["*"] = "*") -> str:
+    def config(
+        typ: Literal["ingester", "worker", "*"] = "*",
+        instance: IngesterName | WorkerName | Literal["*"] = "*",
+    ) -> str:
         return f"{RedisKeys.PREFIX}:{typ}:{instance}:config"
 
     @staticmethod
@@ -49,6 +51,7 @@ class RedisKeys:
 
 class ProtocolException(Exception):
     pass
+
 
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4

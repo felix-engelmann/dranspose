@@ -19,7 +19,11 @@ from dranspose.protocol import (
     IngesterState,
     WorkerUpdate,
     WorkerStateEnum,
-    WorkAssignment, WorkerName, EventNumber, IngesterName, StreamName,
+    WorkAssignment,
+    WorkerName,
+    EventNumber,
+    IngesterName,
+    StreamName,
 )
 
 
@@ -28,8 +32,10 @@ class ConnectedIngester(BaseModel):
     socket: zmq.asyncio.Socket
     config: IngesterState
 
+
 class WorkerSettings(DistributedSettings):
     pass
+
 
 class Worker(DistributedService):
     def __init__(self, name: WorkerName, settings: WorkerSettings | None = None):

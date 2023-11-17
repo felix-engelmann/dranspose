@@ -2,19 +2,17 @@ import json
 import uuid
 from typing import List, Dict, Union
 
-from dranspose.protocol import WorkAssignment, StreamName, VirtualWorker, WorkerName, EventNumber
+from dranspose.protocol import (
+    WorkAssignment,
+    StreamName,
+    VirtualWorker,
+    WorkerName,
+    EventNumber,
+)
 
 
 class Mapping:
     def __init__(self, m: Dict[StreamName, List[List[VirtualWorker] | None]]) -> None:
-        # ntrig = 10
-        # self.mapping = {
-        # "orca": [[2 * i] for i in range(1, ntrig)],
-        #    "eiger": [[2 * i + 1] for i in range(1, ntrig)],
-        #    "slow": [[1000+2 * i] if i%3 == 0 else None for i in range(1, ntrig)],
-        # "alba": [[4000+2 * i, 2 * i + 1] for i in range(1, ntrig)],
-        # }
-
         if len(set(map(len, m.values()))) > 1:
             raise Exception("length not equal: ", list(map(len, m.values())))
 
@@ -47,7 +45,9 @@ class Mapping:
             minimum = max(minimum, len(workers))
         return minimum
 
-    def get_event_workers(self, no: EventNumber) -> WorkAssignment:  # Dict[Stream, List[str]]:
+    def get_event_workers(
+        self, no: EventNumber
+    ) -> WorkAssignment:  # Dict[Stream, List[str]]:
         ret = {}
         for s, v in self.mapping.items():
             if v[no] is None:
@@ -94,7 +94,10 @@ if __name__ == "__main__":
         {
             StreamName("eiger"): [[VirtualWorker(2 * i)] for i in range(1, ntrig)],
             StreamName("orca"): [[VirtualWorker(2 * i + 1)] for i in range(1, ntrig)],
-            StreamName("alba"): [[VirtualWorker(2 * i), VirtualWorker(2 * i + 1)] for i in range(1, ntrig)],
+            StreamName("alba"): [
+                [VirtualWorker(2 * i), VirtualWorker(2 * i + 1)]
+                for i in range(1, ntrig)
+            ],
         }
     )
     m.print()

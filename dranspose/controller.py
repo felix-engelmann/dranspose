@@ -27,13 +27,19 @@ from dranspose.protocol import (
     ControllerUpdate,
     EnsembleState,
     WorkerUpdate,
-    WorkerStateEnum, WorkerName, StreamName, EventNumber, VirtualWorker,
+    WorkerStateEnum,
+    WorkerName,
+    StreamName,
+    EventNumber,
+    VirtualWorker,
 )
 
 logger = logging.getLogger(__name__)
 
+
 class ControllerSettings(DistributedSettings):
     pass
+
 
 class Controller:
     def __init__(self, settings: ControllerSettings | None = None):
@@ -41,7 +47,9 @@ class Controller:
         if self.settings is None:
             self.settings = ControllerSettings()
 
-        self.redis = redis.from_url(f"{self.settings.redis_dsn}?decode_responses=True&protocol=3")
+        self.redis = redis.from_url(
+            f"{self.settings.redis_dsn}?decode_responses=True&protocol=3"
+        )
         self.mapping = Mapping({})
         self.completed: dict[int, list[WorkerName]] = {}
         self.completed_events: list[int] = []
@@ -124,7 +132,9 @@ class Controller:
                                 for evn in range(
                                     event_no, self.mapping.complete_events
                                 ):
-                                    wrks = self.mapping.get_event_workers(EventNumber(evn))
+                                    wrks = self.mapping.get_event_workers(
+                                        EventNumber(evn)
+                                    )
                                     await pipe.xadd(
                                         RedisKeys.assigned(self.mapping.uuid),
                                         {"data": wrks.model_dump_json()},
@@ -188,7 +198,9 @@ async def get_status() -> dict[str, Any]:
 
 
 @app.post("/api/v1/mapping")
-async def set_mapping(mapping: Dict[StreamName, List[List[VirtualWorker] | None]]) -> UUID4 | str:
+async def set_mapping(
+    mapping: Dict[StreamName, List[List[VirtualWorker] | None]]
+) -> UUID4 | str:
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():
         return (

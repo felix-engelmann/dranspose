@@ -13,17 +13,23 @@ class StreamingSingleSettings(IngesterSettings):
 
 
 class StreamingSingleIngester(Ingester):
-    def __init__(self, name: StreamName, settings: StreamingSingleSettings | None = None) -> None:
+    def __init__(
+        self, name: StreamName, settings: StreamingSingleSettings | None = None
+    ) -> None:
         self._streaming_single_settings = settings
         if self._streaming_single_settings is None:
             self._streaming_single_settings = StreamingSingleSettings()
 
-        super().__init__(IngesterName(f"{name}_ingester"), settings=self._streaming_single_settings)
+        super().__init__(
+            IngesterName(f"{name}_ingester"), settings=self._streaming_single_settings
+        )
         self.state.streams = [name]
         self.in_socket = self.ctx.socket(zmq.PULL)
         self.in_socket.connect(str(self._streaming_single_settings.upstream_url))
 
-    async def run_source(self, stream: StreamName) -> AsyncGenerator[list[zmq.Frame], None]:
+    async def run_source(
+        self, stream: StreamName
+    ) -> AsyncGenerator[list[zmq.Frame], None]:
         hdr: zmq.Frame
         while True:
             self._logger.debug("clear up insocket")

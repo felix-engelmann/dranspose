@@ -10,17 +10,22 @@ import logging
 from pydantic import UUID4
 
 from dranspose.distributed import DistributedService, DistributedSettings
-from dranspose.protocol import IngesterState, StreamName, RedisKeys, WorkAssignment, IngesterName, ZmqUrl
+from dranspose.protocol import (
+    IngesterState,
+    StreamName,
+    RedisKeys,
+    WorkAssignment,
+    IngesterName,
+    ZmqUrl,
+)
 
 
 class IngesterSettings(DistributedSettings):
     worker_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
 
+
 class Ingester(DistributedService):
-    def __init__(
-        self, name: IngesterName,
-        settings: IngesterSettings | None = None
-    ):
+    def __init__(self, name: IngesterName, settings: IngesterSettings | None = None):
         self._ingester_settings = settings
         if self._ingester_settings is None:
             self._ingester_settings = IngesterSettings()
@@ -41,7 +46,6 @@ class Ingester(DistributedService):
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 300)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
         self.out_socket.bind(f"tcp://*:{self._ingester_settings.worker_url.port}")
-
 
     async def run(self) -> None:
         self.accept_task = asyncio.create_task(self.accept_workers())
@@ -89,7 +93,9 @@ class Ingester(DistributedService):
                 zmqyields.append(anext(sourcegens[stream]))
                 streams.append(stream)
             zmqstreams: list[list[bytes | zmq.Frame]] = await asyncio.gather(*zmqyields)
-            zmqparts: dict[StreamName, list[bytes | zmq.Frame]] = {stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)}
+            zmqparts: dict[StreamName, list[bytes | zmq.Frame]] = {
+                stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
+            }
             for stream, workers in work_assignment.assignments.items():
                 for worker in workers:
                     if worker not in workermessages:
@@ -113,7 +119,7 @@ class Ingester(DistributedService):
                 )
                 self._logger.debug("sent message to worker %s", worker)
 
-    #async def run_source(self, stream: StreamName) -> AsyncGenerator[list[zmq.Frame], None]:
+    # async def run_source(self, stream: StreamName) -> AsyncGenerator[list[zmq.Frame], None]:
     #    raise NotImplemented("get_frame must be implemented")
 
     async def accept_workers(self) -> None:
