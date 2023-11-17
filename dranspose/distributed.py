@@ -4,6 +4,7 @@ from typing import Literal
 
 import redis.asyncio as redis
 from pydantic import UUID4, AliasChoices, Field, RedisDsn
+from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
 from dranspose.protocol import (
@@ -18,7 +19,7 @@ import asyncio
 
 class DistributedSettings(BaseSettings):
     redis_dsn: RedisDsn = Field(
-        'redis://localhost:6379/0',
+        Url('redis://localhost:6379/0'),
         validation_alias=AliasChoices('service_redis_dsn', 'redis_url')
     )
 
@@ -72,5 +73,5 @@ class DistributedService(abc.ABC):
                 break
 
     @abc.abstractmethod
-    async def restart_work(self, new_uuid: UUID4):
+    async def restart_work(self, new_uuid: UUID4) -> None:
         raise NotImplemented("restart work needs to be implemented")

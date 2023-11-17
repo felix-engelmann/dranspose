@@ -45,12 +45,12 @@ class Worker(DistributedService):
         self._ingesters: dict[str, ConnectedIngester] = {}
         self._stream_map: dict[str, zmq.Socket] = {}
 
-    async def run(self):
+    async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
         self.work_task = asyncio.create_task(self.work())
         await self.register()
 
-    async def work(self):
+    async def work(self) -> None:
         self._logger.info("started work task")
 
         await self.redis.xadd(
@@ -110,19 +110,19 @@ class Worker(DistributedService):
                 {
                     "data": WorkerUpdate(
                         state=WorkerStateEnum.IDLE,
-                        completed=int(lastev.split("-")[0]),
+                        completed=work_assignment.event_number,
                         worker=self.state.name,
                     ).model_dump_json()
                 },
             )
 
-    async def restart_work(self, new_uuid: UUID4):
+    async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)
         self.work_task.cancel()
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
 
-    async def manage_ingesters(self):
+    async def manage_ingesters(self) -> None:
         while True:
             configs = await self.redis.keys(RedisKeys.config("ingester"))
             self._logger.debug("present_ingester_keys: %s", configs)
@@ -164,7 +164,7 @@ class Worker(DistributedService):
 
             await asyncio.sleep(2)
 
-    async def close(self):
+    async def close(self) -> None:
         self.manage_ingester_task.cancel()
         await self.redis.delete(RedisKeys.config("worker", self.state.name))
         await self.redis.aclose()

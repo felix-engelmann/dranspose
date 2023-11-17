@@ -2,14 +2,14 @@ import asyncio
 import json
 import os
 from asyncio import Task
-from typing import Dict, List
+from typing import Dict, List, Any, AsyncGenerator
 
 import uvicorn
 import zmq.asyncio
 import logging
 import time
 
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 from dranspose import protocol
 from dranspose.distributed import DistributedSettings
@@ -27,7 +27,7 @@ from dranspose.protocol import (
     ControllerUpdate,
     EnsembleState,
     WorkerUpdate,
-    WorkerStateEnum, WorkerName,
+    WorkerStateEnum, WorkerName, StreamName, EventNumber, VirtualWorker,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,12 +42,12 @@ class Controller:
             self.settings = ControllerSettings()
 
         self.redis = redis.from_url(f"{self.settings.redis_dsn}?decode_responses=True&protocol=3")
-        self.mapping = Mapping({"": []})
+        self.mapping = Mapping({})
         self.completed: dict[int, list[WorkerName]] = {}
         self.completed_events: list[int] = []
-        self.assign_task: Task
+        self.assign_task: Task[None]
 
-    async def run(self):
+    async def run(self) -> None:
         logger.debug("started controller run")
         self.assign_task = asyncio.create_task(self.assign_work())
 
@@ -65,7 +65,7 @@ class Controller:
         workers = [WorkerState.model_validate_json(w) for w in worker_json]
         return EnsembleState(ingesters=ingesters, workers=workers)
 
-    async def set_mapping(self, m):
+    async def set_mapping(self, m: Mapping) -> None:
         self.assign_task.cancel()
         await self.redis.delete(RedisKeys.ready(self.mapping.uuid))
         await self.redis.delete(RedisKeys.assigned(self.mapping.uuid))
@@ -89,7 +89,7 @@ class Controller:
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
 
-    async def assign_work(self):
+    async def assign_work(self) -> None:
         last = 0
         event_no = 0
         start = time.perf_counter()
@@ -114,7 +114,7 @@ class Controller:
                                 logger.debug(
                                     "added completed to set %s", self.completed
                                 )
-                                wa = self.mapping.get_event_workers(compev - 1)
+                                wa = self.mapping.get_event_workers(compev)
                                 if wa.get_all_workers() == set(self.completed[compev]):
                                     self.completed_events.append(compev)
                             logger.debug(
@@ -124,7 +124,7 @@ class Controller:
                                 for evn in range(
                                     event_no, self.mapping.complete_events
                                 ):
-                                    wrks = self.mapping.get_event_workers(evn)
+                                    wrks = self.mapping.get_event_workers(EventNumber(evn))
                                     await pipe.xadd(
                                         RedisKeys.assigned(self.mapping.uuid),
                                         {"data": wrks.model_dump_json()},
@@ -142,7 +142,7 @@ class Controller:
             except rexceptions.ConnectionError as e:
                 break
 
-    async def close(self):
+    async def close(self) -> None:
         await self.redis.delete(RedisKeys.updates())
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
@@ -157,7 +157,7 @@ ctrl: Controller
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
     global ctrl
     ctrl = Controller()
@@ -172,12 +172,12 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/api/v1/config")
-async def get_configs():
+async def get_configs() -> EnsembleState:
     return await ctrl.get_configs()
 
 
 @app.get("/api/v1/status")
-async def get_status():
+async def get_status() -> dict[str, Any]:
     return {
         "work_completed": ctrl.completed,
         "last_assigned": ctrl.mapping.complete_events,
@@ -188,7 +188,7 @@ async def get_status():
 
 
 @app.post("/api/v1/mapping")
-async def set_mapping(mapping: Dict[str, List[List[int] | None]]):
+async def set_mapping(mapping: Dict[StreamName, List[List[VirtualWorker] | None]]) -> UUID4 | str:
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():
         return (

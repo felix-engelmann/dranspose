@@ -14,13 +14,19 @@ ZmqUrl = Annotated[
     Url, UrlConstraints(allowed_schemes=["tcp"])
 ]
 
+StreamName = NewType("StreamName", str)
+WorkerName = NewType("WorkerName", str)
+IngesterName = NewType("IngesterName", str)
+VirtualWorker = NewType("VirtualWorker", int)
+EventNumber = NewType("EventNumber", int)
+
 class RedisKeys:
     PREFIX = "dranspose"
 
     @staticmethod
     @cache
     @validate_call
-    def config(typ: Literal["ingester", "worker", "*"] = "*", instance = "*") -> str:
+    def config(typ: Literal["ingester", "worker", "*"] = "*", instance: IngesterName | WorkerName | Literal["*"] = "*") -> str:
         return f"{RedisKeys.PREFIX}:{typ}:{instance}:config"
 
     @staticmethod
@@ -44,18 +50,12 @@ class RedisKeys:
 class ProtocolException(Exception):
     pass
 
-
-StreamName = NewType("StreamName", str)
-WorkerName = NewType("WorkerName", str)
-IngesterName = NewType("IngesterName", str)
-
-
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
 
 
 class WorkAssignment(BaseModel):
-    event_number: int
+    event_number: EventNumber
     assignments: dict[StreamName, list[WorkerName]]
 
     def get_workers_for_streams(self, streams: list[StreamName]) -> "WorkAssignment":
@@ -75,7 +75,7 @@ class WorkerStateEnum(Enum):
 
 class WorkerUpdate(BaseModel):
     state: WorkerStateEnum
-    completed: int
+    completed: EventNumber
     worker: WorkerName
     new: bool = False
 

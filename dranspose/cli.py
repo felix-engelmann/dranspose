@@ -12,7 +12,7 @@ from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker
 
 
-async def main():
+async def main() -> None:
     ins = []
     ins.append(
         StreamingSingleIngester(name=StreamName("eiger"), settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")))
@@ -31,7 +31,7 @@ async def main():
         await i.close()
 
 
-def run():
+def run() -> None:
     parser = argparse.ArgumentParser(prog="dranspose", description="Transposes Streams")
 
     parser.add_argument(
@@ -54,7 +54,7 @@ def run():
         print(args.ingestclass)
         ing = globals()[args.ingestclass]
 
-        async def run():
+        async def run() -> None:
             i = ing(
                 name=args.name,
                 settings=StreamingSingleSettings(upstream_url=args.connect_url)
@@ -66,7 +66,7 @@ def run():
     elif args.component == "worker":
         print(args.name)
 
-        async def run():
+        async def run() -> None:
             w = Worker(args.name)
             await w.run()
             await w.close()
