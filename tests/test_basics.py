@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import random
 import time
 import aiohttp
@@ -13,11 +12,12 @@ import zmq.asyncio
 import zmq
 
 from dranspose.controller import app
+from tests.stream1 import AcquisitionSocket
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-from dranspose.protocol import EnsembleState, RedisKeys, IngesterName, StreamName
+from dranspose.protocol import EnsembleState, RedisKeys, StreamName
 from dranspose.worker import Worker
 
 import redis.asyncio as redis
@@ -72,32 +72,21 @@ async def create_ingester():
 @pytest_asyncio.fixture
 async def stream_eiger():
     async def _make_eiger(ctx, port, nframes):
-        socket = ctx.socket(zmq.PUSH)
-        socket.bind(f"tcp://*:{port}")
-        await socket.send_json({"htype": "header"})
+
+        socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
+        acq = await socket.start(filename="")
         width = 1475
         height = 831
-        for _ in range(nframes):
+        for frameno in range(nframes):
             img = np.zeros((width, height), dtype=np.uint16)
             for _ in range(20):
                 img[random.randint(0, width - 1)][
                     random.randint(0, height - 1)
                 ] = random.randint(0, 10)
-            frame = zmq.Frame(img, copy=False)
-
-            await socket.send_json(
-                {
-                    "htype": "image",
-                    "shape": img.shape,
-                    "type": "uint16",
-                    "compression": "none",
-                },
-                flags=zmq.SNDMORE,
-            )
-            await socket.send(frame, copy=False)
+            await acq.image(img, img.shape, frameno)
             time.sleep(0.1)
-        await socket.send_json({"htype": "series_end"})
-        socket.close()
+        await acq.close()
+        await socket.close()
 
     yield _make_eiger
 
@@ -105,32 +94,20 @@ async def stream_eiger():
 @pytest_asyncio.fixture
 async def stream_orca():
     async def _make_orca(ctx, port, nframes):
-        socket = ctx.socket(zmq.PUSH)
-        socket.bind(f"tcp://*:{port}")
-        await socket.send_json({"htype": "header"})
+        socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
+        acq = await socket.start(filename="")
         width = 2000
         height = 4000
-        for _ in range(nframes):
+        for frameno in range(nframes):
             img = np.zeros((width, height), dtype=np.uint16)
             for _ in range(20):
                 img[random.randint(0, width - 1)][
                     random.randint(0, height - 1)
                 ] = random.randint(0, 10)
-            frame = zmq.Frame(img, copy=False)
-
-            await socket.send_json(
-                {
-                    "htype": "image",
-                    "shape": img.shape,
-                    "type": "uint16",
-                    "compression": "none",
-                },
-                flags=zmq.SNDMORE,
-            )
-            await socket.send(frame, copy=False)
+            await acq.image(img, img.shape, frameno)
             time.sleep(0.1)
-        await socket.send_json({"htype": "series_end"})
-        socket.close()
+        await acq.close()
+        await socket.close()
 
     yield _make_orca
 
@@ -138,25 +115,14 @@ async def stream_orca():
 @pytest_asyncio.fixture
 async def stream_alba():
     async def _make_alba(ctx, port, nframes):
-        socket = ctx.socket(zmq.PUSH)
-        socket.bind(f"tcp://*:{port}")
-        await socket.send_json({"htype": "header"})
+        socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
+        acq = await socket.start(filename="")
         val = np.zeros((0,), dtype=numpy.float64)
-        frame = zmq.Frame(val, copy=False)
-        for _ in range(nframes):
-            await socket.send_json(
-                {
-                    "htype": "image",
-                    "shape": val.shape,
-                    "type": "float64",
-                    "compression": "none",
-                },
-                flags=zmq.SNDMORE,
-            )
-            await socket.send(frame, copy=False)
+        for frameno in range(nframes):
+            await acq.image(val, val.shape, frameno)
             time.sleep(0.1)
-        await socket.send_json({"htype": "series_end"})
-        socket.close()
+        await acq.close()
+        await socket.close()
 
     yield _make_alba
 

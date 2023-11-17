@@ -1,9 +1,9 @@
 import json
-from typing import AsyncIterator, Annotated, AsyncGenerator
+from typing import AsyncGenerator
 
-import numpy as np
 import zmq
 
+from dranspose.data.protocol import Stream1Packet, SeriesStart, SeriesData, SeriesEnd
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl, IngesterName
 
@@ -34,18 +34,26 @@ class StreamingSingleIngester(Ingester):
         while True:
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)
-            header = json.loads(parts[0].bytes)
-            self._logger.debug("received frame with header %s", header)
-            if header["htype"] == "header":
-                self._logger.info("start of new sequence %s", header)
+            try:
+                packet = Stream1Packet.validate_json(parts[0].bytes)
+            except Exception as e:
+                self._logger.error("packet not valid %s", e.__repr__())
+                continue
+            self._logger.debug("received frame with header %s", packet)
+            if type(packet) is SeriesStart:
+                self._logger.info("start of new sequence %s", packet)
                 hdr = parts[0]
                 break
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
-            header = json.loads(parts[0].bytes)
-            if header["htype"] == "image":
+            try:
+                packet = Stream1Packet.validate_json(parts[0].bytes)
+            except Exception as e:
+                self._logger.error("packet not valid %s", e.__repr__())
+                continue
+            if type(packet) is SeriesData:
                 yield [hdr] + parts
-            if header["htype"] == "series_end":
+            if type(packet) is SeriesEnd:
                 break
         while True:
             self._logger.debug("discarding messages until next run")
