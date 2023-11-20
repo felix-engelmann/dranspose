@@ -173,11 +173,11 @@ async def test_simple(controller, create_worker, create_ingester, stream_eiger):
     asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/status")
+        st = await session.get("http://localhost:5000/api/v1/progress")
         content = await st.json()
         while not content["finished"]:
             await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/status")
+            st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
     context.destroy()
@@ -269,11 +269,11 @@ async def test_map(
     asyncio.create_task(stream_alba(context, 9996, ntrig // 4))
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/status")
+        st = await session.get("http://localhost:5000/api/v1/progress")
         content = await st.json()
         while not content["finished"]:
             await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/status")
+            st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
     context.destroy()

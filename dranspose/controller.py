@@ -107,7 +107,6 @@ class Controller:
                     {RedisKeys.ready(self.mapping.uuid): last},
                     block=1000,
                 )
-                logger.debug("ready returned: %s", workers)
                 if RedisKeys.ready(self.mapping.uuid) in workers:
                     for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
                         update = WorkerUpdate.model_validate_json(ready[1]["data"])
@@ -193,6 +192,15 @@ async def get_status() -> dict[str, Any]:
         "last_assigned": ctrl.mapping.complete_events,
         "assignment": ctrl.mapping.assignments,
         "completed_events": ctrl.completed_events,
+        "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
+    }
+
+@app.get("/api/v1/progress")
+async def get_progress() -> dict[str, Any]:
+    return {
+        "last_assigned": ctrl.mapping.complete_events,
+        "completed_events": len(ctrl.completed_events),
+        "total_events": ctrl.mapping.len(),
         "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
     }
 

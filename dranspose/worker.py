@@ -131,10 +131,8 @@ class Worker(DistributedService):
     async def manage_ingesters(self) -> None:
         while True:
             configs = await self.redis.keys(RedisKeys.config("ingester"))
-            self._logger.debug("present_ingester_keys: %s", configs)
             processed = []
             for key in configs:
-                self._logger.debug("processing ingester %s", key)
                 cfg = IngesterState.model_validate_json(await self.redis.get(key))
                 iname = cfg.name
                 processed.append(iname)
