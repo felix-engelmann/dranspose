@@ -1,12 +1,15 @@
 import argparse
 import asyncio
+import logging
 import os
 import random
 import socket
 import string
+from typing import Literal
 
 import uvicorn
 from pydantic_core import Url
+from pydantic_settings import BaseSettings
 
 from dranspose.controller import app
 from dranspose.ingester import Ingester
@@ -17,6 +20,12 @@ from dranspose.ingesters.streaming_single import (
 from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker
 
+class CliSettings(BaseSettings):
+    log_level: Literal["DEBUG","INFO","WARNING","ERROR"] = "INFO"
+
+settings = CliSettings()
+
+logging.basicConfig(level=settings.log_level.upper())
 
 async def main() -> None:
     ins = []
