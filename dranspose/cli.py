@@ -20,12 +20,15 @@ from dranspose.ingesters.streaming_single import (
 from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker
 
+
 class CliSettings(BaseSettings):
-    log_level: Literal["DEBUG","INFO","WARNING","ERROR"] = "INFO"
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
 
 settings = CliSettings()
 
 logging.basicConfig(level=settings.log_level.upper())
+
 
 async def main() -> None:
     ins = []
@@ -64,7 +67,7 @@ def run() -> None:
     print(args)
     if args.component == "controller":
         try:
-            config = uvicorn.Config(app, port=5000, host=args.host , log_level="info")
+            config = uvicorn.Config(app, port=5000, host=args.host, log_level="info")
             server = uvicorn.Server(config)
             server.run()
         except KeyboardInterrupt:
@@ -88,6 +91,7 @@ def run() -> None:
             randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
             name = "Worker-{}-{}".format(socket.gethostname(), randid).encode("ascii")
         print("worker name:", name)
+
         async def run() -> None:
             w = Worker(name)
             await w.run()

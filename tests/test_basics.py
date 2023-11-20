@@ -72,7 +72,6 @@ async def create_ingester():
 @pytest_asyncio.fixture
 async def stream_eiger():
     async def _make_eiger(ctx, port, nframes):
-
         socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
         acq = await socket.start(filename="")
         width = 1475

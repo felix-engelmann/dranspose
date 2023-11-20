@@ -195,6 +195,7 @@ async def get_status() -> dict[str, Any]:
         "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
     }
 
+
 @app.get("/api/v1/progress")
 async def get_progress() -> dict[str, Any]:
     return {

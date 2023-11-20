@@ -10,7 +10,6 @@ class Acquisition:
         self._filename = filename
         self._msg_number = it
 
-
     async def start(self, meta=None):
         header = {
             "htype": "header",
@@ -61,4 +60,3 @@ class AcquisitionSocket:
 
     async def close(self):
         self.data_socket.close()
-
