@@ -4,6 +4,7 @@ import pytest
 from dranspose.protocol import EnsembleState
 from tests.fixtures import controller
 
+
 @pytest.mark.asyncio
 async def test_status(controller):
     async with aiohttp.ClientSession() as session:

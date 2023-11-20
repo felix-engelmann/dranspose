@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import pickle
 from asyncio import Task
 from typing import Dict, List, Any, AsyncGenerator
 
@@ -10,6 +11,7 @@ import logging
 import time
 
 from pydantic import BaseModel, UUID4
+from starlette.requests import Request
 
 from dranspose import protocol
 from dranspose.distributed import DistributedSettings
@@ -18,13 +20,12 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 
 from dranspose.protocol import (
     IngesterState,
     WorkerState,
     RedisKeys,
-    ControllerUpdate,
     EnsembleState,
     WorkerUpdate,
     WorkerStateEnum,
@@ -32,6 +33,8 @@ from dranspose.protocol import (
     StreamName,
     EventNumber,
     VirtualWorker,
+    WorkParameters,
+    ControllerUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,6 +54,7 @@ class Controller:
             f"{self.settings.redis_dsn}?decode_responses=True&protocol=3"
         )
         self.mapping = Mapping({})
+        self.parameters = WorkParameters(pickle=pickle.dumps({}))
         self.completed: dict[int, list[WorkerName]] = {}
         self.completed_events: list[int] = []
         self.assign_task: Task[None]
@@ -74,14 +78,22 @@ class Controller:
         return EnsembleState(ingesters=ingesters, workers=workers)
 
     async def set_mapping(self, m: Mapping) -> None:
+        logger.debug("cancelling assign task")
         self.assign_task.cancel()
+        logger.debug(
+            "deleting keys %s and %s",
+            RedisKeys.ready(self.mapping.uuid),
+            RedisKeys.assigned(self.mapping.uuid),
+        )
         await self.redis.delete(RedisKeys.ready(self.mapping.uuid))
         await self.redis.delete(RedisKeys.assigned(self.mapping.uuid))
 
         # cleaned up
         self.mapping = m
-
-        cupd = ControllerUpdate(mapping_uuid=self.mapping.uuid)
+        cupd = ControllerUpdate(
+            mapping_uuid=self.mapping.uuid, parameters_uuid=self.parameters.uuid
+        )
+        logger.debug("send controller update %s", cupd)
         await self.redis.xadd(
             RedisKeys.updates(),
             cupd.model_dump(mode="json"),
@@ -94,8 +106,23 @@ class Controller:
         ) != {self.mapping.uuid}:
             await asyncio.sleep(0.1)
             cfgs = await self.get_configs()
+            logger.debug("updated configs %s", cfgs)
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
+
+    async def set_params(self, parameters: bytes) -> UUID4:
+        self.parameters = WorkParameters(pickle=parameters)
+        await self.redis.set(
+            RedisKeys.parameters(self.parameters.uuid), self.parameters.pickle
+        )
+        cupd = ControllerUpdate(
+            mapping_uuid=self.mapping.uuid, parameters_uuid=self.parameters.uuid
+        )
+        await self.redis.xadd(
+            RedisKeys.updates(),
+            cupd.model_dump(mode="json"),
+        )
+        return self.parameters.uuid
 
     async def assign_work(self) -> None:
         last = 0
@@ -222,3 +249,10 @@ async def set_mapping(
         return f"only {len(config.workers)} workers available, but {m.min_workers()} required"
     await ctrl.set_mapping(m)
     return m.uuid
+
+
+@app.post("/api/v1/parameters/json")
+async def set_params(payload: dict = Body(...)) -> UUID4 | str:
+    res = pickle.dumps(payload)
+    u = await ctrl.set_params(res)
+    return u

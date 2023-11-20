@@ -129,7 +129,7 @@ class Ingester(DistributedService):
             socks = dict(await poller.poll())
             for sock in socks:
                 data = await sock.recv_multipart()
-                self._logger.info("new worker connected %s", data[0])
+                self._logger.debug("new worker connected %s", data[0])
 
     async def close(self) -> None:
         self.accept_task.cancel()

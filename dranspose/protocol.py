@@ -3,8 +3,17 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import NewType, Literal, Annotated
 
-from pydantic import AnyUrl, UUID4, BaseModel, validate_call, UrlConstraints
+from pydantic import (
+    AnyUrl,
+    UUID4,
+    BaseModel,
+    validate_call,
+    UrlConstraints,
+    Field,
+    TypeAdapter,
+)
 
+from uuid import uuid4
 import zmq
 from functools import cache
 
@@ -48,6 +57,14 @@ class RedisKeys:
     def updates() -> str:
         return f"{RedisKeys.PREFIX}:controller:updates"
 
+    @staticmethod
+    @cache
+    @validate_call
+    def parameters(
+        uuid: UUID4,
+    ) -> str:
+        return f"{RedisKeys.PREFIX}:controller:parameters:{uuid}"
+
 
 class ProtocolException(Exception):
     pass
@@ -55,6 +72,12 @@ class ProtocolException(Exception):
 
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
+    parameters_uuid: UUID4
+
+
+class WorkParameters(BaseModel):
+    pickle: bytes
+    uuid: UUID4 = Field(default_factory=uuid4)
 
 
 class WorkAssignment(BaseModel):
@@ -83,16 +106,19 @@ class WorkerUpdate(BaseModel):
     new: bool = False
 
 
-class IngesterState(BaseModel):
+class DistributedState(BaseModel):
+    mapping_uuid: UUID4 | None = None
+    parameters_uuid: UUID4 | None = None
+
+
+class IngesterState(DistributedState):
     name: IngesterName
     url: ZmqUrl
-    mapping_uuid: UUID4 | None = None
     streams: list[StreamName] = []
 
 
-class WorkerState(BaseModel):
+class WorkerState(DistributedState):
     name: WorkerName
-    mapping_uuid: UUID4 | None = None
     ingesters: list[IngesterState] = []
 
 

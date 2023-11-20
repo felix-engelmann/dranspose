@@ -1,5 +1,6 @@
 import abc
 import logging
+import pickle
 from typing import Literal
 
 import redis.asyncio as redis
@@ -70,10 +71,19 @@ class DistributedService(abc.ABC):
                     update = update[RedisKeys.updates()][0][-1]
                     last = update[0]
                     update = ControllerUpdate.model_validate(update[1])
+                    self._logger.debug("update type %s", update)
                     newuuid = update.mapping_uuid
                     if newuuid != self.state.mapping_uuid:
                         self._logger.info("resetting config to %s", newuuid)
                         await self.restart_work(newuuid)
+                    newuuid = update.parameters_uuid
+                    if newuuid != self.state.parameters_uuid:
+                        self._logger.info("setting parameters to %s", newuuid)
+                        params = await self.redis.get(RedisKeys.parameters(newuuid))
+                        if params:
+                            self._logger.error("set parameters %s", params)
+                            self.parameters = pickle.loads(params)
+
             except rexceptions.ConnectionError:
                 break
             except asyncio.exceptions.CancelledError:
