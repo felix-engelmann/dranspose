@@ -58,12 +58,13 @@ def run() -> None:
     parser.add_argument("-n", "--name")  # option that takes a value
     parser.add_argument("-c", "--ingestclass")  # option that takes a value
     parser.add_argument("-u", "--connect_url")  # option that takes a value
+    parser.add_argument("-b", "--bind")  # option that takes a value
 
     args = parser.parse_args()
     print(args)
     if args.component == "controller":
         try:
-            config = uvicorn.Config(app, port=5000, log_level="info")
+            config = uvicorn.Config(app, port=5000, host=args.bind , log_level="info")
             server = uvicorn.Server(config)
             server.run()
         except KeyboardInterrupt:
