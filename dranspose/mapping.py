@@ -22,7 +22,10 @@ class Mapping:
         self.complete_events = 0
 
     def len(self) -> int:
-        return len(list(self.mapping.values())[0])
+        if len(self.mapping) > 0:
+            return len(list(self.mapping.values())[0])
+        else:
+            return 0
 
     def assign_next(self, worker: WorkerName) -> Union[int, None]:
         for evn in range(self.complete_events, self.len()):
