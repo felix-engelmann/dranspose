@@ -11,7 +11,7 @@ import uvicorn
 import zmq.asyncio
 import zmq
 
-from dranspose.controller import app
+from tests.fixtures import controller
 from tests.stream1 import AcquisitionSocket
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
@@ -21,19 +21,6 @@ from dranspose.protocol import EnsembleState, RedisKeys, StreamName
 from dranspose.worker import Worker
 
 import redis.asyncio as redis
-
-
-@pytest_asyncio.fixture()
-async def controller():
-    config = uvicorn.Config(app, port=5000, log_level="debug")
-    server = uvicorn.Server(config)
-    server_task = asyncio.create_task(server.serve())
-    while server.started is False:
-        await asyncio.sleep(0.1)
-    yield
-    server.should_exit = True
-    await server_task
-    time.sleep(0.1)
 
 
 @pytest_asyncio.fixture
