@@ -100,6 +100,8 @@ class Controller:
     async def assign_work(self) -> None:
         last = 0
         event_no = 0
+        self.completed = {}
+        self.completed_events = []
         start = time.perf_counter()
         while True:
             try:
