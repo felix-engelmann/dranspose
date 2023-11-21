@@ -23,6 +23,8 @@ from dranspose.worker import Worker
 
 import redis.asyncio as redis
 
+from dranspose.reducer import app as reducer_app
+
 
 @pytest_asyncio.fixture
 async def create_worker():
@@ -55,6 +57,18 @@ async def create_ingester():
     for inst, task in ingesters:
         await inst.close()
         task.cancel()
+
+@pytest_asyncio.fixture()
+async def reducer():
+    config = uvicorn.Config(reducer_app, port=5001, log_level="debug")
+    server = uvicorn.Server(config)
+    server_task = asyncio.create_task(server.serve())
+    while server.started is False:
+        await asyncio.sleep(0.1)
+    yield
+    server.should_exit = True
+    await server_task
+    await asyncio.sleep(0.1)
 
 
 @pytest_asyncio.fixture
@@ -115,7 +129,7 @@ async def stream_alba():
 
 
 @pytest.mark.asyncio
-async def test_simple(controller, create_worker, create_ingester, stream_eiger):
+async def test_simple(controller, reducer, create_worker, create_ingester, stream_eiger):
     await create_worker("w1")
     await create_ingester(
         StreamingSingleIngester(
@@ -173,7 +187,7 @@ async def test_simple(controller, create_worker, create_ingester, stream_eiger):
 
 @pytest.mark.asyncio
 async def test_map(
-    controller, create_worker, create_ingester, stream_eiger, stream_orca, stream_alba
+    controller, reducer, create_worker, create_ingester, stream_eiger, stream_orca, stream_alba
 ):
     await create_worker("w1")
     await create_worker("w2")
@@ -188,7 +202,7 @@ async def test_map(
         StreamingSingleIngester(
             name=StreamName("orca"),
             settings=StreamingSingleSettings(
-                upstream_url="tcp://localhost:9998", worker_url="tcp://localhost:10011"
+                upstream_url="tcp://localhost:9998", ingester_url="tcp://localhost:10011"
             ),
         )
     )
@@ -196,7 +210,7 @@ async def test_map(
         StreamingSingleIngester(
             name=StreamName("alba"),
             settings=StreamingSingleSettings(
-                upstream_url="tcp://localhost:9997", worker_url="tcp://localhost:10012"
+                upstream_url="tcp://localhost:9997", ingester_url="tcp://localhost:10012"
             ),
         )
     )
@@ -204,7 +218,7 @@ async def test_map(
         StreamingSingleIngester(
             name=StreamName("slow"),
             settings=StreamingSingleSettings(
-                upstream_url="tcp://localhost:9996", worker_url="tcp://localhost:10013"
+                upstream_url="tcp://localhost:9996", ingester_url="tcp://localhost:10013"
             ),
         )
     )
@@ -241,7 +255,7 @@ async def test_map(
     print("updates", updates)
     keys = await r.keys("dranspose:*")
     print("keys", keys)
-    present_keys = {f"dranspose:assigned:{uuid}"}
+    present_keys = {f"dranspose:ready:{uuid}"}
     print("presentkeys", present_keys)
     assert present_keys - set(keys) == set()
 

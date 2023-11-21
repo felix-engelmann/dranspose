@@ -14,7 +14,7 @@ from dranspose.protocol import (
     IngesterState,
     WorkerState,
     WorkerName,
-    IngesterName,
+    IngesterName, ReducerState,
 )
 import redis.exceptions as rexceptions
 import asyncio
@@ -30,14 +30,15 @@ class DistributedSettings(BaseSettings):
 class DistributedService(abc.ABC):
     def __init__(
         self,
-        state: WorkerState | IngesterState,
+        state: WorkerState | IngesterState | ReducerState,
         settings: Optional[DistributedSettings] = None,
     ):
         self._distributed_settings = settings
         if self._distributed_settings is None:
             self._distributed_settings = DistributedSettings()
 
-        self.state: WorkerState | IngesterState = state
+        self.state: WorkerState | IngesterState | ReducerState = state
+
         if ":" in state.name:
             raise Exception("Worker name must not contain a :")
         # TODO: check for already existing query string
@@ -56,6 +57,8 @@ class DistributedService(abc.ABC):
                 category = "ingester"
             elif isinstance(self.state, WorkerState):
                 category = "worker"
+            elif isinstance(self.state, ReducerState):
+                category = "reducer"
             else:
                 raise NotImplemented(
                     "Distributed Service not implemented for your Service"

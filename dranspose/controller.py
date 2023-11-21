@@ -35,7 +35,7 @@ from dranspose.protocol import (
     EventNumber,
     VirtualWorker,
     WorkParameters,
-    ControllerUpdate,
+    ControllerUpdate, ReducerState,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,11 +72,15 @@ class Controller:
         async with self.redis.pipeline() as pipe:
             await pipe.mget(ingester_keys)
             await pipe.mget(worker_keys)
-            ingester_json, worker_json = await pipe.execute()
+            await pipe.get(RedisKeys.config("reducer"))
+            ingester_json, worker_json, reducer_json = await pipe.execute()
 
         ingesters = [IngesterState.model_validate_json(i) for i in ingester_json]
         workers = [WorkerState.model_validate_json(w) for w in worker_json]
-        return EnsembleState(ingesters=ingesters, workers=workers)
+        reducer = None
+        if reducer_json:
+            reducer = ReducerState.model_validate_json(reducer_json)
+        return EnsembleState(ingesters=ingesters, workers=workers, reducer=reducer)
 
     async def set_mapping(self, m: Mapping) -> None:
         logger.debug("cancelling assign task")
@@ -101,13 +105,13 @@ class Controller:
         )
 
         cfgs = await self.get_configs()
-        while set(
+        while cfgs.reducer is None or set(
             [u.mapping_uuid for u in cfgs.ingesters]
-            + [u.mapping_uuid for u in cfgs.workers]
+            + [u.mapping_uuid for u in cfgs.workers] + [cfgs.reducer.mapping_uuid]
         ) != {self.mapping.uuid}:
             await asyncio.sleep(0.1)
             cfgs = await self.get_configs()
-            logger.debug("updated configs %s", cfgs)
+            #logger.debug("updated configs %s", cfgs)
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
 

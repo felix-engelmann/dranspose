@@ -21,7 +21,7 @@ from dranspose.protocol import (
 
 
 class IngesterSettings(DistributedSettings):
-    worker_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
+    ingester_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
 
 
 class Ingester(DistributedService):
@@ -32,7 +32,7 @@ class Ingester(DistributedService):
         streams: list[StreamName] = []
         state = IngesterState(
             name=name,
-            url=self._ingester_settings.worker_url,
+            url=self._ingester_settings.ingester_url,
             streams=streams,
         )
 
@@ -45,7 +45,7 @@ class Ingester(DistributedService):
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE, 1)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_IDLE, 300)
         self.out_socket.setsockopt(zmq.TCP_KEEPALIVE_INTVL, 300)
-        self.out_socket.bind(f"tcp://*:{self._ingester_settings.worker_url.port}")
+        self.out_socket.bind(f"tcp://*:{self._ingester_settings.ingester_url.port}")
 
     async def run(self) -> None:
         self.accept_task = asyncio.create_task(self.accept_workers())

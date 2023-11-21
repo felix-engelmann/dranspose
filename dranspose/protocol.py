@@ -35,9 +35,11 @@ class RedisKeys:
     @cache
     @validate_call
     def config(
-        typ: Literal["ingester", "worker", "*"] = "*",
-        instance: IngesterName | WorkerName | Literal["*"] = "*",
+        typ: Literal["ingester", "worker", "reducer", "*"] = "*",
+        instance: IngesterName | WorkerName | Literal["reducer", "*"] = "*",
     ) -> str:
+        if typ == "reducer":
+            instance = "reducer"
         return f"{RedisKeys.PREFIX}:{typ}:{instance}:config"
 
     @staticmethod
@@ -121,10 +123,14 @@ class WorkerState(DistributedState):
     name: WorkerName
     ingesters: list[IngesterState] = []
 
+class ReducerState(DistributedState):
+    name: str = "reducer"
+    url: ZmqUrl
 
 class EnsembleState(BaseModel):
     ingesters: list[IngesterState]
     workers: list[WorkerState]
+    reducer: Optional[ReducerState]
 
     def get_streams(self) -> list[StreamName]:
         ingester_streams = set([s for i in self.ingesters for s in i.streams])

@@ -12,6 +12,7 @@ from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
 from dranspose.controller import app
+from dranspose.reducer import app as reducer_app
 from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
@@ -42,6 +43,10 @@ async def main() -> None:
 
     for i in ins + wos:
         asyncio.create_task(i.run())
+
+    rconfig = uvicorn.Config(reducer_app, port=5001, log_level="info")
+    rserver = uvicorn.Server(rconfig)
+    reducer_task = asyncio.create_task(rserver.serve())
 
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)
