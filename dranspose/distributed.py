@@ -1,7 +1,7 @@
 import abc
 import logging
 import pickle
-from typing import Literal
+from typing import Literal, Optional
 
 import redis.asyncio as redis
 from pydantic import UUID4, AliasChoices, Field, RedisDsn
@@ -31,7 +31,7 @@ class DistributedService(abc.ABC):
     def __init__(
         self,
         state: WorkerState | IngesterState,
-        settings: DistributedSettings | None = None,
+        settings: Optional[DistributedSettings] = None,
     ):
         self._distributed_settings = settings
         if self._distributed_settings is None:

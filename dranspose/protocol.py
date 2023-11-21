@@ -1,7 +1,7 @@
 import pickle
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import NewType, Literal, Annotated
+from typing import NewType, Literal, Annotated, Optional
 
 from pydantic import (
     AnyUrl,
@@ -43,13 +43,13 @@ class RedisKeys:
     @staticmethod
     @cache
     @validate_call
-    def ready(uuid: UUID4 | Literal["*"] | None = None) -> str:
+    def ready(uuid: Optional[UUID4 | Literal["*"]] = None) -> str:
         return f"{RedisKeys.PREFIX}:ready:{uuid}"
 
     @staticmethod
     @cache
     @validate_call
-    def assigned(uuid: UUID4 | Literal["*"] | None = None) -> str:
+    def assigned(uuid: Optional[UUID4 | Literal["*"]] = None) -> str:
         return f"{RedisKeys.PREFIX}:assigned:{uuid}"
 
     @staticmethod
@@ -107,8 +107,8 @@ class WorkerUpdate(BaseModel):
 
 
 class DistributedState(BaseModel):
-    mapping_uuid: UUID4 | None = None
-    parameters_uuid: UUID4 | None = None
+    mapping_uuid: Optional[UUID4] = None
+    parameters_uuid: Optional[UUID4] = None
 
 
 class IngesterState(DistributedState):

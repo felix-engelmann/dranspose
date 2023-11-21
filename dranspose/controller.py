@@ -3,7 +3,8 @@ import json
 import os
 import pickle
 from asyncio import Task
-from typing import Dict, List, Any, AsyncGenerator
+from collections import defaultdict
+from typing import Dict, List, Any, AsyncGenerator, Literal
 
 import uvicorn
 import zmq.asyncio
@@ -55,7 +56,7 @@ class Controller:
         )
         self.mapping = Mapping({})
         self.parameters = WorkParameters(pickle=pickle.dumps({}))
-        self.completed: dict[int, list[WorkerName]] = {}
+        self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
         self.assign_task: Task[None]
 
@@ -127,7 +128,7 @@ class Controller:
     async def assign_work(self) -> None:
         last = 0
         event_no = 0
-        self.completed = {}
+        self.completed = defaultdict(list)
         self.completed_events = []
         start = time.perf_counter()
         while True:
@@ -141,11 +142,12 @@ class Controller:
                         update = WorkerUpdate.model_validate_json(ready[1]["data"])
                         logger.debug("got a ready worker %s", update)
                         if update.state == WorkerStateEnum.IDLE:
-                            virt = self.mapping.assign_next(update.worker)
+                            cfg = await self.get_configs()
+                            virt = self.mapping.assign_next(
+                                update.worker, [ws.name for ws in cfg.workers]
+                            )
                             if not update.new:
                                 compev = update.completed
-                                if compev not in self.completed:
-                                    self.completed[compev] = []
                                 self.completed[compev].append(update.worker)
                                 logger.debug(
                                     "added completed to set %s", self.completed
@@ -237,7 +239,7 @@ async def get_progress() -> dict[str, Any]:
 
 @app.post("/api/v1/mapping")
 async def set_mapping(
-    mapping: Dict[StreamName, List[List[VirtualWorker] | None]]
+    mapping: Dict[StreamName, List[List[VirtualWorker] | Literal["all"] | None]]
 ) -> UUID4 | str:
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():

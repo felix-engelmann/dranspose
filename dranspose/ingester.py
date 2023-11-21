@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Coroutine, AsyncGenerator
+from typing import Coroutine, AsyncGenerator, Optional
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -25,7 +25,7 @@ class IngesterSettings(DistributedSettings):
 
 
 class Ingester(DistributedService):
-    def __init__(self, name: IngesterName, settings: IngesterSettings | None = None):
+    def __init__(self, name: IngesterName, settings: Optional[IngesterSettings] = None):
         self._ingester_settings = settings
         if self._ingester_settings is None:
             self._ingester_settings = IngesterSettings()

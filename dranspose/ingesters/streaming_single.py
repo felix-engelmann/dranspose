@@ -1,5 +1,5 @@
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 import zmq
 
@@ -14,7 +14,7 @@ class StreamingSingleSettings(IngesterSettings):
 
 class StreamingSingleIngester(Ingester):
     def __init__(
-        self, name: StreamName, settings: StreamingSingleSettings | None = None
+        self, name: StreamName, settings: Optional[StreamingSingleSettings] = None
     ) -> None:
         self._streaming_single_settings = settings
         if self._streaming_single_settings is None:

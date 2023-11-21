@@ -172,7 +172,7 @@ async def test_simple(controller, create_worker, create_ingester, stream_eiger):
 
 
 @pytest.mark.asyncio
-async def est_map(
+async def test_map(
     controller, create_worker, create_ingester, stream_eiger, stream_orca, stream_alba
 ):
     await create_worker("w1")

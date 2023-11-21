@@ -1,7 +1,7 @@
 import asyncio
 import json
 import time
-from typing import Any
+from typing import Any, Optional
 
 import zmq.asyncio
 import logging
@@ -38,7 +38,7 @@ class WorkerSettings(DistributedSettings):
 
 
 class Worker(DistributedService):
-    def __init__(self, name: WorkerName, settings: WorkerSettings | None = None):
+    def __init__(self, name: WorkerName, settings: Optional[WorkerSettings] = None):
         self._worker_settings = settings
         if self._worker_settings is None:
             self._worker_settings = WorkerSettings()
