@@ -123,9 +123,11 @@ class WorkerState(DistributedState):
     name: WorkerName
     ingesters: list[IngesterState] = []
 
+
 class ReducerState(DistributedState):
     name: str = "reducer"
     url: ZmqUrl
+
 
 class EnsembleState(BaseModel):
     ingesters: list[IngesterState]

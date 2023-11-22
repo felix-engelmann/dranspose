@@ -14,7 +14,8 @@ from dranspose.protocol import (
     IngesterState,
     WorkerState,
     WorkerName,
-    IngesterName, ReducerState,
+    IngesterName,
+    ReducerState,
 )
 import redis.exceptions as rexceptions
 import asyncio

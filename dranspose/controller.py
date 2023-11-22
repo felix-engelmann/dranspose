@@ -35,7 +35,8 @@ from dranspose.protocol import (
     EventNumber,
     VirtualWorker,
     WorkParameters,
-    ControllerUpdate, ReducerState,
+    ControllerUpdate,
+    ReducerState,
 )
 
 logger = logging.getLogger(__name__)
@@ -107,11 +108,12 @@ class Controller:
         cfgs = await self.get_configs()
         while cfgs.reducer is None or set(
             [u.mapping_uuid for u in cfgs.ingesters]
-            + [u.mapping_uuid for u in cfgs.workers] + [cfgs.reducer.mapping_uuid]
+            + [u.mapping_uuid for u in cfgs.workers]
+            + [cfgs.reducer.mapping_uuid]
         ) != {self.mapping.uuid}:
             await asyncio.sleep(0.1)
             cfgs = await self.get_configs()
-            #logger.debug("updated configs %s", cfgs)
+            # logger.debug("updated configs %s", cfgs)
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
 

@@ -13,6 +13,7 @@ from dranspose.protocol import ReducerState, ZmqUrl, RedisKeys
 class ReducerSettings(DistributedSettings):
     reducer_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
 
+
 class Reducer(DistributedService):
     def __init__(self, settings: Optional[ReducerSettings] = None):
         self._reducer_settings = settings

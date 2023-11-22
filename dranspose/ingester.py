@@ -100,14 +100,23 @@ class Ingester(DistributedService):
             for stream, workers in work_assignment.assignments.items():
                 for worker in workers:
                     if worker not in workermessages:
-                        workermessages[worker] = InternalWorkerMessage(event_number=work_assignment.event_number)
+                        workermessages[worker] = InternalWorkerMessage(
+                            event_number=work_assignment.event_number
+                        )
                     workermessages[worker].streams[stream] = zmqparts[stream]
             self._logger.debug("workermessages %s", workermessages)
             for worker, message in workermessages.items():
-                self._logger.debug("header is %s", message.model_dump_json(exclude={"streams":{"__all__":"frames"}}))
+                self._logger.debug(
+                    "header is %s",
+                    message.model_dump_json(exclude={"streams": {"__all__": "frames"}}),
+                )
                 await self.out_socket.send_multipart(
                     [worker.encode("ascii")]
-                    + [message.model_dump_json(exclude={"streams":{"__all__":"frames"}}).encode("utf8")]
+                    + [
+                        message.model_dump_json(
+                            exclude={"streams": {"__all__": "frames"}}
+                        ).encode("utf8")
+                    ]
                     + message.get_all_frames()
                 )
                 self._logger.debug("sent message to worker %s", worker)

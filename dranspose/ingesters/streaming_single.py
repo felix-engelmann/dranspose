@@ -28,9 +28,7 @@ class StreamingSingleIngester(Ingester):
         self.in_socket = self.ctx.socket(zmq.PULL)
         self.in_socket.connect(str(self._streaming_single_settings.upstream_url))
 
-    async def run_source(
-        self, stream: StreamName
-    ) -> AsyncGenerator[StreamData, None]:
+    async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
         while True:
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)

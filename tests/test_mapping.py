@@ -10,14 +10,14 @@ from dranspose.protocol import (
 )
 
 
-def test_simple_map():
+def test_simple_map() -> None:
     ntrig = 10
     m = Mapping({StreamName("test"): [[VirtualWorker(i)] for i in range(ntrig)]})
 
     assert m.len() == ntrig
 
 
-def test_none():
+def test_none() -> None:
     ntrig = 10
     m = Mapping(
         {
@@ -43,7 +43,7 @@ def test_none():
     assert assign.assignments[StreamName("test")] == [WorkerName("w1")]
 
 
-def test_all():
+def test_all() -> None:
     ntrig = 10
     m = Mapping(
         {
@@ -72,7 +72,7 @@ def test_all():
     assert set(assign.assignments[StreamName("test")]) == set(all_workers)
 
 
-def test_multiple():
+def test_multiple() -> None:
     ntrig = 10
     m = Mapping(
         {
@@ -101,13 +101,17 @@ def test_multiple():
     evworkers = m.get_event_workers(EventNumber(m.complete_events - 1))
 
     assert evworkers == WorkAssignment(
-        event_number=6,
-        assignments={"eiger": ["w1"], "alba": ["w1", "w2"], "orca": ["w2"]},
+        event_number=EventNumber(6),
+        assignments={
+            StreamName("eiger"): [WorkerName("w1")],
+            StreamName("alba"): [WorkerName("w1"), WorkerName("w2")],
+            StreamName("orca"): [WorkerName("w2")],
+        },
     )
     assert m.min_workers() == 2
 
 
-def test_mixed_all():
+def test_mixed_all() -> None:
     ntrig = 10
     m = Mapping(
         {
@@ -129,6 +133,10 @@ def test_mixed_all():
         # m.assign_next("w3")
     print(m.assignments)
     print(m.all_assignments)
-    assert m.all_assignments[(1, "announcer")] == ["w2", "w3", "w1"]
+    assert m.all_assignments[(EventNumber(1), StreamName("announcer"))] == [
+        "w2",
+        "w3",
+        "w1",
+    ]
 
     m.print()

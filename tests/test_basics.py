@@ -1,140 +1,38 @@
 import asyncio
-import logging
-import random
-import time
+from typing import Awaitable, Callable, Any, Coroutine, Never
+
 import aiohttp
-import numpy
 
 import pytest
-import pytest_asyncio
-import numpy as np
-import uvicorn
 import zmq.asyncio
 import zmq
+from pydantic_core import Url
 
-from tests.fixtures import controller
-from tests.stream1 import AcquisitionSocket
+from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-from dranspose.protocol import EnsembleState, RedisKeys, StreamName
-from dranspose.worker import Worker
+from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName
 
 import redis.asyncio as redis
 
-from dranspose.reducer import app as reducer_app
-
-
-@pytest_asyncio.fixture
-async def create_worker():
-    workers = []
-
-    async def _make_worker(name):
-        worker = Worker(name)
-        worker_task = asyncio.create_task(worker.run())
-        workers.append((worker, worker_task))
-        return worker
-
-    yield _make_worker
-
-    for worker, task in workers:
-        await worker.close()
-        task.cancel()
-
-
-@pytest_asyncio.fixture
-async def create_ingester():
-    ingesters = []
-
-    async def _make_ingester(inst):
-        ingester_task = asyncio.create_task(inst.run())
-        ingesters.append((inst, ingester_task))
-        return inst
-
-    yield _make_ingester
-
-    for inst, task in ingesters:
-        await inst.close()
-        task.cancel()
-
-@pytest_asyncio.fixture()
-async def reducer():
-    config = uvicorn.Config(reducer_app, port=5001, log_level="debug")
-    server = uvicorn.Server(config)
-    server_task = asyncio.create_task(server.serve())
-    while server.started is False:
-        await asyncio.sleep(0.1)
-    yield
-    server.should_exit = True
-    await server_task
-    await asyncio.sleep(0.1)
-
-
-@pytest_asyncio.fixture
-async def stream_eiger():
-    async def _make_eiger(ctx, port, nframes):
-        socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
-        acq = await socket.start(filename="")
-        width = 1475
-        height = 831
-        for frameno in range(nframes):
-            img = np.zeros((width, height), dtype=np.uint16)
-            for _ in range(20):
-                img[random.randint(0, width - 1)][
-                    random.randint(0, height - 1)
-                ] = random.randint(0, 10)
-            await acq.image(img, img.shape, frameno)
-            time.sleep(0.1)
-        await acq.close()
-        await socket.close()
-
-    yield _make_eiger
-
-
-@pytest_asyncio.fixture
-async def stream_orca():
-    async def _make_orca(ctx, port, nframes):
-        socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
-        acq = await socket.start(filename="")
-        width = 2000
-        height = 4000
-        for frameno in range(nframes):
-            img = np.zeros((width, height), dtype=np.uint16)
-            for _ in range(20):
-                img[random.randint(0, width - 1)][
-                    random.randint(0, height - 1)
-                ] = random.randint(0, 10)
-            await acq.image(img, img.shape, frameno)
-            time.sleep(0.1)
-        await acq.close()
-        await socket.close()
-
-    yield _make_orca
-
-
-@pytest_asyncio.fixture
-async def stream_alba():
-    async def _make_alba(ctx, port, nframes):
-        socket = AcquisitionSocket(ctx, f"tcp://*:{port}")
-        acq = await socket.start(filename="")
-        val = np.zeros((0,), dtype=numpy.float64)
-        for frameno in range(nframes):
-            await acq.image(val, val.shape, frameno)
-            time.sleep(0.1)
-        await acq.close()
-        await socket.close()
-
-    yield _make_alba
+from dranspose.worker import Worker
 
 
 @pytest.mark.asyncio
-async def test_simple(controller, reducer, create_worker, create_ingester, stream_eiger):
-    await create_worker("w1")
+async def test_simple(
+    controller: None,
+    reducer: None,
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
+) -> None:
+    await create_worker(WorkerName("w1"))
     await create_ingester(
         StreamingSingleIngester(
             name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url="tcp://localhost:9999"),
+            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
         )
     )
 
@@ -187,22 +85,29 @@ async def test_simple(controller, reducer, create_worker, create_ingester, strea
 
 @pytest.mark.asyncio
 async def test_map(
-    controller, reducer, create_worker, create_ingester, stream_eiger, stream_orca, stream_alba
-):
-    await create_worker("w1")
-    await create_worker("w2")
-    await create_worker("w3")
+    controller: None,
+    reducer: None,
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
+    stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
+    stream_alba: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
+) -> None:
+    await create_worker(WorkerName("w1"))
+    await create_worker(WorkerName("w2"))
+    await create_worker(WorkerName("w3"))
     await create_ingester(
         StreamingSingleIngester(
             name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url="tcp://localhost:9999"),
+            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
         )
     )
     await create_ingester(
         StreamingSingleIngester(
             name=StreamName("orca"),
             settings=StreamingSingleSettings(
-                upstream_url="tcp://localhost:9998", ingester_url="tcp://localhost:10011"
+                upstream_url=Url("tcp://localhost:9998"),
+                ingester_url=Url("tcp://localhost:10011"),
             ),
         )
     )
@@ -210,7 +115,8 @@ async def test_map(
         StreamingSingleIngester(
             name=StreamName("alba"),
             settings=StreamingSingleSettings(
-                upstream_url="tcp://localhost:9997", ingester_url="tcp://localhost:10012"
+                upstream_url=Url("tcp://localhost:9997"),
+                ingester_url=Url("tcp://localhost:10012"),
             ),
         )
     )
@@ -218,7 +124,8 @@ async def test_map(
         StreamingSingleIngester(
             name=StreamName("slow"),
             settings=StreamingSingleSettings(
-                upstream_url="tcp://localhost:9996", ingester_url="tcp://localhost:10013"
+                upstream_url=Url("tcp://localhost:9996"),
+                ingester_url=Url("tcp://localhost:10013"),
             ),
         )
     )

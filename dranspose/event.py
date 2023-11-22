@@ -15,12 +15,14 @@ class StreamData(BaseModel):
     def length(self) -> int:
         return len(self.frames)
 
+
 class InternalWorkerMessage(BaseModel):
     event_number: EventNumber
     streams: dict[StreamName, StreamData] = {}
 
     def get_all_frames(self):
         return [frame for stream in self.streams.values() for frame in stream.frames]
+
 
 class EventData(BaseModel):
     event_number: EventNumber
