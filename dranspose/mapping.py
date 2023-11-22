@@ -36,9 +36,7 @@ class Mapping:
         self.mapping = m
         self.uuid = uuid.uuid4()
         self.assignments: dict[VirtualWorker, WorkerName] = {}
-        self.all_assignments: dict[
-            tuple[EventNumber, StreamName], list[WorkerName]
-        ] = defaultdict(list)
+        self.all_assignments: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.complete_events = 0
 
     def len(self) -> int:
@@ -49,7 +47,8 @@ class Mapping:
 
     def assign_next(
         self, worker: WorkerName, all_workers: list[WorkerName]
-    ) -> VirtualWorker | tuple[EventNumber, StreamName] | None:
+    ) -> VirtualWorker | Literal["all"] | None:
+        maxassign = EventNumber(self.len() + 1)
         for evnint in range(self.complete_events, self.len()):
             evn = EventNumber(evnint)
             for stream, v in self.mapping.items():
@@ -57,12 +56,11 @@ class Mapping:
                 if assign is not None:
                     if assign == "all":
                         if worker in (
-                            set(all_workers) - set(self.all_assignments[(evn, stream)])
+                            set(all_workers) - set(self.all_assignments[evn])
                         ):
                             # assign worker to the "all" of the current stream as it is not yet in it
-                            self.all_assignments[(evn, stream)].append(worker)
-                            self.update_filled(all_workers)
-                            return evn, stream
+                            self.all_assignments[evn].append(worker)
+                            maxassign = evn
                         else:
                             continue  # maybe the worker is needed in the next stream
                     elif isinstance(assign, list):  # not all
@@ -71,6 +69,9 @@ class Mapping:
                                 self.assignments[w] = worker
                                 self.update_filled(all_workers)
                                 return w
+            if evn == maxassign:
+                self.update_filled(all_workers)
+                return "all"
         return None
 
     def min_workers(self) -> int:
@@ -92,7 +93,7 @@ class Mapping:
             if assign is None:
                 continue
             elif assign == "all":
-                ret[s] = self.all_assignments[(no, s)]
+                ret[s] = self.all_assignments[no]
             elif isinstance(assign, list):
                 ret[s] = [self.assignments[x] for x in assign]
         return WorkAssignment(event_number=no, assignments=ret)
@@ -105,7 +106,7 @@ class Mapping:
                 if assign is None:
                     continue
                 elif assign == "all":
-                    if set(self.all_assignments[(evn, stream)]) != set(all_workers):
+                    if set(self.all_assignments[evn]) != set(all_workers):
                         return
                 else:
                     for w in assign:
@@ -129,9 +130,7 @@ class Mapping:
                     continue
                 elif val == "all":
                     print(
-                        ("all:" + " ".join(self.all_assignments[evn, stream])).rjust(
-                            20
-                        ),
+                        ("all:" + " ".join(self.all_assignments[evn])).rjust(20),
                         end="",
                     )
                 else:

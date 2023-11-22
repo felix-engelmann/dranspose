@@ -149,6 +149,11 @@ class Controller:
                         logger.debug("got a ready worker %s", update)
                         if update.state == WorkerStateEnum.IDLE:
                             cfg = await self.get_configs()
+                            logger.debug(
+                                "assigning worker %s with all %s",
+                                update.worker,
+                                [ws.name for ws in cfg.workers],
+                            )
                             virt = self.mapping.assign_next(
                                 update.worker, [ws.name for ws in cfg.workers]
                             )
@@ -165,6 +170,11 @@ class Controller:
                                 "assigned worker %s to %s", update.worker, virt
                             )
                             async with self.redis.pipeline() as pipe:
+                                logger.debug(
+                                    "send out complete events in range(%d, %d)",
+                                    event_no,
+                                    self.mapping.complete_events,
+                                )
                                 for evn in range(
                                     event_no, self.mapping.complete_events
                                 ):

@@ -47,6 +47,29 @@ def test_none() -> None:
     assert assign.assignments[StreamName("test")] == [WorkerName("w1")]
 
 
+def test_auto() -> None:
+    ntrig = 10
+    m = Mapping(
+        {
+            StreamName("test"): [
+                [VirtualWorker(i)] if i % 4 == 0 else None for i in range(ntrig)
+            ]
+        },
+    )
+
+    m.print()
+    all_workers = [WorkerName("w1"), WorkerName("w2")]
+    m.assign_next(WorkerName("w1"), all_workers)
+    m.assign_next(WorkerName("w2"), all_workers)
+
+    m.print()
+
+    assert 1 == m.complete_events
+
+    with pytest.raises(NotYetAssigned):
+        m.get_event_workers(EventNumber(8))
+
+
 def test_all() -> None:
     ntrig = 10
     m = Mapping(
@@ -68,6 +91,38 @@ def test_all() -> None:
 
     with pytest.raises(NotYetAssigned):
         m.get_event_workers(EventNumber(4))
+
+    m.assign_next(WorkerName("w1"), all_workers)
+
+    m.print()
+
+    assign = m.get_event_workers(EventNumber(4))
+    assert set(assign.assignments[StreamName("test")]) == set(all_workers)
+
+
+def test_multi_all() -> None:
+    ntrig = 10
+    m = Mapping(
+        {
+            StreamName("test"): [
+                [VirtualWorker(i)] if i % 4 else "all" for i in range(ntrig)
+            ],
+            StreamName("test2"): [
+                [VirtualWorker(i)] if i % 4 else "all" for i in range(ntrig)
+            ],
+            StreamName("noall"): [[VirtualWorker(i)] for i in range(ntrig)],
+        },
+        add_start_end=False,
+    )
+
+    m.print()
+    all_workers = [WorkerName("w1"), WorkerName("w2"), WorkerName("w3")]
+    for _ in range(3):
+        m.assign_next(WorkerName("w1"), all_workers)
+        m.assign_next(WorkerName("w2"), all_workers)
+        m.assign_next(WorkerName("w3"), all_workers)
+
+    m.print()
 
     m.assign_next(WorkerName("w1"), all_workers)
 
@@ -140,7 +195,7 @@ def test_mixed_all() -> None:
         # m.assign_next("w3")
     print(m.assignments)
     print(m.all_assignments)
-    assert m.all_assignments[(EventNumber(1), StreamName("announcer"))] == [
+    assert m.all_assignments[EventNumber(1)] == [
         "w2",
         "w3",
         "w1",

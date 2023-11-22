@@ -94,7 +94,7 @@ async def test_simple(
 
 
 @pytest.mark.asyncio
-async def est_map(
+async def test_map(
     controller: None,
     reducer: None,
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
