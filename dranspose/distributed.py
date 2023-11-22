@@ -92,3 +92,6 @@ class DistributedService(abc.ABC):
                 break
             except asyncio.exceptions.CancelledError:
                 break
+
+    async def restart_work(self, uuid: UUID4)-> None:
+        pass

@@ -1,7 +1,8 @@
 import asyncio
 import json
 import time
-from typing import Any, Optional
+from asyncio import Future
+from typing import Any, Optional, Awaitable
 
 import zmq.asyncio
 import logging
@@ -49,7 +50,7 @@ class Worker(DistributedService):
         self.ctx = zmq.asyncio.Context()
 
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
-        self._stream_map: dict[StreamName, zmq.Socket] = {}
+        self._stream_map: dict[StreamName, zmq.Socket[Any]] = {}
 
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
@@ -103,9 +104,14 @@ class Worker(DistributedService):
             lastev = assignments[0]
             if len(ingesterset) == 0:
                 continue
-            tasks = [sock.recv_multipart() for sock in ingesterset]
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            tasks: list[Future[list[zmq.Frame]]] = [
+                sock.recv_multipart() for sock in ingesterset
+            ]
+            done_pending: tuple[
+                set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
+            ] = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             # print("done", done, "pending", pending)
+            done, pending = done_pending
             for res in done:
                 self._logger.debug("received work %s", res.result()[0])
             proced += 1

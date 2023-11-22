@@ -20,7 +20,7 @@ class InternalWorkerMessage(BaseModel):
     event_number: EventNumber
     streams: dict[StreamName, StreamData] = {}
 
-    def get_all_frames(self):
+    def get_all_frames(self) -> list[zmq.Frame]:
         return [frame for stream in self.streams.values() for frame in stream.frames]
 
 

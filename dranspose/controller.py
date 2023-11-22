@@ -270,7 +270,7 @@ async def set_mapping(
 
 
 @app.post("/api/v1/parameters/json")
-async def set_params(payload: dict = Body(...)) -> UUID4 | str:
+async def set_params(payload: dict[Any, Any] = Body(...)) -> UUID4 | str:
     res = pickle.dumps(payload)
     u = await ctrl.set_params(res)
     return u

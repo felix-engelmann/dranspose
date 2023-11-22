@@ -121,8 +121,9 @@ class Ingester(DistributedService):
                 )
                 self._logger.debug("sent message to worker %s", worker)
 
-    # async def run_source(self, stream: StreamName) -> AsyncGenerator[list[zmq.Frame], None]:
-    #    raise NotImplemented("get_frame must be implemented")
+    async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
+        yield StreamData(typ="", frames=[])
+        return
 
     async def accept_workers(self) -> None:
         poller = zmq.asyncio.Poller()
