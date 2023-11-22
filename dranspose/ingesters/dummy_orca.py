@@ -12,7 +12,7 @@ class DummyOrcaIngester(Ingester):
     def __init__(self) -> None:
         super().__init__(
             IngesterName("dummy_orca"),
-            IngesterSettings(worker_url=Url("tcp://localhost:10006")),
+            IngesterSettings(ingester_url=Url("tcp://localhost:10006")),
         )
         self.state.streams = [StreamName("orca")]
 

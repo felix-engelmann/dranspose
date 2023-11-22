@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import Coroutine, AsyncGenerator, Optional
+from typing import Coroutine, AsyncGenerator, Optional, Awaitable
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -10,6 +10,7 @@ import logging
 from pydantic import UUID4
 
 from dranspose.distributed import DistributedService, DistributedSettings
+from dranspose.event import StreamData, InternalWorkerMessage
 from dranspose.protocol import (
     IngesterState,
     StreamName,
@@ -87,35 +88,27 @@ class Ingester(DistributedService):
         while True:
             work_assignment: WorkAssignment = await self.assignment_queue.get()
             workermessages = {}
-            zmqyields: list[Coroutine] = []
+            zmqyields: list[Awaitable[StreamData]] = []
             streams: list[StreamName] = []
             for stream in work_assignment.assignments:
                 zmqyields.append(anext(sourcegens[stream]))
                 streams.append(stream)
-            zmqstreams: list[list[bytes | zmq.Frame]] = await asyncio.gather(*zmqyields)
-            zmqparts: dict[StreamName, list[bytes | zmq.Frame]] = {
+            zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+            zmqparts: dict[StreamName, StreamData] = {
                 stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
             }
             for stream, workers in work_assignment.assignments.items():
                 for worker in workers:
                     if worker not in workermessages:
-                        workermessages[worker] = {
-                            "data": [],
-                            "header": {
-                                "event": work_assignment.event_number,
-                                "parts": [],
-                            },
-                        }
-                    workermessages[worker]["data"] += zmqparts[stream]
-                    workermessages[worker]["header"]["parts"].append(
-                        {"stream": stream, "length": len(zmqparts[stream])}
-                    )
+                        workermessages[worker] = InternalWorkerMessage(event_number=work_assignment.event_number)
+                    workermessages[worker].streams[stream] = zmqparts[stream]
             self._logger.debug("workermessages %s", workermessages)
             for worker, message in workermessages.items():
+                self._logger.debug("header is %s", message.model_dump_json(exclude={"streams":{"__all__":"frames"}}))
                 await self.out_socket.send_multipart(
                     [worker.encode("ascii")]
-                    + [json.dumps(message["header"]).encode("utf8")]
-                    + message["data"]
+                    + [message.model_dump_json(exclude={"streams":{"__all__":"frames"}}).encode("utf8")]
+                    + message.get_all_frames()
                 )
                 self._logger.debug("sent message to worker %s", worker)
 

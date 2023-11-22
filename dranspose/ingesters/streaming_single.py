@@ -4,6 +4,7 @@ from typing import AsyncGenerator, Optional
 import zmq
 
 from dranspose.data.stream1 import Stream1Packet, SeriesStart, SeriesData, SeriesEnd
+from dranspose.event import StreamData
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl, IngesterName
 
@@ -29,8 +30,7 @@ class StreamingSingleIngester(Ingester):
 
     async def run_source(
         self, stream: StreamName
-    ) -> AsyncGenerator[list[zmq.Frame], None]:
-        hdr: zmq.Frame
+    ) -> AsyncGenerator[StreamData, None]:
         while True:
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)
@@ -42,7 +42,7 @@ class StreamingSingleIngester(Ingester):
             self._logger.debug("received frame with header %s", packet)
             if type(packet) is SeriesStart:
                 self._logger.info("start of new sequence %s", packet)
-                hdr = parts[0]
+                yield StreamData(typ="STINS", frames=parts)
                 break
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
@@ -52,8 +52,9 @@ class StreamingSingleIngester(Ingester):
                 self._logger.error("packet not valid %s", e.__repr__())
                 continue
             if type(packet) is SeriesData:
-                yield [hdr] + parts
+                yield StreamData(typ="STINS", frames=parts)
             if type(packet) is SeriesEnd:
+                yield StreamData(typ="STINS", frames=parts)
                 break
         while True:
             self._logger.debug("discarding messages until next run")

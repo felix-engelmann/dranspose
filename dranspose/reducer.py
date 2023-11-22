@@ -37,7 +37,7 @@ class Reducer(DistributedService):
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
 
-    async def close(self):
+    async def close(self) -> None:
         self.work_task.cancel()
         await self.redis.delete(RedisKeys.config("reducer", self.state.name))
         await self.redis.aclose()

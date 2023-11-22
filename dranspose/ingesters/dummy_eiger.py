@@ -13,7 +13,7 @@ class DummyEigerIngester(Ingester):
     def __init__(self) -> None:
         super().__init__(
             IngesterName("dummy_ingester"),
-            IngesterSettings(worker_url=Url("tcp://localhost:10005")),
+            IngesterSettings(ingester_url=Url("tcp://localhost:10005")),
         )
         self.state.streams = [StreamName("eigerdummy")]
 
