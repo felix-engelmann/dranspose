@@ -61,7 +61,7 @@ class Acquisition:
 class AcquisitionSocket:
     def __init__(self, ctx: zmq.Context[Any], bind: ZmqUrl) -> None:
         self.data_socket = ctx.socket(zmq.PUSH)
-        self.data_socket.bind(bind)
+        self.data_socket.bind(str(bind))
         self.msg_number = itertools.count(0)
 
     async def start(self, filename: str, meta: Any = None) -> Acquisition:

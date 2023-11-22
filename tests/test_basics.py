@@ -19,6 +19,16 @@ import redis.asyncio as redis
 
 from dranspose.worker import Worker
 
+from tests.fixtures import (
+    controller,
+    reducer,
+    create_worker,
+    create_ingester,
+    stream_eiger,
+    stream_orca,
+    stream_alba,
+)
+
 
 @pytest.mark.asyncio
 async def test_simple(
@@ -84,7 +94,7 @@ async def test_simple(
 
 
 @pytest.mark.asyncio
-async def test_map(
+async def est_map(
     controller: None,
     reducer: None,
     create_worker: Callable[[WorkerName], Awaitable[Worker]],

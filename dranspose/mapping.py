@@ -21,11 +21,18 @@ class NotYetAssigned(Exception):
 class Mapping:
     @validate_call
     def __init__(
-        self, m: Dict[StreamName, List[Optional[List[VirtualWorker] | Literal["all"]]]]
+        self,
+        m: Dict[StreamName, List[Optional[List[VirtualWorker] | Literal["all"]]]],
+        add_start_end: bool = True,
     ) -> None:
         if len(set(map(len, m.values()))) > 1:
             raise Exception("length not equal: ", list(map(len, m.values())))
+        if add_start_end:
+            for li in m.values():
+                li.insert(0, "all")
+                li.append("all")
 
+        print("mapping is", m)
         self.mapping = m
         self.uuid = uuid.uuid4()
         self.assignments: dict[VirtualWorker, WorkerName] = {}
@@ -71,7 +78,7 @@ class Mapping:
         for evn, i in enumerate(zip(*self.mapping.values())):
             workers = set()
             for val in i:
-                if val is not None:
+                if val is not None and val != "all":
                     workers.update(val)
             minimum = max(minimum, len(workers))
         return minimum

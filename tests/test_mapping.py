@@ -12,7 +12,10 @@ from dranspose.protocol import (
 
 def test_simple_map() -> None:
     ntrig = 10
-    m = Mapping({StreamName("test"): [[VirtualWorker(i)] for i in range(ntrig)]})
+    m = Mapping(
+        {StreamName("test"): [[VirtualWorker(i)] for i in range(ntrig)]},
+        add_start_end=False,
+    )
 
     assert m.len() == ntrig
 
@@ -24,7 +27,8 @@ def test_none() -> None:
             StreamName("test"): [
                 [VirtualWorker(i)] if i % 4 == 0 else None for i in range(ntrig)
             ]
-        }
+        },
+        add_start_end=False,
     )
 
     m.print()
@@ -50,7 +54,8 @@ def test_all() -> None:
             StreamName("test"): [
                 [VirtualWorker(i)] if i % 4 else "all" for i in range(ntrig)
             ]
-        }
+        },
+        add_start_end=False,
     )
 
     m.print()
@@ -82,7 +87,8 @@ def test_multiple() -> None:
                 for i in range(1, ntrig)
             ],
             StreamName("orca"): [[VirtualWorker(2 * i + 1)] for i in range(1, ntrig)],
-        }
+        },
+        add_start_end=False,
     )
     m.print()
     all_workers = [WorkerName("w1"), WorkerName("w2"), WorkerName("w3")]
@@ -118,7 +124,8 @@ def test_mixed_all() -> None:
             StreamName("eiger"): [[VirtualWorker(2 * i)] for i in range(1, ntrig)],
             StreamName("orca"): [[VirtualWorker(2 * i + 1)] for i in range(1, ntrig)],
             StreamName("announcer"): ["all" for i in range(1, ntrig)],
-        }
+        },
+        add_start_end=False,
     )
     m.print()
 

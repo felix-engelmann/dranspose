@@ -99,7 +99,7 @@ async def stream_eiger() -> Callable[
         await acq.close()
         await socket.close()
 
-    return _make_eiger
+    yield _make_eiger
 
 
 @pytest_asyncio.fixture
@@ -122,7 +122,7 @@ async def stream_orca() -> Callable[
         await acq.close()
         await socket.close()
 
-    return _make_orca
+    yield _make_orca
 
 
 @pytest_asyncio.fixture
@@ -139,4 +139,4 @@ async def stream_alba() -> Callable[
         await acq.close()
         await socket.close()
 
-    return _make_alba
+    yield _make_alba
