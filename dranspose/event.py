@@ -1,7 +1,9 @@
+from typing import Any
+
 import zmq
 from pydantic_core.core_schema import ValidationInfo
 
-from dranspose.protocol import EventNumber, StreamName
+from dranspose.protocol import EventNumber, StreamName, WorkerName
 from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 
 
@@ -22,6 +24,12 @@ class InternalWorkerMessage(BaseModel):
 
     def get_all_frames(self) -> list[zmq.Frame]:
         return [frame for stream in self.streams.values() for frame in stream.frames]
+
+
+class ResultData(BaseModel):
+    event_number: EventNumber
+    worker: WorkerName
+    payload: Any
 
 
 class EventData(BaseModel):

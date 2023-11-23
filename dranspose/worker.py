@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import json
 import os
+import pickle
 import sys
 import time
 from asyncio import Future
@@ -17,7 +18,7 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService, DistributedSettings
-from dranspose.event import InternalWorkerMessage, EventData
+from dranspose.event import InternalWorkerMessage, EventData, ResultData
 from dranspose.protocol import (
     WorkerState,
     RedisKeys,
@@ -29,6 +30,7 @@ from dranspose.protocol import (
     EventNumber,
     IngesterName,
     StreamName,
+    ReducerState,
 )
 
 
@@ -56,6 +58,9 @@ class Worker(DistributedService):
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
         self._stream_map: dict[StreamName, zmq.Socket[Any]] = {}
 
+        self._reducer_url = None
+        self.out_socket = None
+
         self.custom = None
         if self._worker_settings.worker_class:
             try:
@@ -73,6 +78,7 @@ class Worker(DistributedService):
 
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
+        self.manage_receiver_task = asyncio.create_task(self.manage_receiver())
         self.work_task = asyncio.create_task(self.work())
         await self.register()
 
@@ -154,6 +160,17 @@ class Worker(DistributedService):
                 except Exception as e:
                     self._logger.error("custom worker failed: %s", e.__repr__())
             self._logger.debug("got result %s", result)
+            rd = ResultData(
+                event_number=event.event_number, worker=self.state.name, payload=result
+            )
+            if self.out_socket:
+                await self.out_socket.send_multipart(
+                    [
+                        rd.model_dump_json(exclude={"payload"}).encode("utf8"),
+                        pickle.dumps(rd.payload),
+                    ]
+                )
+
             proced += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)
@@ -173,6 +190,25 @@ class Worker(DistributedService):
         self.work_task.cancel()
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
+
+    async def manage_receiver(self) -> None:
+        while True:
+            config = await self.redis.get(RedisKeys.config("reducer"))
+            if config is None:
+                self._logger.warning("cannot get reducer configuration")
+                await asyncio.sleep(1)
+                continue
+            cfg = ReducerState.model_validate_json(config)
+            self._logger.warning("reducer config %s", cfg)
+            if cfg.url != self._reducer_url:
+                # connect to a new reducer
+                if self.out_socket is not None:
+                    self.out_socket.close()
+                self.out_socket = self.ctx.socket(zmq.PUSH)
+                self.out_socket.connect(str(cfg.url))
+                self._reducer_url = cfg.url
+                self._logger.info("connected out_socket to reducer at %s", cfg.url)
+            await asyncio.sleep(10)
 
     async def manage_ingesters(self) -> None:
         while True:
@@ -218,6 +254,7 @@ class Worker(DistributedService):
 
     async def close(self) -> None:
         self.manage_ingester_task.cancel()
+        self.manage_receiver_task.cancel()
         await self.redis.delete(RedisKeys.config("worker", self.state.name))
         await self.redis.aclose()
         self.ctx.destroy()
