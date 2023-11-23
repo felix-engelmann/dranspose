@@ -199,7 +199,6 @@ class Worker(DistributedService):
                 await asyncio.sleep(1)
                 continue
             cfg = ReducerState.model_validate_json(config)
-            self._logger.warning("reducer config %s", cfg)
             if cfg.url != self._reducer_url:
                 # connect to a new reducer
                 if self.out_socket is not None:

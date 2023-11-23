@@ -1,6 +1,14 @@
 import asyncio
 import random
-from typing import AsyncGenerator, Coroutine, Awaitable, AsyncIterator, Callable, Any
+from typing import (
+    AsyncGenerator,
+    Coroutine,
+    Awaitable,
+    AsyncIterator,
+    Callable,
+    Any,
+    Optional,
+)
 
 import numpy as np
 import pytest_asyncio
@@ -35,8 +43,11 @@ async def create_worker() -> AsyncIterator[
 ]:
     workers = []
 
-    async def _make_worker(name: WorkerName) -> Worker:
-        worker = Worker(name)
+    async def _make_worker(name: WorkerName | Worker) -> Worker:
+        if not isinstance(name, Worker):
+            worker = Worker(name)
+        else:
+            worker = name
         worker_task = asyncio.create_task(worker.run())
         workers.append((worker, worker_task))
         return worker
@@ -67,15 +78,36 @@ async def create_ingester() -> AsyncIterator[
 
 
 @pytest_asyncio.fixture()
-async def reducer() -> AsyncIterator[None]:
-    config = uvicorn.Config(reducer_app, port=5001, log_level="debug")
-    server = uvicorn.Server(config)
-    server_task = asyncio.create_task(server.serve())
-    while server.started is False:
-        await asyncio.sleep(0.1)
-    yield
-    server.should_exit = True
-    await server_task
+async def reducer(
+    tmp_path: Any,
+) -> AsyncIterator[Callable[[Optional[str]], Coroutine[None, None, None]]]:
+    server_tasks = []
+
+    async def start_reducer(custom: Optional[str] = None) -> None:
+        envfile = None
+        if custom:
+            p = tmp_path / "reducer.env"
+            print(p, type(p))
+            p.write_text(
+                f"""
+                REDUCER_CLASS="{custom}"
+                """
+            )
+            envfile = str(p)
+        config = uvicorn.Config(
+            reducer_app, port=5001, log_level="debug", env_file=envfile
+        )
+        server = uvicorn.Server(config)
+        server_tasks.append((server, asyncio.create_task(server.serve())))
+        while server.started is False:
+            await asyncio.sleep(0.1)
+
+    yield start_reducer
+
+    for server, task in server_tasks:
+        server.should_exit = True
+        await task
+
     await asyncio.sleep(0.1)
 
 

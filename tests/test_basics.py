@@ -1,5 +1,5 @@
 import asyncio
-from typing import Awaitable, Callable, Any, Coroutine, Never
+from typing import Awaitable, Callable, Any, Coroutine, Never, Optional
 
 import aiohttp
 
@@ -33,11 +33,12 @@ from tests.fixtures import (
 @pytest.mark.asyncio
 async def test_simple(
     controller: None,
-    reducer: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
 ) -> None:
+    await reducer(None)
     await create_worker(WorkerName("w1"))
     await create_ingester(
         StreamingSingleIngester(
@@ -96,13 +97,14 @@ async def test_simple(
 @pytest.mark.asyncio
 async def test_map(
     controller: None,
-    reducer: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
     stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
     stream_alba: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
 ) -> None:
+    await reducer(None)
     await create_worker(WorkerName("w1"))
     await create_worker(WorkerName("w2"))
     await create_worker(WorkerName("w3"))
