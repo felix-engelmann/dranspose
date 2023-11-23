@@ -67,9 +67,12 @@ class Ingester(DistributedService):
         self.assign_task = asyncio.create_task(self.manage_assignments())
 
     async def finish_work(self) -> None:
+        self._logger.info("finishing work")
         if self.dump_file:
             self.dump_file.close()
+            self._logger.info("closed dump file at finish %s", self.dump_file)
             self.dump_file = None
+
 
     async def manage_assignments(self) -> None:
         self._logger.info("started ingester manage assign task")
@@ -96,6 +99,7 @@ class Ingester(DistributedService):
         self.dump_file = None
         if self._ingester_settings.dump_path:
             self.dump_file = open(self._ingester_settings.dump_path, "ab")
+            self._logger.info("dump file %s opened at %s", self._ingester_settings.dump_path, self.dump_file)
         try:
             while True:
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
@@ -145,6 +149,7 @@ class Ingester(DistributedService):
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
             if self.dump_file:
+                self._logger.info("closing dump file %s at cancelled work", self.dump_file)
                 self.dump_file.close()
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:

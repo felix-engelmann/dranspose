@@ -195,6 +195,7 @@ class Controller:
                                 await pipe.execute()
                             event_no = self.mapping.complete_events
                         last = ready[0]
+                logger.warning("checking if finised, completed %d, len %d", len(self.completed_events), self.mapping.len())
                 if len(self.completed_events) == self.mapping.len():
                     # all events done, send close
                     cupd = ControllerUpdate(
