@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import pickle
 from typing import Coroutine, AsyncGenerator, Optional, Awaitable
 
 import redis.exceptions as rexceptions
@@ -23,6 +25,7 @@ from dranspose.protocol import (
 
 class IngesterSettings(DistributedSettings):
     ingester_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
+    dump_path: Optional[os.PathLike] = None
 
 
 class Ingester(DistributedService):
@@ -63,6 +66,11 @@ class Ingester(DistributedService):
         self.work_task = asyncio.create_task(self.work())
         self.assign_task = asyncio.create_task(self.manage_assignments())
 
+    async def finish_work(self) -> None:
+        if self.dump_file:
+            self.dump_file.close()
+            self.dump_file = None
+
     async def manage_assignments(self) -> None:
         self._logger.info("started ingester manage assign task")
         lastev = 0
@@ -85,41 +93,59 @@ class Ingester(DistributedService):
     async def work(self) -> None:
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
-        while True:
-            work_assignment: WorkAssignment = await self.assignment_queue.get()
-            workermessages = {}
-            zmqyields: list[Awaitable[StreamData]] = []
-            streams: list[StreamName] = []
-            for stream in work_assignment.assignments:
-                zmqyields.append(anext(sourcegens[stream]))
-                streams.append(stream)
-            zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
-            zmqparts: dict[StreamName, StreamData] = {
-                stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
-            }
-            for stream, workers in work_assignment.assignments.items():
-                for worker in workers:
-                    if worker not in workermessages:
-                        workermessages[worker] = InternalWorkerMessage(
-                            event_number=work_assignment.event_number
-                        )
-                    workermessages[worker].streams[stream] = zmqparts[stream]
-            self._logger.debug("workermessages %s", workermessages)
-            for worker, message in workermessages.items():
-                self._logger.debug(
-                    "header is %s",
-                    message.model_dump_json(exclude={"streams": {"__all__": "frames"}}),
-                )
-                await self.out_socket.send_multipart(
-                    [worker.encode("ascii")]
-                    + [
-                        message.model_dump_json(
-                            exclude={"streams": {"__all__": "frames"}}
-                        ).encode("utf8")
-                    ]
-                    + message.get_all_frames()
-                )
-                self._logger.debug("sent message to worker %s", worker)
+        self.dump_file = None
+        if self._ingester_settings.dump_path:
+            self.dump_file = open(self._ingester_settings.dump_path, "ab")
+        try:
+            while True:
+                work_assignment: WorkAssignment = await self.assignment_queue.get()
+                workermessages = {}
+                zmqyields: list[Awaitable[StreamData]] = []
+                streams: list[StreamName] = []
+                for stream in work_assignment.assignments:
+                    zmqyields.append(anext(sourcegens[stream]))
+                    streams.append(stream)
+                zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+                zmqparts: dict[StreamName, StreamData] = {
+                    stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
+                }
+                if self.dump_file:
+                    self._logger.debug("writing dump to path %s", self._ingester_settings.dump_path)
+                    allstr = InternalWorkerMessage(event_number=work_assignment.event_number,
+                                                   streams = {k: v.get_bytes() for k,v in zmqparts.items()}
+                                                   )
+                    try:
+                        pickle.dump(allstr, self.dump_file)
+                    except Exception as e:
+                        self._logger.error("cound not dump %s", e.__repr__())
+                    self._logger.debug("written dump")
+                for stream, workers in work_assignment.assignments.items():
+                    for worker in workers:
+                        if worker not in workermessages:
+                            workermessages[worker] = InternalWorkerMessage(
+                                event_number=work_assignment.event_number
+                            )
+                        workermessages[worker].streams[stream] = zmqparts[stream]
+                self._logger.debug("workermessages %s", workermessages)
+                for worker, message in workermessages.items():
+                    self._logger.debug(
+                        "header is %s",
+                        message.model_dump_json(exclude={"streams": {"__all__": "frames"}}),
+                    )
+                    await self.out_socket.send_multipart(
+                        [worker.encode("ascii")]
+                        + [
+                            message.model_dump_json(
+                                exclude={"streams": {"__all__": "frames"}}
+                            ).encode("utf8")
+                        ]
+                        + message.get_all_frames()
+                    )
+                    self._logger.debug("sent message to worker %s", worker)
+        except asyncio.exceptions.CancelledError:
+            self._logger.info("stopping worker")
+            if self.dump_file:
+                self.dump_file.close()
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
         yield StreamData(typ="", frames=[])

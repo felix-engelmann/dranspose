@@ -102,7 +102,7 @@ class Controller:
         logger.debug("send controller update %s", cupd)
         await self.redis.xadd(
             RedisKeys.updates(),
-            cupd.model_dump(mode="json"),
+            {"data": cupd.model_dump_json()},
         )
 
         cfgs = await self.get_configs()
@@ -127,7 +127,7 @@ class Controller:
         )
         await self.redis.xadd(
             RedisKeys.updates(),
-            cupd.model_dump(mode="json"),
+            {"data": cupd.model_dump_json()},
         )
         return self.parameters.uuid
 
@@ -195,6 +195,17 @@ class Controller:
                                 await pipe.execute()
                             event_no = self.mapping.complete_events
                         last = ready[0]
+                if len(self.completed_events) == self.mapping.len():
+                    # all events done, send close
+                    cupd = ControllerUpdate(
+                        mapping_uuid=self.mapping.uuid, parameters_uuid=self.parameters.uuid,
+                        finished=True
+                    )
+                    logger.debug("send finished update %s", cupd)
+                    await self.redis.xadd(
+                        RedisKeys.updates(),
+                        {"data": cupd.model_dump_json()},
+                    )
             except rexceptions.ConnectionError as e:
                 break
 

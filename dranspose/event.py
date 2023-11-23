@@ -10,12 +10,16 @@ from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 class StreamData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     typ: str
-    frames: list[zmq.Frame]
+    frames: list[zmq.Frame | bytes]
 
     @computed_field
     @property
     def length(self) -> int:
         return len(self.frames)
+
+
+    def get_bytes(self):
+        return StreamData(typ=self.typ, frames=[frame.bytes if isinstance(frame, zmq.Frame) else frame for frame in self.frames])
 
 
 class InternalWorkerMessage(BaseModel):

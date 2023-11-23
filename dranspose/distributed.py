@@ -75,7 +75,7 @@ class DistributedService(abc.ABC):
                 if RedisKeys.updates() in update:
                     update = update[RedisKeys.updates()][0][-1]
                     last = update[0]
-                    update = ControllerUpdate.model_validate(update[1])
+                    update = ControllerUpdate.model_validate_json(update[1]["data"])
                     self._logger.debug("update type %s", update)
                     newuuid = update.mapping_uuid
                     if newuuid != self.state.mapping_uuid:
@@ -88,6 +88,9 @@ class DistributedService(abc.ABC):
                         if params:
                             self._logger.error("set parameters %s", params)
                             self.parameters = pickle.loads(params)
+                    if update.finished:
+                        self._logger.info("finished messages")
+                        await self.finish_work()
 
             except rexceptions.ConnectionError:
                 break
@@ -95,4 +98,7 @@ class DistributedService(abc.ABC):
                 break
 
     async def restart_work(self, uuid: UUID4) -> None:
+        pass
+
+    async def finish_work(self) -> None:
         pass
