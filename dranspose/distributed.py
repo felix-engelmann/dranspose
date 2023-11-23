@@ -47,6 +47,7 @@ class DistributedService(abc.ABC):
             f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3"
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
+        self.parameters = None
 
     async def register(self) -> None:
         latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
@@ -93,5 +94,5 @@ class DistributedService(abc.ABC):
             except asyncio.exceptions.CancelledError:
                 break
 
-    async def restart_work(self, uuid: UUID4)-> None:
+    async def restart_work(self, uuid: UUID4) -> None:
         pass

@@ -1,5 +1,8 @@
 import asyncio
+import importlib
 import json
+import os
+import sys
 import time
 from asyncio import Future
 from typing import Any, Optional, Awaitable
@@ -14,6 +17,7 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService, DistributedSettings
+from dranspose.event import InternalWorkerMessage, EventData
 from dranspose.protocol import (
     WorkerState,
     RedisKeys,
@@ -35,7 +39,7 @@ class ConnectedIngester(BaseModel):
 
 
 class WorkerSettings(DistributedSettings):
-    pass
+    worker_class: Optional[str] = None
 
 
 class Worker(DistributedService):
@@ -52,6 +56,21 @@ class Worker(DistributedService):
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
         self._stream_map: dict[StreamName, zmq.Socket[Any]] = {}
 
+        self.custom = None
+        if self._worker_settings.worker_class:
+            try:
+                sys.path.append(os.getcwd())
+                module = importlib.import_module(
+                    self._worker_settings.worker_class.split(":")[0]
+                )
+                self._logger.info("loaded module %s", module)
+                self.custom = getattr(
+                    module, self._worker_settings.worker_class.split(":")[1]
+                )
+                self._logger.info("custom worker class %s", self.custom)
+            except:
+                self._logger.warning("no custom worker class loaded, discarding events")
+
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
         self.work_task = asyncio.create_task(self.work())
@@ -59,6 +78,10 @@ class Worker(DistributedService):
 
     async def work(self) -> None:
         self._logger.info("started work task")
+
+        self.worker = None
+        if self.custom:
+            self.worker = self.custom()
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
@@ -105,15 +128,32 @@ class Worker(DistributedService):
             if len(ingesterset) == 0:
                 continue
             tasks: list[Future[list[zmq.Frame]]] = [
-                sock.recv_multipart() for sock in ingesterset
+                sock.recv_multipart(copy=False) for sock in ingesterset
             ]
             done_pending: tuple[
                 set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
             ] = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             # print("done", done, "pending", pending)
             done, pending = done_pending
+            msgs = []
             for res in done:
-                self._logger.debug("received work %s", res.result()[0])
+                prelim = json.loads(res.result()[0].bytes)
+                pos = 1
+                for stream, data in prelim["streams"].items():
+                    data["frames"] = res.result()[pos : pos + data["length"]]
+                    pos += data["length"]
+                msg = InternalWorkerMessage.model_validate(prelim)
+                msgs.append(msg)
+
+            event = EventData.from_internals(msgs)
+            self._logger.debug("received work %s", event)
+            result = None
+            if self.worker:
+                try:
+                    result = self.worker.process_event(event, self.parameters)
+                except Exception as e:
+                    self._logger.error("custom worker failed: %s", e.__repr__())
+            self._logger.debug("got result %s", result)
             proced += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)

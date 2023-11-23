@@ -27,3 +27,19 @@ class InternalWorkerMessage(BaseModel):
 class EventData(BaseModel):
     event_number: EventNumber
     streams: dict[StreamName, StreamData]
+
+    @classmethod
+    def from_internals(cls, msgs: list[InternalWorkerMessage]) -> "EventData":
+        assert len(msgs) > 0, "merge at least one message"
+        assert (
+            len(set([m.event_number for m in msgs])) == 1
+        ), "Cannot merge data from different events"
+        all_stream_names = [stream for m in msgs for stream in m.streams.keys()]
+        assert len(all_stream_names) == len(
+            set(all_stream_names)
+        ), "Cannot merge data with duplicate streams"
+
+        ret = EventData(event_number=msgs[0].event_number, streams={})
+        for msg in msgs:
+            ret.streams.update(msg.streams)
+        return ret
