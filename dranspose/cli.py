@@ -61,7 +61,7 @@ def run() -> None:
     parser = argparse.ArgumentParser(prog="dranspose", description="Transposes Streams")
 
     parser.add_argument(
-        "component", choices=["controller", "worker", "ingester", "combined"]
+        "component", choices=["controller", "worker", "ingester", "reducer", "combined"]
     )  # positional argument
     parser.add_argument("-n", "--name")  # option that takes a value
     parser.add_argument("-c", "--ingestclass")  # option that takes a value
@@ -73,6 +73,13 @@ def run() -> None:
     if args.component == "controller":
         try:
             config = uvicorn.Config(app, port=5000, host=args.host, log_level="info")
+            server = uvicorn.Server(config)
+            server.run()
+        except KeyboardInterrupt:
+            print("exiting")
+    elif args.component == "reducer":
+        try:
+            config = uvicorn.Config(reducer_app, port=5000, host=args.host, log_level="info")
             server = uvicorn.Server(config)
             server.run()
         except KeyboardInterrupt:
