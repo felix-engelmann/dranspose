@@ -156,7 +156,8 @@ class Worker(DistributedService):
             result = None
             if self.worker:
                 try:
-                    result = self.worker.process_event(event, self.parameters)
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, self.worker.process_event, event, self.parameters)
                 except Exception as e:
                     self._logger.error("custom worker failed: %s", e.__repr__())
             self._logger.debug("got result %s", result)
