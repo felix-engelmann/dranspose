@@ -339,7 +339,7 @@ showstringspaces=false
  \begin{block}{Stateful workers}
   \begin{itemize}
    \item load balance with constraints
-   \item worker for event $n$ will also get $n+1$
+   \item e.g. worker for event $n$ will also get $n+1$
   \end{itemize}
 
  \end{block}
@@ -365,7 +365,8 @@ showstringspaces=false
 \begin{block}{Virtual Workers}
 \begin{itemize}
  \item Virtual workers are dynamically assigned to real workers
- \item secial \emph{all} workers (stream headers), or discard frame with $\emptyset$
+ \item special \emph{all} workers (stream headers), or discard frame with $\emptyset$
+ \item stream header goes to all
 \end{itemize}
 
 \medskip
