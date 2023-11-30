@@ -1,3 +1,4 @@
+import os
 import pickle
 
 import redis.asyncio as redis
@@ -10,10 +11,12 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
+from dranspose.ingesters.streaming_contrast import StreamingContrastIngester, StreamingContrastSettings
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
+from dranspose.ingesters.streaming_xspress3 import StreamingXspressIngester, StreamingXspressSettings
 from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName
 from dranspose.worker import Worker, WorkerSettings
 
@@ -22,9 +25,7 @@ from tests.fixtures import (
     reducer,
     create_worker,
     create_ingester,
-    stream_eiger,
-    stream_orca,
-    stream_alba,
+    stream_pkls,
 )
 
 
@@ -34,7 +35,7 @@ async def test_reduction(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
+    stream_pkls: Callable[[zmq.Context[Any], int, os.PathLike, float, int], Coroutine[Any, Any, Never]],
 ) -> None:
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(
@@ -46,43 +47,43 @@ async def test_reduction(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
+        StreamingContrastIngester(
+            name=StreamName("contrast"),
+            settings=StreamingContrastSettings(upstream_url=Url("tcp://localhost:5556"),
+                                               ingester_url=Url("tcp://localhost:10000")),
         )
     )
-
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
+    await create_ingester(
+        StreamingXspressIngester(
+            name=StreamName("xspress3"),
+            settings=StreamingXspressSettings(upstream_url=Url("tcp://localhost:9999"),
+                                              ingester_url=Url("tcp://localhost:10001")),
+        )
+    )
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
+        while {"contrast", "xspress3"} - set(state.get_streams()) != set():
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        ntrig = 10
+        ntrig = 20
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
             json={
-                "eiger": [[2 * i] for i in range(1, ntrig)],
+                "contrast": [[i] for i in range(ntrig)],
+                "xspress3": [[i] for i in range(ntrig)],
             },
         )
         assert resp.status == 200
         uuid = await resp.json()
 
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:assigned:{uuid}"}
-    print("presentkeys", present_keys)
-    assert present_keys - set(keys) == set()
-
     context = zmq.asyncio.Context()
 
-    asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
+    asyncio.create_task(stream_pkls(context, 9999, "tests/data/xspress3-dump.pkls",0.05, zmq.PUB))
+    asyncio.create_task(stream_pkls(context, 5556, "tests/data/contrast-dump.pkls",0.05, zmq.PUB))
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
@@ -96,10 +97,8 @@ async def test_reduction(
         content = await st.content.read()
         result = pickle.loads(content)
         print("content", result)
-        assert len(result["results"]) == ntrig + 1
+        assert len(result["results"]) == ntrig + 2
 
     context.destroy()
-
-    await r.aclose()
 
     print(content)

@@ -51,7 +51,7 @@ class StreamingSingleIngester(Ingester):
                 continue
             if type(packet) is SeriesData:
                 yield StreamData(typ="STINS", frames=parts)
-            if type(packet) is SeriesEnd:
+            elif type(packet) is SeriesEnd:
                 yield StreamData(typ="STINS", frames=parts)
                 break
         while True:

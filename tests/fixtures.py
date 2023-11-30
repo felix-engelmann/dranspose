@@ -1,4 +1,6 @@
 import asyncio
+import os
+import pickle
 import random
 from typing import (
     AsyncGenerator,
@@ -133,6 +135,28 @@ async def stream_eiger() -> Callable[
 
     return _make_eiger
 
+@pytest_asyncio.fixture
+async def stream_pkls() -> Callable[
+    [zmq.Context[Any], int, os.PathLike, float, int], Coroutine[Any, Any, None]
+]:
+    async def _make_pkls(ctx: zmq.Context[Any], port: int, filename: os.PathLike, frame_time: float = 0.1, typ=zmq.PUSH) -> None:
+        socket: zmq.Socket[Any] = ctx.socket(typ)
+        socket.bind(f"tcp://*:{port}")
+        for _ in range(3):
+            await socket.send_multipart([b'emptyness'])
+            await asyncio.sleep(0.1)
+        with open(filename, "rb") as f:
+            while True:
+                try:
+                    frames = pickle.load(f)
+                    await socket.send_multipart(frames)
+                    await asyncio.sleep(frame_time)
+                except EOFError:
+                    break
+
+        socket.close()
+
+    return _make_pkls
 
 @pytest_asyncio.fixture
 async def stream_orca() -> Callable[

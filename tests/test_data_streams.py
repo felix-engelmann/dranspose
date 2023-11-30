@@ -28,8 +28,7 @@ def test_xspress3_stream() -> None:
                 if skip > 0:
                     skip += 1
                     continue
-                data = json.loads(frames[0])
-                pkg = XspressPacket.validate_python(data)
+                pkg = XspressPacket.validate_json(frames[0])
                 print(pkg)
                 if pkg.htype == "image":
                     skip = 2
