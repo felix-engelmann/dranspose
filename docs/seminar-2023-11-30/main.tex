@@ -3,6 +3,7 @@
 \usepackage[utf8]{inputenc}
 \usetheme{default}
 \setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
 
 \title{dranspose: distributed event formation with dynamic map-reduce}
 \author{Felix Engelmann \\\medskip \url{felix.engelmann@maxiv.lu.se}}
@@ -106,9 +107,9 @@ showstringspaces=false
 \begin{frame}{Limitations of Live Analysis}
  \begin{block}{Single Data Stream}
   \begin{itemize}
-   \item Only one detector data available
+   \item only one detector data available
    \item simple tools, e.g. azint, crop, time integration
-   \item limits: Normalisation to $I_0$, sorting by motor position
+   \item beyond limits: normalisation to $I_0$, sorting by motor position
   \end{itemize}
  \end{block}
  \begin{block}{Custom Modules}
@@ -162,16 +163,20 @@ showstringspaces=false
 \end{frame}
 
 \begin{frame}{Frame/Worker Matrix Transformation}
- \begin{minipage}{0.49\textwidth}
+ \begin{minipage}[t]{0.49\textwidth}
+ \begin{block}{Frame Stream}
+ \medskip
   \begin{tabular}{rccccc}
    \faCamera & 1 & 2 & 3 & 4 & 5 \\
    \faVideo & 1 & 2  & 3 & 4 & 5\\
    \faSlidersH & 1 & & & 2 \\
    \faThermometerHalf & 1 & & 2 &  & 3 \\
   \end{tabular}
-
+\end{block}
  \end{minipage}
- \begin{minipage}{0.49\textwidth}
+ \begin{minipage}[t]{0.49\textwidth}
+ \begin{block}{Event Stream}
+ \medskip
     \begin{tabular}{rcccc}
      Event 1 & \faCamera\ 1 & \faVideo\ 1 &\faSlidersH\ 1 & \faThermometerHalf\ 1 \\
      Event 2 & \faCamera\ 2 & \faVideo\ 2 & & \\
@@ -179,13 +184,13 @@ showstringspaces=false
      Event 4 & \faCamera\ 4 & \faVideo\ 4 &\faSlidersH\ 2 &  \\
      Event 5 & \faCamera\ 5 & \faVideo\ 5 & & \faThermometerHalf\ 3 \\
     \end{tabular}
-
+\end{block}
  \end{minipage}
  
  \begin{block}{Stream}
  \begin{itemize}
-  \item Matrix is sequentially filled column by column
-  \item Possibly unknown size (reactive scanning)
+  \item matrix is sequentially filled column by column
+  \item possibly unknown size (reactive scanning)
  \end{itemize}
  \end{block}
 
@@ -195,13 +200,13 @@ showstringspaces=false
 \begin{frame}{Bandwidth and Latency}
  \begin{block}{Limitations}
   \begin{itemize}
-   \item TCP connection max 60 GBit/s
-   \item ZMQ connection ca. 30 GBit/s
+   \item TCP connection max 60 Gbit/s
+   \item ZMQ connection measured ca. 30 Gbit/s
   \end{itemize}
  \end{block}
  
  \begin{block}{Bottleneck}
-  \centering
+ % \centering
  \begin{tikzpicture}
   \node at (1,-1) {Event Formation};
   \node (ef) at (3,-1) {\faHatWizard};
@@ -215,8 +220,8 @@ showstringspaces=false
  
  \begin{block}{Processing Delay}
   \begin{itemize}
-   \item Acquisition at $\approx$ 100 -- 1000 Hz
-   \item Processing at $\approx$ 5-10 Hz
+   \item acquisition at $\approx$ 100 -- 1000 Hz
+   \item processing at $\approx$ 5-10 Hz
   \end{itemize}
 
  \end{block}
@@ -278,7 +283,7 @@ showstringspaces=false
 \end{frame}
 
 \begin{frame}{Sequential Reduce}
- \begin{block}{Acquisition at Line Speed}
+ \begin{block}{Operations at Acquisition Speed}
   \begin{itemize}
    \item append to list
    \item sum
@@ -331,15 +336,15 @@ showstringspaces=false
 
 \begin{block}{Examples}
   \begin{itemize}
-   \item Aligning images (correlation)
+   \item aligning images (correlation)
    \item temporal fourier transform
   \end{itemize}
   
  \end{block}
- \begin{block}{Stateful workers}
+ \begin{block}{Stateful Workers}
   \begin{itemize}
    \item load balance with constraints
-   \item e.g. worker for event $n$ will also get $n+1$
+   \item e.g. worker selected for event $n$ will also get $n+1$
   \end{itemize}
 
  \end{block}
@@ -359,33 +364,33 @@ showstringspaces=false
 
 \begin{frame}{Trigger Map}
  \begin{block}{Event Definitions}
-  Which \emph{frames} from which \emph{detectors} have to be processed by the same \emph{worker}?
+  Which \emph{frames} from which \emph{detectors} belong to the same \emph{event} and have to be processed by the same \emph{worker}?
  \end{block}
     
 \begin{block}{Virtual Workers}
 \begin{itemize}
- \item Virtual workers are dynamically assigned to real workers
+ \item virtual workers are dynamically assigned to real workers
  \item special \emph{all} workers (stream headers), or discard frame with $\emptyset$
- \item stream header goes to all
+ \item \emph{none} if stream has no frame for event
 \end{itemize}
 
 \medskip
  \begin{tabular}{rcccccc}
    \faCamera & all & 1 & 3 & 5 & 7 & 8 \\
    \faVideo & all & 2 & 4  & 6 & 7 & 9\\
-   \faSlidersH & all & all & & & $\emptyset$ \\
-   \faThermometerHalf & all & \{1,2\} & & \{5,6\} &  & \{8,9\} \\
+   \faSlidersH & all & all & none & none & $\emptyset$ &none \\
+   \faThermometerHalf & all & \{1,2\} & none & \{5,6\} & none  & \{8,9\} \\
   \end{tabular}
   \end{block}
   
   \begin{block}{Scanning}
-   Trigger map comes from scanning software, append-only extendable
+   trigger map specified by scanning software, append-only extendable
   \end{block}
 
 \end{frame}
 
 \begin{frame}[fragile]{Development: Events}
- Ease of use/development by SciDa and beamline staff
+ ease of use/development by SciDa and beamline staff
  
  \begin{block}{Event Structure}
   \begin{python}
@@ -413,8 +418,7 @@ class FluorescenceWorker:
     def __init__(self):
         self.number = 0
     
-    def process_event(self, 
-                      event: EventData, 
+    def process_event(self, event: EventData,
                       parameters=None):
         print(event)
         # parse zmq frames
@@ -423,7 +427,7 @@ class FluorescenceWorker:
         return {"position": mot, "concentrations": ...}
 \end{python}
  
-Restarted for every scan
+reinstantiated for every scan (new Trigger Map)
 \end{frame}
 
 \begin{frame}[fragile]{Development: Reducer}
@@ -437,12 +441,13 @@ class FluorescenceReducer:
                       parameters=None):
         print(result.event_number)
         print(result.worker)
+        print(result.parameters_uuid)
         data = result.payload
         self.publish["map"][data["position"]] = \
                 data["concentrations"]
 \end{python}
 
-Restarted for every scan
+reinstantiated for every scan (new Trigger Map)
 
 \end{frame}
 
@@ -466,20 +471,40 @@ plt.imshow(data["map"])
 
 \end{frame}
 
+\begin{frame}{Development: Silx based Viewer}
+ \begin{block}{Parameters}
+ \begin{itemize}
+  \item set parameters
+  \item influence slow processing
+ \end{itemize}
+ \end{block}
+
+ \begin{block}{Partial Views}
+  \begin{itemize}
+   \item keep large accumulated data set on reducer
+   \item query specific slice of \texttt{reducer.publish}
+   \item e.g. \url{http://<ns>-reducer.../result/map/100:110,:}
+  \end{itemize}
+ \end{block}
+
+
+\end{frame}
+
+
 \begin{frame}{Development: Testing}
  \begin{block}{Recording}
-  Ingesters optionally write all zmq Frames to disk
+  ingesters optionally write all zmq frames to disk (sequential pickle dumps)
  \end{block}
     
 \begin{block}{Replay}
 \begin{itemize}
- \item from recorded zmq Frames
+ \item from recorded zmq frames
  \item from hdf5 files
 \end{itemize}
 \end{block}
 
 \begin{block}{Local}
- Run file-based ingesters, workers and reducer locally
+ run file-based ingesters, workers and reducer locally
 \end{block}
 
 \end{frame}
@@ -498,6 +523,9 @@ plt.imshow(data["map"])
   \node (temp) at (6,1) {\faThermometerHalf};
   \node (det2) at (2,1) {\faVideo};
   
+  \node[color=title.fg, left] at (-1,0) {custom zmq};
+  \node[color=title.fg, left] at (-1,-2) {wrapped(custom zmq)};
+  \node[color=title.fg, left] at (-1,-4) {pickle in zmq};
 
   \node at (-2,-1) {Event Formation};
   \node (ef1) at (0,-1) {\faHatWizard};
@@ -554,27 +582,27 @@ plt.imshow(data["map"])
  \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{Architecture, Redis}
+\begin{frame}{Architecture, redis}
  \begin{block}{\faDatabase\ config}
   \begin{itemize}
-   \item Components publish config (connected peers, trigger map version, url)
+   \item components publish config (connected peers, trigger map version, zmq url)
    \item timeout for liveness probe
   \end{itemize}
  \end{block}
  
- \begin{block}{\faDatabase\ updates STREAM}
+ \begin{block}{\faDatabase\ \faForward\ updates}
   \begin{itemize}
-   \item Controller notifies of new mapping/parameters
+   \item controller notifies of new mapping/parameters
   \end{itemize}
  \end{block}
  
- \begin{block}{\faDatabase\ ready STREAM}
+ \begin{block}{\faDatabase\ \faForward\ ready}
   \begin{itemize}
-   \item Workers notify readyness after event processed
+   \item workers notify readyness after event processed
   \end{itemize}
  \end{block}
  
- \begin{block}{\faDatabase\ assign STREAM}
+ \begin{block}{\faDatabase\ \faForward\ assign}
   \begin{description}
    \item[event\_number:] EventNumber
    \item[assignments:] dict[StreamName, list[WorkerName]]
@@ -587,18 +615,18 @@ plt.imshow(data["map"])
 \begin{frame}{Event Coordination}
 \begin{block}{Controller}
 \begin{itemize}
- \item Wait for new entry in \faDatabase\ ready
- \item Assign worker to first unassigned virtual worker (and all)
- \item Distribute WorkAssignment in \faDatabase\ assign
+ \item wait for new entry in \faDatabase\ \faForward\ ready
+ \item assign worker to first unassigned virtual worker (and \emph{all})
+ \item distribute WorkAssignment in \faDatabase\ \faForward\ assign
 \end{itemize}
 \end{block}
 
 \begin{minipage}[t]{0.49\textwidth}
  \begin{block}{Ingester}
   \begin{itemize}
-   \item Filter assignment for own streams
-   \item Combine all local streams
-   \item Copy event to specified workers (ROUTER)
+   \item filter assignment for own streams
+   \item combine all local streams
+   \item copy event to specified workers (ROUTER)
   \end{itemize}
 
  \end{block}
@@ -607,12 +635,12 @@ plt.imshow(data["map"])
 \begin{minipage}[t]{0.49\textwidth}
  \begin{block}{Worker}
   \begin{itemize}
-   \item Filter assignment for own work
-   \item Listen to ingesters with participating streams
-   \item Assemble EventData
-   \item Call custom code
-   \item Send result to reducer
-   \item Send ready message to \faDatabase\ ready
+   \item filter assignment for own work
+   \item listen to ingesters with participating streams
+   \item assemble EventData
+   \item call custom code
+   \item send pickled result to reducer
+   \item send ready message to \faDatabase\ \faForward\ ready
   \end{itemize}
 
  \end{block}
@@ -622,27 +650,75 @@ plt.imshow(data["map"])
 \end{frame}
 
 \begin{frame}{Common Modules}
- \begin{block}{zmq format / STINS}
+ \begin{block}{ZMQ Format / STINS}
   \begin{itemize}
-   \item Unpacking of (mulit-part) zmq frames to np arrays
+   \item unpacking of (mulit-part) zmq frames to numpy arrays
   \end{itemize}
  \end{block}
  
   \begin{block}{Calibration}
 \begin{itemize}
- \item python modules
+ \item installed as python modules
 \end{itemize}
+\end{block}
+
+\begin{block}{Middlewares}
+\medskip
+\begin{tikzpicture}
+ \node[draw,minimum height=6mm] (proc) at (0,0) {process\_event};
+ \node[draw,minimum height=6mm] (parse) at (2.5,0) {parse zmq};
+ \node[draw,minimum height=6mm] (corr) at (4.8,0) {callibration};
+ \node[draw,minimum height=6mm] (az) at (6.7,0) {azint};
+ \node[draw,minimum height=6mm] (norm) at (8.5,0) {normalise};
+ \node[draw,minimum height=6mm] (custom) at (10.5,0) {custom};
+ \draw[-latex] (proc) -- (parse);
+ \draw[-latex] (parse) -- (corr);
+ \draw[-latex] (corr) -- (az);
+ \draw[-latex] (az) -- (norm);
+ \draw[-latex] (norm) -- (custom);
+\end{tikzpicture}
+
+\begin{itemize}
+ \item maybe register required parameters?
+ \item registered in Worker \texttt{\_\_init\_\_}
+\end{itemize}
+
+
+\end{block}
+\end{frame}
+
+\begin{frame}{Tests}
+ \begin{block}{End-to-End}
+  \begin{itemize}
+   \item stream fake zmq frames
+   \item full scan test
+  \end{itemize}
+
+ \end{block}
+ \begin{block}{Protocols}
+  \begin{itemize}
+   \item Pydantic BaseModel (similar to dataclass)
+   \item all messages defined and validated
+   \item no \texttt{dict}s with random fields
+  \end{itemize}
+ \end{block}
+
+\begin{block}{Typing}
+ \begin{itemize}
+ \item type hint annotations
+  \item \texttt{mypy} strict
+ \end{itemize}
 
 \end{block}
 
- 
+
 \end{frame}
 
 \begin{frame}{Deployment}
  \begin{block}{Docker}
   \begin{itemize}
    \item install custom dependencies
-   \item end-to-end latency multiple minutes
+   \item end-to-end build latency multiple minutes
   \end{itemize}
  \end{block}
  
@@ -650,6 +726,7 @@ plt.imshow(data["map"])
   \begin{itemize}
    \item HELM chart for beamline
    \item restart pulls new version
+   \item different containers for different experiments
   \end{itemize}
  \end{block}
     
@@ -669,20 +746,20 @@ plt.imshow(data["map"])
    \item 10 Gbit/s from b-daq-cn2 and b-daq-cn3
    \item 8 workers
   \end{itemize}
- Horizontally scalable if each stream $\leq$ 30 Gbit/s
+ horizontally scalable if each stream $\leq$ 30 Gbit/s
  \end{block}
  
  \begin{block}{Latency}
   \begin{itemize}
    \item $\approx$ 2 kHz with enough workers
   \end{itemize}
-  Practically limited to $\approx n$  workers $\Rightarrow$ worker timeout $\frac{n}{\text{acquisition rate [Hz]}}$s 
+  practically limited to $\approx n$  workers $\Rightarrow$ max worker runtime $\frac{n}{\text{acquisition rate [Hz]}}$s
  \end{block}
     \newcommand{\ev}{\mathsf{ev}}
     \newcommand{\st}{\mathsf{st}}
   \begin{block}{Virtual Worker Distribution}
-  $\forall \st_0\in\mathbb{N}:$
-   \[|\{M_{\ev,\st} : \st_0\leq\ev<(\st_0+w), \st\in\mathsf{streams}\}| > w-\epsilon \]
+  $\forall \st_0\in\mathbb{N}, h\in[|\mathsf{workers}|,\infty):$
+   \[|\{M_{\ev,\st} : \st_0\leq\ev<(\st_0+h), \st\in\mathsf{streams}\}| > h-\epsilon \]
   \end{block}
 
 
