@@ -21,7 +21,7 @@ def test_header_serialisation() -> None:
     )  #: {"frames"}})
 
     buffers = message.get_all_frames()
-    print([b.bytes for b in buffers])
+    print([b.bytes if type(b) == zmq.Frame else b for b in buffers])
     print(dump)
     prelim = json.loads(dump)
     print("prelim", prelim)
@@ -32,9 +32,18 @@ def test_header_serialisation() -> None:
         pos += data["length"]
     msg = InternalWorkerMessage.model_validate(prelim)
     print(msg)
-    assert msg.streams[StreamName("alba")].frames[0].bytes == b"alba"
-    assert msg.streams[StreamName("lambda")].frames[2].bytes == b"lam3"
-    assert msg.streams[StreamName("orca")].frames[0].bytes == b"asd"
+    albaframe = msg.streams[StreamName("alba")].frames[0]
+    if isinstance(albaframe, zmq.Frame):
+        albaframe = albaframe.bytes
+    lamframe = msg.streams[StreamName("lambda")].frames[2]
+    if isinstance(lamframe, zmq.Frame):
+        lamframe = lamframe.bytes
+    orcaframe = msg.streams[StreamName("orca")].frames[0]
+    if isinstance(orcaframe, zmq.Frame):
+        orcaframe = orcaframe.bytes
+    assert albaframe == b"alba"
+    assert lamframe == b"lam3"
+    assert orcaframe == b"asd"
 
 
 def test_out_of_band_frames() -> None:

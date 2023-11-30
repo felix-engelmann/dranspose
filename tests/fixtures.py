@@ -135,15 +135,22 @@ async def stream_eiger() -> Callable[
 
     return _make_eiger
 
+
 @pytest_asyncio.fixture
 async def stream_pkls() -> Callable[
-    [zmq.Context[Any], int, os.PathLike, float, int], Coroutine[Any, Any, None]
+    [zmq.Context[Any], int, os.PathLike[Any], float, int], Coroutine[Any, Any, None]
 ]:
-    async def _make_pkls(ctx: zmq.Context[Any], port: int, filename: os.PathLike, frame_time: float = 0.1, typ=zmq.PUSH) -> None:
+    async def _make_pkls(
+        ctx: zmq.Context[Any],
+        port: int,
+        filename: os.PathLike[Any],
+        frame_time: float = 0.1,
+        typ: int = zmq.PUSH,
+    ) -> None:
         socket: zmq.Socket[Any] = ctx.socket(typ)
         socket.bind(f"tcp://*:{port}")
         for _ in range(3):
-            await socket.send_multipart([b'emptyness'])
+            await socket.send_multipart([b"emptyness"])
             await asyncio.sleep(0.1)
         with open(filename, "rb") as f:
             while True:
@@ -157,6 +164,7 @@ async def stream_pkls() -> Callable[
         socket.close()
 
     return _make_pkls
+
 
 @pytest_asyncio.fixture
 async def stream_orca() -> Callable[

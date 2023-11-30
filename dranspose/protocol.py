@@ -75,7 +75,7 @@ class ProtocolException(Exception):
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
     parameters_uuid: UUID4
-    finished:  bool = False
+    finished: bool = False
 
 
 class WorkParameters(BaseModel):

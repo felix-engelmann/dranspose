@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import pickle
-from typing import Coroutine, AsyncGenerator, Optional, Awaitable
+from typing import Coroutine, AsyncGenerator, Optional, Awaitable, Any, IO
 
 import redis.exceptions as rexceptions
 import redis.asyncio as redis
@@ -25,14 +25,14 @@ from dranspose.protocol import (
 
 class IngesterSettings(DistributedSettings):
     ingester_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
-    dump_path: Optional[os.PathLike] = None
+    dump_path: Optional[os.PathLike[Any]] = None
 
 
 class Ingester(DistributedService):
     def __init__(self, name: IngesterName, settings: Optional[IngesterSettings] = None):
+        if settings is None:
+            settings = IngesterSettings()
         self._ingester_settings = settings
-        if self._ingester_settings is None:
-            self._ingester_settings = IngesterSettings()
         streams: list[StreamName] = []
         state = IngesterState(
             name=name,
@@ -42,6 +42,8 @@ class Ingester(DistributedService):
 
         super().__init__(state=state, settings=self._ingester_settings)
         self.state: IngesterState
+
+        self.dump_file: Optional[IO[bytes]] = None
 
         self.ctx = zmq.asyncio.Context()
         self.out_socket = self.ctx.socket(zmq.ROUTER)
@@ -73,7 +75,6 @@ class Ingester(DistributedService):
             self._logger.info("closed dump file at finish %s", self.dump_file)
             self.dump_file = None
 
-
     async def manage_assignments(self) -> None:
         self._logger.info("started ingester manage assign task")
         lastev = 0
@@ -99,7 +100,11 @@ class Ingester(DistributedService):
         self.dump_file = None
         if self._ingester_settings.dump_path:
             self.dump_file = open(self._ingester_settings.dump_path, "ab")
-            self._logger.info("dump file %s opened at %s", self._ingester_settings.dump_path, self.dump_file)
+            self._logger.info(
+                "dump file %s opened at %s",
+                self._ingester_settings.dump_path,
+                self.dump_file,
+            )
         try:
             while True:
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
@@ -114,10 +119,13 @@ class Ingester(DistributedService):
                     stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
                 }
                 if self.dump_file:
-                    self._logger.debug("writing dump to path %s", self._ingester_settings.dump_path)
-                    allstr = InternalWorkerMessage(event_number=work_assignment.event_number,
-                                                   streams = {k: v.get_bytes() for k,v in zmqparts.items()}
-                                                   )
+                    self._logger.debug(
+                        "writing dump to path %s", self._ingester_settings.dump_path
+                    )
+                    allstr = InternalWorkerMessage(
+                        event_number=work_assignment.event_number,
+                        streams={k: v.get_bytes() for k, v in zmqparts.items()},
+                    )
                     try:
                         pickle.dump(allstr, self.dump_file)
                     except Exception as e:
@@ -134,7 +142,9 @@ class Ingester(DistributedService):
                 for worker, message in workermessages.items():
                     self._logger.debug(
                         "header is %s",
-                        message.model_dump_json(exclude={"streams": {"__all__": "frames"}}),
+                        message.model_dump_json(
+                            exclude={"streams": {"__all__": "frames"}}
+                        ),
                     )
                     await self.out_socket.send_multipart(
                         [worker.encode("ascii")]
@@ -149,7 +159,9 @@ class Ingester(DistributedService):
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
             if self.dump_file:
-                self._logger.info("closing dump file %s at cancelled work", self.dump_file)
+                self._logger.info(
+                    "closing dump file %s at cancelled work", self.dump_file
+                )
                 self.dump_file.close()
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:

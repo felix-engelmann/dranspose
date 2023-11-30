@@ -8,14 +8,17 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 class FluorescenceWorker:
     def __init__(self):
         self.number = 0
 
     def process_event(self, event: EventData, parameters=None):
         print(event)
-        if {"contrast","xspress3"} - set(event.streams.keys()) != set():
-            logger.error("missing streams for this worker, only present %s", event.streams.keys())
+        if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
+            logger.error(
+                "missing streams for this worker, only present %s", event.streams.keys()
+            )
             return
         try:
             con = contrast.parse(event.streams["contrast"])
@@ -38,4 +41,4 @@ class FluorescenceWorker:
 
             roi1 = spec[1][3][0:200].sum()
 
-            return {"position": (sx,sy), "concentations":{"roi1": roi1}}
+            return {"position": (sx, sy), "concentations": {"roi1": roi1}}

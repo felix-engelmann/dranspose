@@ -3,7 +3,6 @@ from typing import Literal
 from pydantic import BaseModel, TypeAdapter
 
 
-
 class XspressStart(BaseModel):
     htype: Literal["header"]
     filename: str

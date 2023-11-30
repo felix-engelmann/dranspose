@@ -31,6 +31,7 @@ from dranspose.protocol import (
     IngesterName,
     StreamName,
     ReducerState,
+    ZmqUrl,
 )
 
 
@@ -56,10 +57,10 @@ class Worker(DistributedService):
         self.ctx = zmq.asyncio.Context()
 
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
-        self._stream_map: dict[StreamName, zmq.Socket[Any]] = {}
+        self._stream_map: dict[StreamName, zmq._future._AsyncSocket] = {}
 
-        self._reducer_url = None
-        self.out_socket = None
+        self._reducer_url: Optional[ZmqUrl] = None
+        self.out_socket: Optional[zmq._future._AsyncSocket] = None
 
         self.custom = None
         if self._worker_settings.worker_class:
@@ -74,7 +75,10 @@ class Worker(DistributedService):
                 )
                 self._logger.info("custom worker class %s", self.custom)
             except Exception as e:
-                self._logger.error("no custom worker class loaded, discarding events, err %s", e.__repr__())
+                self._logger.error(
+                    "no custom worker class loaded, discarding events, err %s",
+                    e.__repr__(),
+                )
 
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
@@ -90,7 +94,9 @@ class Worker(DistributedService):
             try:
                 self.worker = self.custom()
             except Exception as e:
-                self._logger.error("Failed to instantiate custom worker: %s", e.__repr__())
+                self._logger.error(
+                    "Failed to instantiate custom worker: %s", e.__repr__()
+                )
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
@@ -160,13 +166,17 @@ class Worker(DistributedService):
             if self.worker:
                 try:
                     loop = asyncio.get_event_loop()
-                    result = await loop.run_in_executor(None, self.worker.process_event, event, self.parameters)
+                    result = await loop.run_in_executor(
+                        None, self.worker.process_event, event, self.parameters
+                    )
                 except Exception as e:
                     self._logger.error("custom worker failed: %s", e.__repr__())
             self._logger.debug("got result %s", result)
             rd = ResultData(
-                event_number=event.event_number, worker=self.state.name, payload=result,
-                parameters_uuid=self.state.parameters_uuid
+                event_number=event.event_number,
+                worker=self.state.name,
+                payload=result,
+                parameters_uuid=self.state.parameters_uuid,
             )
             if self.out_socket:
                 await self.out_socket.send_multipart(

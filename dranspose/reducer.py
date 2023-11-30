@@ -120,7 +120,8 @@ async def get_status() -> bool:
 async def get_result() -> Any | bytes:
     data = b""
     try:
-        data = pickle.dumps(reducer.reducer.publish)
+        if hasattr(reducer.reducer, "publish"):
+            data = pickle.dumps(reducer.reducer.publish)
     except:
         logging.warning("no publishable data")
     return Response(data, media_type="application/x.pickle")

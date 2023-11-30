@@ -79,7 +79,9 @@ def run() -> None:
             print("exiting")
     elif args.component == "reducer":
         try:
-            config = uvicorn.Config(reducer_app, port=5000, host=args.host, log_level="info")
+            config = uvicorn.Config(
+                reducer_app, port=5000, host=args.host, log_level="info"
+            )
             server = uvicorn.Server(config)
             server.run()
         except KeyboardInterrupt:

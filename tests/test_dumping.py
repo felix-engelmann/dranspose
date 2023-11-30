@@ -31,6 +31,7 @@ from tests.fixtures import (
     stream_alba,
 )
 
+
 @pytest.mark.asyncio
 async def test_dump(
     controller: None,
@@ -53,8 +54,9 @@ async def test_dump(
     await create_ingester(
         StreamingSingleIngester(
             name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999"),
-                                             dump_path=p_eiger),
+            settings=StreamingSingleSettings(
+                upstream_url=Url("tcp://localhost:9999"), dump_path=p_eiger
+            ),
         )
     )
     await create_ingester(
@@ -136,9 +138,8 @@ async def test_dump(
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
-
     # read dump
-    with open(p_eiger,"rb") as f:
+    with open(p_eiger, "rb") as f:
         evs = []
         while True:
             try:
@@ -149,7 +150,7 @@ async def test_dump(
                 break
 
     print(evs)
-    assert evs == list(range(0,ntrig+1))
+    assert evs == list(range(0, ntrig + 1))
 
     context.destroy()
 

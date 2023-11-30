@@ -4,7 +4,12 @@ from typing import AsyncGenerator, Optional
 
 import zmq
 
-from dranspose.data.xspress3_stream import XspressPacket, XspressStart, XspressImage, XspressEnd
+from dranspose.data.xspress3_stream import (
+    XspressPacket,
+    XspressStart,
+    XspressImage,
+    XspressEnd,
+)
 from dranspose.event import StreamData
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl, IngesterName
@@ -54,7 +59,7 @@ class StreamingXspressIngester(Ingester):
             if type(packet) is XspressImage:
                 image = await self.in_socket.recv_multipart(copy=False)
                 meta = await self.in_socket.recv_multipart(copy=False)
-                yield StreamData(typ="xspress", frames=parts+image+meta)
+                yield StreamData(typ="xspress", frames=parts + image + meta)
             elif type(packet) is XspressEnd:
                 yield StreamData(typ="xspress", frames=parts)
                 break

@@ -10,23 +10,28 @@ from pydantic import BaseModel, ConfigDict, computed_field, field_validator, UUI
 class StreamData(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     typ: str
-    frames: list[zmq.Frame | bytes]
+    frames: list[zmq.Frame] | list[bytes]
 
     @computed_field
     @property
     def length(self) -> int:
         return len(self.frames)
 
-
-    def get_bytes(self):
-        return StreamData(typ=self.typ, frames=[frame.bytes if isinstance(frame, zmq.Frame) else frame for frame in self.frames])
+    def get_bytes(self) -> "StreamData":
+        return StreamData(
+            typ=self.typ,
+            frames=[
+                frame.bytes if isinstance(frame, zmq.Frame) else frame
+                for frame in self.frames
+            ],
+        )
 
 
 class InternalWorkerMessage(BaseModel):
     event_number: EventNumber
     streams: dict[StreamName, StreamData] = {}
 
-    def get_all_frames(self) -> list[zmq.Frame]:
+    def get_all_frames(self) -> list[zmq.Frame | bytes]:
         return [frame for stream in self.streams.values() for frame in stream.frames]
 
 

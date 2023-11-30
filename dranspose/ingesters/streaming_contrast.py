@@ -4,7 +4,12 @@ from typing import AsyncGenerator, Optional
 
 import zmq
 
-from dranspose.data.contrast import ContrastPacket, ContrastStarted, ContrastRunning, ContrastFinished
+from dranspose.data.contrast import (
+    ContrastPacket,
+    ContrastStarted,
+    ContrastRunning,
+    ContrastFinished,
+)
 from dranspose.event import StreamData
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl, IngesterName

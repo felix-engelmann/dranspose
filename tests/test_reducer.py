@@ -1,5 +1,6 @@
 import os
 import pickle
+from pathlib import PosixPath
 
 import redis.asyncio as redis
 import asyncio
@@ -11,12 +12,18 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_contrast import StreamingContrastIngester, StreamingContrastSettings
+from dranspose.ingesters.streaming_contrast import (
+    StreamingContrastIngester,
+    StreamingContrastSettings,
+)
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-from dranspose.ingesters.streaming_xspress3 import StreamingXspressIngester, StreamingXspressSettings
+from dranspose.ingesters.streaming_xspress3 import (
+    StreamingXspressIngester,
+    StreamingXspressSettings,
+)
 from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName
 from dranspose.worker import Worker, WorkerSettings
 
@@ -35,7 +42,10 @@ async def test_reduction(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[[zmq.Context[Any], int, os.PathLike, float, int], Coroutine[Any, Any, Never]],
+    stream_pkls: Callable[
+        [zmq.Context[Any], int, os.PathLike[Any], float, int],
+        Coroutine[Any, Any, Never],
+    ],
 ) -> None:
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(
@@ -49,15 +59,19 @@ async def test_reduction(
     await create_ingester(
         StreamingContrastIngester(
             name=StreamName("contrast"),
-            settings=StreamingContrastSettings(upstream_url=Url("tcp://localhost:5556"),
-                                               ingester_url=Url("tcp://localhost:10000")),
+            settings=StreamingContrastSettings(
+                upstream_url=Url("tcp://localhost:5556"),
+                ingester_url=Url("tcp://localhost:10000"),
+            ),
         )
     )
     await create_ingester(
         StreamingXspressIngester(
             name=StreamName("xspress3"),
-            settings=StreamingXspressSettings(upstream_url=Url("tcp://localhost:9999"),
-                                              ingester_url=Url("tcp://localhost:10001")),
+            settings=StreamingXspressSettings(
+                upstream_url=Url("tcp://localhost:9999"),
+                ingester_url=Url("tcp://localhost:10001"),
+            ),
         )
     )
 
@@ -82,8 +96,16 @@ async def test_reduction(
 
     context = zmq.asyncio.Context()
 
-    asyncio.create_task(stream_pkls(context, 9999, "tests/data/xspress3-dump.pkls",0.001, zmq.PUB))
-    asyncio.create_task(stream_pkls(context, 5556, "tests/data/contrast-dump.pkls",0.001, zmq.PUB))
+    asyncio.create_task(
+        stream_pkls(
+            context, 9999, PosixPath("tests/data/xspress3-dump.pkls"), 0.001, zmq.PUB
+        )
+    )
+    asyncio.create_task(
+        stream_pkls(
+            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        )
+    )
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
