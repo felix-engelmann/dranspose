@@ -1,9 +1,12 @@
 import json
+import logging
 
 from dranspose.event import EventData
-
+from dranspose.middlewares import contrast
+from dranspose.middlewares import xspress
 import numpy as np
 
+logger = logging.getLogger(__name__)
 
 class FluorescenceWorker:
     def __init__(self):
@@ -11,5 +14,28 @@ class FluorescenceWorker:
 
     def process_event(self, event: EventData, parameters=None):
         print(event)
+        if {"contrast","xspress3"} - set(event.streams.keys()) != set():
+            logger.error("missing streams for this worker, only present %s", event.streams.keys())
+            return
+        try:
+            con = contrast.parse(event.streams["contrast"])
+        except Exception as e:
+            logger.error("failed to parse contrast %s", e.__repr__())
+            return
 
-        return {"position": 1}
+        try:
+            spec = xspress.parse(event.streams["xspress3"])
+        except Exception as e:
+            logger.error("failed to parse xspress3 %s", e.__repr__())
+            return
+        logger.error("contrast: %s", con)
+        logger.error("spectrum: %s", spec)
+
+        if con["status"] == "running":
+            # new data
+            sx, sy = con["pseudo"]["x"][0], con["pseudo"]["y"][0]
+            logger.error("process position %s %s", sx, sy)
+
+            roi1 = spec[1][3][0:200].sum()
+
+            return {"position": (sx,sy), "concentations":{"roi1": roi1}}

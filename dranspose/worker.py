@@ -73,8 +73,8 @@ class Worker(DistributedService):
                     module, self._worker_settings.worker_class.split(":")[1]
                 )
                 self._logger.info("custom worker class %s", self.custom)
-            except:
-                self._logger.warning("no custom worker class loaded, discarding events")
+            except Exception as e:
+                self._logger.error("no custom worker class loaded, discarding events, err %s", e.__repr__())
 
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
@@ -87,7 +87,10 @@ class Worker(DistributedService):
 
         self.worker = None
         if self.custom:
-            self.worker = self.custom()
+            try:
+                self.worker = self.custom()
+            except Exception as e:
+                self._logger.error("Failed to instantiate custom worker: %s", e.__repr__())
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),

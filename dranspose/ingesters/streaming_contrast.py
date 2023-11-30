@@ -38,7 +38,7 @@ class StreamingContrastIngester(Ingester):
                 data = pickle.loads(parts[0].bytes)
                 packet = ContrastPacket.validate_python(data)
             except Exception as e:
-                self._logger.error("packet not valid %s", e.__repr__())
+                self._logger.warning("packet not valid %s", e.__repr__())
                 continue
             self._logger.debug("received frame with header %s", packet)
             if type(packet) is ContrastStarted:

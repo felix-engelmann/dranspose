@@ -82,8 +82,8 @@ async def test_reduction(
 
     context = zmq.asyncio.Context()
 
-    asyncio.create_task(stream_pkls(context, 9999, "tests/data/xspress3-dump.pkls",0.05, zmq.PUB))
-    asyncio.create_task(stream_pkls(context, 5556, "tests/data/contrast-dump.pkls",0.05, zmq.PUB))
+    asyncio.create_task(stream_pkls(context, 9999, "tests/data/xspress3-dump.pkls",0.001, zmq.PUB))
+    asyncio.create_task(stream_pkls(context, 5556, "tests/data/contrast-dump.pkls",0.001, zmq.PUB))
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
@@ -97,7 +97,7 @@ async def test_reduction(
         content = await st.content.read()
         result = pickle.loads(content)
         print("content", result)
-        assert len(result["results"]) == ntrig + 2
+        assert len(result["map"].keys()) == ntrig
 
     context.destroy()
 
