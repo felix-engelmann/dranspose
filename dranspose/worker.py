@@ -162,7 +162,8 @@ class Worker(DistributedService):
                     self._logger.error("custom worker failed: %s", e.__repr__())
             self._logger.debug("got result %s", result)
             rd = ResultData(
-                event_number=event.event_number, worker=self.state.name, payload=result
+                event_number=event.event_number, worker=self.state.name, payload=result,
+                parameters_uuid=self.state.parameters_uuid
             )
             if self.out_socket:
                 await self.out_socket.send_multipart(

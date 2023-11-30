@@ -1,10 +1,10 @@
-from typing import Any
+from typing import Any, Optional
 
 import zmq
 from pydantic_core.core_schema import ValidationInfo
 
 from dranspose.protocol import EventNumber, StreamName, WorkerName
-from pydantic import BaseModel, ConfigDict, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, computed_field, field_validator, UUID4
 
 
 class StreamData(BaseModel):
@@ -33,6 +33,7 @@ class InternalWorkerMessage(BaseModel):
 class ResultData(BaseModel):
     event_number: EventNumber
     worker: WorkerName
+    parameters_uuid: Optional[UUID4]
     payload: Any
 
 
