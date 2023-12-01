@@ -12,9 +12,9 @@ class XspressImage(BaseModel):
     htype: Literal["image"]
     frame: int
     shape: list[int]
-    exptime: Optional[float]
+    exptime: Optional[float] = 1
     type: str
-    compression: Optional[str]
+    compression: Optional[str] = "none"
 
 
 class XspressEnd(BaseModel):
