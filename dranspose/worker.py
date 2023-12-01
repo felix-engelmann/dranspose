@@ -59,7 +59,7 @@ class Worker(DistributedService):
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
         self._stream_map: dict[StreamName, zmq._future._AsyncSocket] = {}
 
-        self._reducer_url: Optional[ZmqUrl] = None
+        self._reducer_service_uuid: Optional[UUID4] = None
         self.out_socket: Optional[zmq._future._AsyncSocket] = None
 
         self.custom = None
@@ -182,14 +182,16 @@ class Worker(DistributedService):
             proced += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)
-            await self.redis.xadd(
-                RedisKeys.ready(self.state.mapping_uuid),
-                {
-                    "data": WorkerUpdate(
+            wu = WorkerUpdate(
                         state=WorkerStateEnum.IDLE,
                         completed=work_assignment.event_number,
                         worker=self.state.name,
-                    ).model_dump_json()
+                    )
+            self._logger.debug("all work done, notify controller with %s", wu)
+            await self.redis.xadd(
+                RedisKeys.ready(self.state.mapping_uuid),
+                {
+                    "data": wu.model_dump_json()
                 },
             )
 
@@ -214,13 +216,13 @@ class Worker(DistributedService):
                 await asyncio.sleep(1)
                 continue
             cfg = ReducerState.model_validate_json(config)
-            if cfg.url != self._reducer_url:
+            if cfg.service_uuid != self._reducer_service_uuid:
                 # connect to a new reducer
                 if self.out_socket is not None:
                     self.out_socket.close()
                 self.out_socket = self.ctx.socket(zmq.PUSH)
                 self.out_socket.connect(str(cfg.url))
-                self._reducer_url = cfg.url
+                self._reducer_service_uuid = cfg.service_uuid
                 self._logger.info("connected out_socket to reducer at %s", cfg.url)
             await asyncio.sleep(10)
 
@@ -234,12 +236,12 @@ class Worker(DistributedService):
                 processed.append(iname)
                 if (
                     iname in self._ingesters
-                    and self._ingesters[iname].config.url != cfg.url
+                    and self._ingesters[iname].config.service_uuid != cfg.service_uuid
                 ):
                     self._logger.warning(
-                        "url of ingester changed from %s to %s, disconnecting",
-                        self._ingesters[iname].config.url,
-                        cfg.url,
+                        "service_uuid of ingester changed from %s to %s, disconnecting",
+                        self._ingesters[iname].config.service_uuid,
+                        cfg.service_uuid,
                     )
                     self._ingesters[iname].socket.close()
                     del self._ingesters[iname]

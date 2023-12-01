@@ -1,4 +1,5 @@
 import pickle
+import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import NewType, Literal, Annotated, Optional
@@ -118,6 +119,7 @@ class WorkerUpdate(BaseModel):
 
 
 class DistributedState(BaseModel):
+    service_uuid: UUID4 = Field(default_factory=uuid.uuid4)
     mapping_uuid: Optional[UUID4] = None
     parameters_uuid: Optional[UUID4] = None
 
