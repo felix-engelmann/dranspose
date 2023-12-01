@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -12,9 +12,9 @@ class XspressImage(BaseModel):
     htype: Literal["image"]
     frame: int
     shape: list[int]
-    exptime: float
+    exptime: Optional[float]
     type: str
-    compression: str
+    compression: Optional[str]
 
 
 class XspressEnd(BaseModel):

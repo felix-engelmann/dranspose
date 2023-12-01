@@ -27,8 +27,9 @@ from dranspose.ingesters.streaming_xspress3 import (
     StreamingXspressSettings,
 )
 from dranspose.protocol import StreamName, WorkerName
-from dranspose.worker import Worker
+from dranspose.worker import Worker, WorkerSettings
 
+from dranspose.replay import replay as run_replay
 
 class CliSettings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -82,7 +83,7 @@ def worker(args):
     print("worker name:", name)
 
     async def run() -> None:
-        w = Worker(name)
+        w = Worker(name, WorkerSettings(worker_class=args.workerclass))
         await w.run()
         await w.close()
 
@@ -91,8 +92,8 @@ def worker(args):
 
 def ingester(args):
     print(args.ingestclass)
-    ing = globals()[args.ingestclass]
-    sett = globals()[args.ingestclass.replace("Ingester", "Settings")]
+    ing = globals()[args.ingesterclass]
+    sett = globals()[args.ingesterclass.replace("Ingester", "Settings")]
 
     async def run() -> None:
         i = ing(
@@ -107,6 +108,8 @@ def ingester(args):
 
 def reducer(args):
     try:
+        if args.reducerclass:
+            os.environ["REDUCER_CLASS"]=args.reducerclass
         config = uvicorn.Config(
             reducer_app, port=5000, host=args.host, log_level="info"
         )
@@ -119,17 +122,15 @@ def reducer(args):
 def combined(args):
     asyncio.run(main())
 
+def replay(args):
+    run_replay(args.workerclass, args.reducerclass, args.files, args.parameters)
+
 
 def create_parser():
     parser = argparse.ArgumentParser(prog="dranspose", description="Transposes Streams")
 
-    # Main command
-    # parser.set_defaults(func=main_command)
-
-    # Subcommands
     subparsers = parser.add_subparsers(title="commands", dest="subcommand")
 
-    # Subcommand 1
     parser_ctrl = subparsers.add_parser("controller", help="run controller")
     parser_ctrl.set_defaults(func=controller)
     parser_ctrl.add_argument("--host", help="host to listen on")
@@ -137,16 +138,17 @@ def create_parser():
     parser_reducer = subparsers.add_parser("reducer", help="run reducer")
     parser_reducer.set_defaults(func=reducer)
     parser_reducer.add_argument("--host", help="host to listen on")
+    parser_reducer.add_argument("-c", "--reducerclass", help="reducer class e.g. 'src.reducer:FluorescenceReducer'")
 
-    # Subcommand 2
     parser_worker = subparsers.add_parser("worker", help="run worker")
     parser_worker.set_defaults(func=worker)
     parser_worker.add_argument("-n", "--name", help="worker name (must not contain :)")
+    parser_worker.add_argument("-c", "--workerclass", help="worker class e.g. 'src.worker:FluorescenceWorker'")
 
     parser_ingester = subparsers.add_parser("ingester", help="run ingester")
     parser_ingester.set_defaults(func=ingester)
     parser_ingester.add_argument(
-        "-c", "--ingestclass", help="Ingester Class", required=True
+        "-c", "--ingesterclass", help="Ingester Class", required=True
     )
     parser_ingester.add_argument(
         "-u", "--upstream_url", help="Where to connect to upstream", required=True
@@ -159,6 +161,14 @@ def create_parser():
         "combined", help="run all parts in a single process"
     )
     parser_all.set_defaults(func=combined)
+
+    parser_replay = subparsers.add_parser("replay", help="run replay of ingester recorded files")
+    parser_replay.set_defaults(func=replay)
+    parser_replay.add_argument("-w", "--workerclass", help="worker class e.g. 'src.worker:FluorescenceWorker'", required=True)
+    parser_replay.add_argument("-r", "--reducerclass", help="reducer class e.g. 'src.reducer:FluorescenceReducer'", required=True)
+    parser_replay.add_argument("-f", "--files", nargs="+", help="List of files to replay", required=True)
+    parser_replay.add_argument("-p", "--parameters", help="parameter file, json or pickle")
+
 
     return parser
 

@@ -13,7 +13,7 @@ import logging
 
 from pydantic import UUID4, BaseModel, ConfigDict
 
-from dranspose import protocol
+from dranspose import protocol, utils
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
@@ -65,14 +65,7 @@ class Worker(DistributedService):
         self.custom = None
         if self._worker_settings.worker_class:
             try:
-                sys.path.append(os.getcwd())
-                module = importlib.import_module(
-                    self._worker_settings.worker_class.split(":")[0]
-                )
-                self._logger.info("loaded module %s", module)
-                self.custom = getattr(
-                    module, self._worker_settings.worker_class.split(":")[1]
-                )
+                self.custom = utils.import_class(self._worker_settings.worker_class)
                 self._logger.info("custom worker class %s", self.custom)
             except Exception as e:
                 self._logger.error(
@@ -199,6 +192,15 @@ class Worker(DistributedService):
                     ).model_dump_json()
                 },
             )
+
+    async def finish_work(self) -> None:
+        self._logger.info("finishing work")
+        if self.worker:
+            if hasattr(self.worker,"finish"):
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None, self.worker.finish, self.parameters
+                )
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)
