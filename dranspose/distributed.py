@@ -22,6 +22,12 @@ import asyncio
 
 
 class DistributedSettings(BaseSettings):
+    """
+    Basic settings for any distributed service
+
+    Attributes:
+        redis_dsn: URL of the common redis instance
+    """
     redis_dsn: RedisDsn = Field(
         Url("redis://localhost:6379/0"),
         validation_alias=AliasChoices("service_redis_dsn", "redis_url"),
@@ -29,6 +35,9 @@ class DistributedSettings(BaseSettings):
 
 
 class DistributedService(abc.ABC):
+    """
+    Abstract class defining common functionality for all services.
+    """
     def __init__(
         self,
         state: WorkerState | IngesterState | ReducerState,
@@ -53,6 +62,10 @@ class DistributedService(abc.ABC):
         self.parameters = None
 
     async def register(self) -> None:
+        """
+        Background job in every distributed service to publish the service's configuration.
+        It publishes the `state` every 6 seconds or faster if there are updates from the controller with a new trigger map or parameters.
+        """
         latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
         last = 0
         if len(latest) > 0:

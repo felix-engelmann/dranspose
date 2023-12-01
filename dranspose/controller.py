@@ -1,3 +1,7 @@
+"""
+This is the central service to orchestrate all distributed components
+
+"""
 import asyncio
 import json
 import os

@@ -1,0 +1,23 @@
+site_name: dranspose
+
+theme:
+  name: "material"
+
+plugins:
+  - mkdocstrings
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+
+#nav:
+#  - "index.md"
+#  - "Reference":
+#    - "protocols/events.md"

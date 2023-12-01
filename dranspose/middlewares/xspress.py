@@ -21,6 +21,15 @@ def parse(
     dict[str, Any]
     | tuple[dict[str, Any], ndarray[Any, Any], dict[str, ndarray[Any, Any]]]
 ):
+    """
+    Parses a Xspress3 packet, which either gives a start/end message or a tuple with a spectra array
+
+    Arguments:
+        data: a frame comming from the Xspress3 tango device
+
+    Returns:
+        a header and optionally a tuple with an image
+    """
     assert data.typ == "xspress"
     assert data.length >= 1
     headerframe = data.frames[0]

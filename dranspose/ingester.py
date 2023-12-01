@@ -29,6 +29,11 @@ class IngesterSettings(DistributedSettings):
 
 
 class Ingester(DistributedService):
+    """
+    The Ingester class provides a basis to write custom ingesters for any protocol.
+    It handles all the forwarding to workers and managing assignments.
+    For the instance to do anything, await `run()`
+    """
     def __init__(self, name: IngesterName, settings: Optional[IngesterSettings] = None):
         if settings is None:
             settings = IngesterSettings()
@@ -54,6 +59,9 @@ class Ingester(DistributedService):
         self.out_socket.bind(f"tcp://*:{self._ingester_settings.ingester_url.port}")
 
     async def run(self) -> None:
+        """
+        Main function orchestrating the dependent tasks. This needs to be called from an async context once an instance is created.
+        """
         self.accept_task = asyncio.create_task(self.accept_workers())
         self.work_task = asyncio.create_task(self.work())
         self.assign_task = asyncio.create_task(self.manage_assignments())
@@ -61,6 +69,12 @@ class Ingester(DistributedService):
         await self.register()
 
     async def restart_work(self, new_uuid: UUID4) -> None:
+        """
+        Restarts all work related tasks to make sure no old state is present in a new scan.
+
+        Arguments:
+            new_uuid: The uuid of the new mapping
+        """
         self.work_task.cancel()
         self.assign_task.cancel()
         self.state.mapping_uuid = new_uuid
@@ -69,6 +83,9 @@ class Ingester(DistributedService):
         self.assign_task = asyncio.create_task(self.manage_assignments())
 
     async def finish_work(self) -> None:
+        """
+        This hook is called when all events of a trigger map were ingested. It is useful for e.g. closing open files.
+        """
         self._logger.info("finishing work")
         if self.dump_file:
             self.dump_file.close()
@@ -76,6 +93,9 @@ class Ingester(DistributedService):
             self.dump_file = None
 
     async def manage_assignments(self) -> None:
+        """
+        A background task reading assignments from the controller, filering them for the relevant ones and enqueueing them for when the frame arrives.
+        """
         self._logger.info("started ingester manage assign task")
         lastev = 0
         while True:
@@ -95,6 +115,13 @@ class Ingester(DistributedService):
                 lastev = assignment[0]
 
     async def work(self) -> None:
+        """
+        The heavy liftig function of an ingester. It consumes a generator `run_source()` which
+        should be implemented for a specific protocol.
+        It then assembles all streams for this ingester and forwards them to the assigned workers.
+
+        Optionally the worker dumps the internal messages to disk. This is useful to develop workers with actual data captured.
+        """
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
         self.dump_file = None
@@ -165,10 +192,24 @@ class Ingester(DistributedService):
                 self.dump_file.close()
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
+        """
+        This generator must be implemented by the customised subclass. It should return exactly one `StreamData` object
+        for every frame arriving from upstream.
+
+        Arguments:
+            stream: optionally it received a stream name for which is should yield frames.
+
+        Returns:
+            Yield a StreamData object for every received frame.
+        """
         yield StreamData(typ="", frames=[])
         return
 
     async def accept_workers(self) -> None:
+        """
+        To allow zmq to learn the names of attached workers, they periodically send empty packets.
+        There is no information flow directly from workers to ingesters, so we discard the data.
+        """
         poller = zmq.asyncio.Poller()
         poller.register(self.out_socket, zmq.POLLIN)
         while True:
@@ -178,6 +219,9 @@ class Ingester(DistributedService):
                 self._logger.debug("new worker connected %s", data[0])
 
     async def close(self) -> None:
+        """
+        Clean up any open connections
+        """
         self.accept_task.cancel()
         self.work_task.cancel()
         await self.redis.delete(RedisKeys.config("ingester", self.state.name))

@@ -38,6 +38,11 @@ test = [
     "pytest-asyncio",
     "aiohttp",
 ]
+docs = [
+    "mkdocs",
+    "mkdocstrings[python]",
+    "mkdocs-material",
+]
 
 [project.scripts]
 dranspose = "dranspose.cli:run"
