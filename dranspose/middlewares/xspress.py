@@ -6,11 +6,9 @@ import numpy as np
 import zmq
 from numpy import ndarray
 
-from dranspose.data.xspress3_stream import (
+from dranspose.data.xspress3 import (
     XspressPacket,
-    XspressStart,
     XspressImage,
-    XspressEnd,
 )
 from dranspose.event import StreamData
 
@@ -18,8 +16,7 @@ from dranspose.event import StreamData
 def parse(
     data: StreamData,
 ) -> (
-    dict[str, Any]
-    | tuple[dict[str, Any], ndarray[Any, Any], dict[str, ndarray[Any, Any]]]
+    XspressPacket
 ):
     """
     Parses a Xspress3 packet, which either gives a start/end message or a tuple with a spectra array
@@ -28,24 +25,22 @@ def parse(
         data: a frame comming from the Xspress3 tango device
 
     Returns:
-        a header and optionally a tuple with an image
+        an XspressPacket
     """
     assert data.typ == "xspress"
     assert data.length >= 1
     headerframe = data.frames[0]
     if isinstance(headerframe, zmq.Frame):
         headerframe = headerframe.bytes
-    header = json.loads(headerframe)
-    packet = XspressPacket.validate_python(header)
-    if type(packet) is XspressStart:
-        return header
-    elif type(packet) is XspressImage:
+    packet = XspressPacket.validate_json(headerframe)
+    print("packets", packet)
+    if isinstance(packet, XspressImage):
         assert data.length == 3
         bufframe = data.frames[1]
         if isinstance(bufframe, zmq.Frame):
             bufframe = bufframe.bytes
-        buf = np.frombuffer(bufframe, dtype=header["type"])
-        img = buf.reshape(header["shape"])
+        buf = np.frombuffer(bufframe, dtype=packet.type)
+        img = buf.reshape(packet.shape)
         metaframe = data.frames[2]
         if isinstance(metaframe, zmq.Frame):
             metaframe = metaframe.bytes
@@ -68,7 +63,7 @@ def parse(
                 meta,
             )
         }
-        return header, img, meta
-    elif type(packet) is XspressEnd:
-        return header
-    return {}
+        packet.data = img
+        packet.meta = meta
+
+    return packet

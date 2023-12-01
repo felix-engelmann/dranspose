@@ -2,7 +2,7 @@ import json
 import pickle
 
 from dranspose.data.contrast import ContrastPacket
-from dranspose.data.xspress3_stream import XspressPacket
+from dranspose.data.xspress3 import XspressPacket
 
 
 def test_contrast_stream() -> None:

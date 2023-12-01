@@ -4,7 +4,7 @@ from typing import AsyncGenerator, Optional
 
 import zmq
 
-from dranspose.data.xspress3_stream import (
+from dranspose.data.xspress3 import (
     XspressPacket,
     XspressStart,
     XspressImage,
