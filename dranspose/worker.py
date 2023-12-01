@@ -85,7 +85,7 @@ class Worker(DistributedService):
         self.worker = None
         if self.custom:
             try:
-                self.worker = self.custom()
+                self.worker = self.custom(self.parameters)
             except Exception as e:
                 self._logger.error(
                     "Failed to instantiate custom worker: %s", e.__repr__()

@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from pydantic import UUID4
 from starlette.responses import Response
 
+from dranspose import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.protocol import ReducerState, ZmqUrl, RedisKeys
@@ -44,14 +45,7 @@ class Reducer(DistributedService):
         self.custom = None
         if self._reducer_settings.reducer_class:
             try:
-                sys.path.append(os.getcwd())
-                module = importlib.import_module(
-                    self._reducer_settings.reducer_class.split(":")[0]
-                )
-                self._logger.info("loaded module %s", module)
-                self.custom = getattr(
-                    module, self._reducer_settings.reducer_class.split(":")[1]
-                )
+                self.custom = utils.import_class(self._reducer_settings.reducer_class)
                 self._logger.info("custom reducer class %s", self.custom)
             except:
                 self._logger.warning(
@@ -66,7 +60,7 @@ class Reducer(DistributedService):
         self._logger.info("started work task")
         self.reducer = None
         if self.custom:
-            self.reducer = self.custom()
+            self.reducer = self.custom(self.parameters)
         while True:
             parts = await self.in_socket.recv_multipart()
             prelim = json.loads(parts[0])

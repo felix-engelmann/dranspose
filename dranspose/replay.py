@@ -29,10 +29,7 @@ def replay(wclass, rclass, zmq_files, parameter_file):
     reducercls = utils.import_class(rclass)
     logger.info("custom reducer class %s", reducercls)
 
-    worker = workercls()
-    reducer = reducercls()
-
-    parameters=None
+    parameters = None
     if parameter_file:
         try:
             with open(parameter_file) as f:
@@ -40,6 +37,9 @@ def replay(wclass, rclass, zmq_files, parameter_file):
         except:
             with open(parameter_file, "rb") as f:
                 parameters = pickle.load(f)
+
+    worker = workercls(parameters)
+    reducer = reducercls(parameters)
 
     while True:
         try:
