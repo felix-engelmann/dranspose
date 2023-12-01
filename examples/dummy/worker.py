@@ -1,10 +1,8 @@
-import json
 import logging
 
 from dranspose.event import EventData
 from dranspose.middlewares import contrast
 from dranspose.middlewares import xspress
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

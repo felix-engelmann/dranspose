@@ -38,9 +38,19 @@ The worker gets events and has to first parse the messages from the data stream.
 Then it reduces the data available and forwards a condensed version.
 
 The worker class is instantiated for every new trigger map. This allows to use the `__init__` for resetting the state.
-All calls provide the current set of `parameters` which may be required to setup the worker.
+All calls provide the current set of `parameters` which may be required to set the worker up.
 
-``` py
+Creating a logger is useful for development and production.
+
+```python
+import logging
+
+from dranspose.event import EventData
+from dranspose.middlewares import contrast
+from dranspose.middlewares import xspress
+
+logger = logging.getLogger(__name__)
+
 class FluorescenceWorker:
     def __init__(self, parameters=None):
         self.number = 0
@@ -48,7 +58,7 @@ class FluorescenceWorker:
 ```
 The `process_event` function gets an [EventData](../reference/protocols/events.md) object which contains all required streams for the current event.
 The first step should be to check that the required streams for the analyis are present.
-``` py
+```python
     def process_event(self, event: EventData, parameters=None):
         logger.debug("using parameters %s", parameters)
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
@@ -58,7 +68,7 @@ The first step should be to check that the required streams for the analyis are 
             return
 ```
 Many streams have the same packet structure and therefore `dranspose` include [middlewares](../reference/middlewares.md) to autmatically parse the frames to python objects.
-``` py
+```python
         try:
             con = contrast.parse(event.streams["contrast"])
         except Exception as e:
@@ -72,13 +82,55 @@ Many streams have the same packet structure and therefore `dranspose` include [m
             return
         logger.error("contrast: %s", con)
         logger.error("spectrum: %s", spec)
-    
-        if con["status"] == "running":
+```
+Check if we are in an event which produces data. Others may be `starting` or `finishing`
+```python
+        if con.status == "running":
             # new data
-            sx, sy = con["pseudo"]["x"][0], con["pseudo"]["y"][0]
+            sx, sy = con.pseudo["x"][0], con.pseudo["y"][0]
             logger.error("process position %s %s", sx, sy)
-    
-            roi1 = spec[1][3][parameters["roi1"][0] : parameters["roi1"][1]].sum()
-    
+
+            roi1 = spec.data[3][parameters["roi1"][0] : parameters["roi1"][1]].sum()
+
             return {"position": (sx, sy), "concentations": {"roi1": roi1}}
 ```
+
+The returned object will be available to the reducer
+
+### `reducer.py`
+
+The reducer may also have a setup in `__init__` where is may initialise the special `publish` attribute.
+This attribute is automatically exposed via *http* for live viewers
+
+```python
+from dranspose.event import ResultData
+
+class FluorescenceReducer:
+    def __init__(self, parameters=None):
+        self.number = 0
+        self.publish = {"map": {}}
+```
+In `process_result`, only simple operations are possible, such as appending to a dictionary, as this has to run at the acquisition speed.
+```python
+    def process_result(self, result: ResultData, parameters=None):
+        print(result)
+        if result.payload:
+            self.publish["map"][result.payload["position"]] = result.payload[
+                "concentations"
+            ]
+```
+
+## Developing an analysis
+
+The worker and reducer is easily tested by the `dranspose replay` command.
+Provide the worker class `-w` and the reducer class `-r`.
+You also need to provide the dumped stream from each ingester.
+If you need parameters, you can provide a json or pickle file which will be provided to your worker functions.
+
+```shell
+LOG_LEVEL="DEBUG" dranspose replay -w "src.worker:FluorescenceWorker" \
+    -r "src.reducer:FluorescenceReducer" \
+    -f ../contrast_ingest.pkls ../xspress_ingest.pkls \
+    -p ../fullparam.json
+```
+
