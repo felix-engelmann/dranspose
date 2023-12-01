@@ -17,6 +17,7 @@ class StreamingSingleIngester(Ingester):
     """
     A simple ingester class to comsume a stream from the streaming-receiver repub port
     """
+
     def __init__(
         self, name: StreamName, settings: Optional[StreamingSingleSettings] = None
     ) -> None:

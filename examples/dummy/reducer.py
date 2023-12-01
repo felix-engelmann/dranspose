@@ -2,7 +2,7 @@ from dranspose.event import ResultData
 
 
 class FluorescenceReducer:
-    def __init__(self):
+    def __init__(self, parameters=None):
         self.number = 0
         self.publish = {"map": {}}
 

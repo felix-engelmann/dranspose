@@ -15,6 +15,7 @@ class StreamData(BaseModel):
          typ: arbitrary typ set by the ingester to common parsing
          frames: all frames received for this event for the stream
     """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
     typ: str
     frames: list[zmq.Frame] | list[bytes]
@@ -54,6 +55,7 @@ class InternalWorkerMessage(BaseModel):
         event_number: event number
         streams: one or more streams from an ingester
     """
+
     event_number: EventNumber
     streams: dict[StreamName, StreamData] = {}
 
@@ -71,6 +73,7 @@ class ResultData(BaseModel):
         parameters_uuid: which version of parameters was used to process the event
         payload: the data return from the custom worker function: process_event
     """
+
     event_number: EventNumber
     worker: WorkerName
     parameters_uuid: Optional[UUID4]
@@ -85,6 +88,7 @@ class EventData(BaseModel):
         event_number:    Current event number relative to the trigger map provided
         streams:         Data for each stream present in the event
     """
+
     event_number: EventNumber
     streams: dict[StreamName, StreamData]
 

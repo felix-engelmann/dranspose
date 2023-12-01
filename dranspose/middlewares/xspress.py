@@ -15,9 +15,7 @@ from dranspose.event import StreamData
 
 def parse(
     data: StreamData,
-) -> (
-    XspressPacket
-):
+) -> XspressPacket:
     """
     Parses a Xspress3 packet, which either gives a start/end message or a tuple with a spectra array
 

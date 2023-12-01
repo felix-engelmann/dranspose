@@ -196,11 +196,9 @@ class Worker(DistributedService):
     async def finish_work(self) -> None:
         self._logger.info("finishing work")
         if self.worker:
-            if hasattr(self.worker,"finish"):
+            if hasattr(self.worker, "finish"):
                 loop = asyncio.get_event_loop()
-                await loop.run_in_executor(
-                    None, self.worker.finish, self.parameters
-                )
+                await loop.run_in_executor(None, self.worker.finish, self.parameters)
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)

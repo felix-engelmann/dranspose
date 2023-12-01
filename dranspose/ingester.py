@@ -34,6 +34,7 @@ class Ingester(DistributedService):
     It handles all the forwarding to workers and managing assignments.
     For the instance to do anything, await `run()`
     """
+
     def __init__(self, name: IngesterName, settings: Optional[IngesterSettings] = None):
         if settings is None:
             settings = IngesterSettings()

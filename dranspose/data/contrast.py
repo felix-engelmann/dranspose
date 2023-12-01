@@ -4,7 +4,7 @@ from pydantic import BaseModel, TypeAdapter, ConfigDict
 
 
 class ContrastStarted(BaseModel):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     status: Literal["started"]
     path: str
@@ -13,14 +13,14 @@ class ContrastStarted(BaseModel):
 
 
 class ContrastRunning(BaseModel):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     status: Literal["running"]
     dt: float
 
 
 class ContrastFinished(BaseModel):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     status: Literal["finished"]
     path: str

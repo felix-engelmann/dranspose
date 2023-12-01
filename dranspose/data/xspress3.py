@@ -4,14 +4,14 @@ from pydantic import BaseModel, TypeAdapter, ConfigDict
 
 
 class XspressStart(BaseModel):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     htype: Literal["header"]
     filename: str
 
 
 class XspressImage(BaseModel):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     htype: Literal["image"]
     frame: int
@@ -22,7 +22,7 @@ class XspressImage(BaseModel):
 
 
 class XspressEnd(BaseModel):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     htype: Literal["series_end"]
 

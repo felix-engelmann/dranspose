@@ -18,7 +18,9 @@ def get_internals(filename) -> Iterator[InternalWorkerMessage]:
             except EOFError:
                 break
 
+
 logger = logging.getLogger(__name__)
+
 
 def replay(wclass, rclass, zmq_files, parameter_file):
     gens = [get_internals(f) for f in zmq_files]
@@ -50,7 +52,7 @@ def replay(wclass, rclass, zmq_files, parameter_file):
 
             rd = ResultData(
                 event_number=event.event_number,
-                worker=b'development',
+                worker=b"development",
                 payload=data,
                 parameters_uuid=uuid.uuid4(),
             )

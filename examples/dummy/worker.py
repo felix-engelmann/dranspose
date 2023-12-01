@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class FluorescenceWorker:
-    def __init__(self):
+    def __init__(self, parameters=None):
         self.number = 0
 
     def process_event(self, event: EventData, parameters=None):
@@ -34,11 +34,11 @@ class FluorescenceWorker:
         logger.error("contrast: %s", con)
         logger.error("spectrum: %s", spec)
 
-        if con["status"] == "running":
+        if con.status == "running":
             # new data
-            sx, sy = con["pseudo"]["x"][0], con["pseudo"]["y"][0]
+            sx, sy = con.pseudo["x"][0], con.pseudo["y"][0]
             logger.error("process position %s %s", sx, sy)
 
-            roi1 = spec[1][3][parameters["roi1"][0] : parameters["roi1"][1]].sum()
+            roi1 = spec.data[3][parameters["roi1"][0] : parameters["roi1"][1]].sum()
 
             return {"position": (sx, sy), "concentations": {"roi1": roi1}}

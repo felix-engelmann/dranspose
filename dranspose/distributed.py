@@ -28,6 +28,7 @@ class DistributedSettings(BaseSettings):
     Attributes:
         redis_dsn: URL of the common redis instance
     """
+
     redis_dsn: RedisDsn = Field(
         Url("redis://localhost:6379/0"),
         validation_alias=AliasChoices("service_redis_dsn", "redis_url"),
@@ -38,6 +39,7 @@ class DistributedService(abc.ABC):
     """
     Abstract class defining common functionality for all services.
     """
+
     def __init__(
         self,
         state: WorkerState | IngesterState | ReducerState,
