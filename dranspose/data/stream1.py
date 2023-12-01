@@ -7,12 +7,12 @@ class Stream1(BaseModel):
     msg_number: int
 
 
-class SeriesStart(Stream1):
+class Stream1Start(Stream1):
     htype: Literal["header"]
     filename: str
 
 
-class SeriesData(Stream1):
+class Stream1Data(Stream1):
     htype: Literal["image"]
     frame: int
     shape: list[int]
@@ -20,8 +20,8 @@ class SeriesData(Stream1):
     compression: str
 
 
-class SeriesEnd(Stream1):
+class Stream1End(Stream1):
     htype: Literal["series_end"]
 
 
-Stream1Packet = TypeAdapter(SeriesStart | SeriesData | SeriesEnd)
+Stream1Packet = TypeAdapter(Stream1Start | Stream1Data | Stream1End)

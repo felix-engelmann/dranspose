@@ -22,11 +22,19 @@ from pydantic_core import Url
 ZmqUrl = Annotated[Url, UrlConstraints(allowed_schemes=["tcp"])]
 
 StreamName = NewType("StreamName", str)
+"""
+strongly typed stream name (str)
+"""
 WorkerName = NewType("WorkerName", str)
 IngesterName = NewType("IngesterName", str)
 VirtualWorker = NewType("VirtualWorker", int)
+"""
+strongly typed virtual worker (int)
+"""
 EventNumber = NewType("EventNumber", int)
-
+"""
+strongly typed event number (int)
+"""
 
 class RedisKeys:
     PREFIX = "dranspose"
