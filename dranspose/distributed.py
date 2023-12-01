@@ -46,6 +46,9 @@ class DistributedService(abc.ABC):
         self.redis = redis.from_url(
             f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3"
         )
+        self.raw_redis = redis.from_url(
+            f"{self._distributed_settings.redis_dsn}?protocol=3"
+        )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         self.parameters = None
 
@@ -84,10 +87,19 @@ class DistributedService(abc.ABC):
                     newuuid = update.parameters_uuid
                     if newuuid != self.state.parameters_uuid:
                         self._logger.info("setting parameters to %s", newuuid)
-                        params = await self.redis.get(RedisKeys.parameters(newuuid))
+                        try:
+                            params = await self.raw_redis.get(
+                                RedisKeys.parameters(newuuid)
+                            )
+                        except Exception as e:
+                            self._logger.error(
+                                "failed to get parameters %s", e.__repr__()
+                            )
+                        self._logger.debug("received binary parameters %s", params)
                         if params:
                             self._logger.error("set parameters %s", params)
                             self.parameters = pickle.loads(params)
+                            self.state.parameters_uuid = newuuid
                     if update.finished:
                         self._logger.info("finished messages")
                         await self.finish_work()
@@ -102,3 +114,7 @@ class DistributedService(abc.ABC):
 
     async def finish_work(self) -> None:
         pass
+
+    async def close(self) -> None:
+        await self.redis.aclose()
+        await self.raw_redis.aclose()

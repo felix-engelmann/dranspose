@@ -181,6 +181,6 @@ class Ingester(DistributedService):
         self.accept_task.cancel()
         self.work_task.cancel()
         await self.redis.delete(RedisKeys.config("ingester", self.state.name))
-        await self.redis.aclose()
+        await super().close()
         self.ctx.destroy(linger=0)
         self._logger.info("closed ingester")

@@ -2,7 +2,6 @@ import os
 import pickle
 from pathlib import PosixPath
 
-import redis.asyncio as redis
 import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Never, Optional
 import zmq.asyncio
@@ -82,6 +81,13 @@ async def test_reduction(
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
+
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameters/json",
+            json={"roi1": [0, 10]},
+        )
+        assert resp.status == 200
+        uuid = await resp.json()
 
         ntrig = 20
         resp = await session.post(

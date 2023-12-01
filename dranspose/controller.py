@@ -119,12 +119,15 @@ class Controller:
 
     async def set_params(self, parameters: bytes) -> UUID4:
         self.parameters = WorkParameters(pickle=parameters)
+        logger.debug("distributing parameters to uuid %s", self.parameters.uuid)
         await self.redis.set(
             RedisKeys.parameters(self.parameters.uuid), self.parameters.pickle
         )
+        logger.debug("stored parameters")
         cupd = ControllerUpdate(
             mapping_uuid=self.mapping.uuid, parameters_uuid=self.parameters.uuid
         )
+        logger.debug("send update %s", cupd)
         await self.redis.xadd(
             RedisKeys.updates(),
             {"data": cupd.model_dump_json()},
@@ -200,7 +203,10 @@ class Controller:
                     len(self.completed_events),
                     self.mapping.len(),
                 )
-                if len(self.completed_events) == self.mapping.len():
+                if (
+                    len(self.completed_events) > 0
+                    and len(self.completed_events) == self.mapping.len()
+                ):
                     # all events done, send close
                     cupd = ControllerUpdate(
                         mapping_uuid=self.mapping.uuid,

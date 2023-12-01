@@ -270,6 +270,6 @@ class Worker(DistributedService):
         self.manage_ingester_task.cancel()
         self.manage_receiver_task.cancel()
         await self.redis.delete(RedisKeys.config("worker", self.state.name))
-        await self.redis.aclose()
+        await super().close()
         self.ctx.destroy()
         self._logger.info("worker closed")

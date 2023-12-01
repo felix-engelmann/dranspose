@@ -14,7 +14,7 @@ class FluorescenceWorker:
         self.number = 0
 
     def process_event(self, event: EventData, parameters=None):
-        print(event)
+        logger.debug("using parameters %s", parameters)
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
             logger.error(
                 "missing streams for this worker, only present %s", event.streams.keys()
@@ -39,6 +39,6 @@ class FluorescenceWorker:
             sx, sy = con["pseudo"]["x"][0], con["pseudo"]["y"][0]
             logger.error("process position %s %s", sx, sy)
 
-            roi1 = spec[1][3][0:200].sum()
+            roi1 = spec[1][3][parameters["roi1"][0] : parameters["roi1"][1]].sum()
 
             return {"position": (sx, sy), "concentations": {"roi1": roi1}}
