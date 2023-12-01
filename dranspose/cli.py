@@ -91,7 +91,7 @@ def worker(args):
 
 
 def ingester(args):
-    print(args.ingestclass)
+    print(args.ingesterclass)
     ing = globals()[args.ingesterclass]
     sett = globals()[args.ingesterclass.replace("Ingester", "Settings")]
 
