@@ -45,6 +45,7 @@ async def test_reduction(
         [zmq.Context[Any], int, os.PathLike[Any], float, int],
         Coroutine[Any, Any, Never],
     ],
+    tmp_path,
 ) -> None:
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(
@@ -55,21 +56,26 @@ async def test_reduction(
             ),
         )
     )
+    p_contrast = tmp_path / "contrast_ingest.pkls"
+    print(p_contrast)
     await create_ingester(
         StreamingContrastIngester(
             name=StreamName("contrast"),
             settings=StreamingContrastSettings(
                 upstream_url=Url("tcp://localhost:5556"),
                 ingester_url=Url("tcp://localhost:10000"),
+                dump_path=p_contrast,
             ),
         )
     )
+    p_xspress = tmp_path / "xspress_ingest.pkls"
     await create_ingester(
         StreamingXspressIngester(
             name=StreamName("xspress3"),
             settings=StreamingXspressSettings(
                 upstream_url=Url("tcp://localhost:9999"),
                 ingester_url=Url("tcp://localhost:10001"),
+                dump_path=p_xspress,
             ),
         )
     )

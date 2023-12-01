@@ -198,8 +198,8 @@ class Controller:
                                 await pipe.execute()
                             event_no = self.mapping.complete_events
                         last = ready[0]
-                logger.warning(
-                    "checking if finised, completed %d, len %d",
+                logger.debug(
+                    "checking if finished, completed %d, len %d",
                     len(self.completed_events),
                     self.mapping.len(),
                 )
