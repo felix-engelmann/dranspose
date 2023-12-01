@@ -172,12 +172,17 @@ class Worker(DistributedService):
                 parameters_uuid=self.state.parameters_uuid,
             )
             if self.out_socket:
-                await self.out_socket.send_multipart(
-                    [
-                        rd.model_dump_json(exclude={"payload"}).encode("utf8"),
-                        pickle.dumps(rd.payload),
-                    ]
-                )
+                try:
+                    header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
+                    body = pickle.dumps(rd.payload)
+                    self._logger.debug("send result to reducer with header %s, len-payload %d", header, len(body) )
+                    await self.out_socket.send_multipart(
+                        [
+                            header, body
+                        ]
+                    )
+                except Exception as e:
+                    self._logger.error("could not dump result %s", e.__repr__())
 
             proced += 1
             if proced % 500 == 0:
