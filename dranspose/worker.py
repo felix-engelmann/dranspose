@@ -253,6 +253,7 @@ class Worker(DistributedService):
                     self._ingesters[iname] = ConnectedIngester(config=cfg, socket=sock)
 
                 await self._ingesters[iname].socket.send(b"")
+                self._logger.debug("pinged %s", iname)
             for iname in set(self._ingesters.keys()) - set(processed):
                 self._logger.info("removing stale ingester %s", iname)
                 self._ingesters[iname].socket.close()
