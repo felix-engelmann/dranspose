@@ -15,7 +15,7 @@ The map phase perform the heavy lifting, e.g. analysing images and then forwards
 
 !!! note
     Before developing a new worker functionality, it is necessary to capture events coming from the streams.
-    Please see [capturing events](tutorials/capturing.md).
+    Please see [capturing events](../deployment/capturing.md).
     Here we assume that you have dumps for all necessary streams
 
 
