@@ -5,6 +5,7 @@ import logging
 import os
 import pickle
 import sys
+import traceback
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncGenerator, Any
 
@@ -47,9 +48,10 @@ class Reducer(DistributedService):
             try:
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
                 self._logger.info("custom reducer class %s", self.custom)
-            except:
+            except Exception as e:
                 self._logger.warning(
-                    "no custom reducer class loaded, discarding results"
+                    "failed to load custom reducer class, discarding results %s trace: %s",
+                    e.__repr__(), traceback.format_exc()
                 )
 
     async def run(self) -> None:
