@@ -64,6 +64,7 @@ class Controller:
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
         self.assign_task: Task[None]
+        self.worker_timing = []
 
     async def run(self) -> None:
         logger.debug("started controller run")
@@ -143,6 +144,7 @@ class Controller:
         event_no = 0
         self.completed = defaultdict(list)
         self.completed_events = []
+        self.worker_timing = []
         notify_finish = True
         start = time.perf_counter()
         while True:
@@ -166,6 +168,7 @@ class Controller:
                                 update.worker, [ws.name for ws in cfg.workers]
                             )
                             if not update.new:
+                                self.worker_timing.append(update.processing_times)
                                 compev = update.completed
                                 self.completed[compev].append(update.worker)
                                 logger.debug(
@@ -270,6 +273,7 @@ async def get_status() -> dict[str, Any]:
         "assignment": ctrl.mapping.assignments,
         "completed_events": ctrl.completed_events,
         "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
+        "processing_times": ctrl.worker_timing
     }
 
 

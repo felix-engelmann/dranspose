@@ -31,7 +31,7 @@ from dranspose.protocol import (
     IngesterName,
     StreamName,
     ReducerState,
-    ZmqUrl,
+    ZmqUrl, WorkerTimes,
 )
 
 
@@ -109,6 +109,7 @@ class Worker(DistributedService):
         proced = 0
         while True:
             sub = RedisKeys.assigned(self.state.mapping_uuid)
+            perf_start = time.perf_counter()
             try:
                 assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
             except rexceptions.ConnectionError:
@@ -131,6 +132,7 @@ class Worker(DistributedService):
                             self._ingesters,
                         )
             self._logger.debug("receive from ingesters %s", ingesterset)
+            perf_got_assignments = time.perf_counter()
 
             lastev = assignments[0]
             if len(ingesterset) == 0:
@@ -142,6 +144,7 @@ class Worker(DistributedService):
                 set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
             ] = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
             # print("done", done, "pending", pending)
+            perf_got_work = time.perf_counter()
             done, pending = done_pending
             msgs = []
             for res in done:
@@ -154,6 +157,7 @@ class Worker(DistributedService):
                 msgs.append(msg)
 
             event = EventData.from_internals(msgs)
+            perf_assembled_event = time.perf_counter()
             self._logger.debug("received work %s", event)
             result = None
             if self.worker:
@@ -164,6 +168,7 @@ class Worker(DistributedService):
                     )
                 except Exception as e:
                     self._logger.error("custom worker failed: %s", e.__repr__())
+            perf_custom_code = time.perf_counter()
             self._logger.debug("got result %s", result)
             rd = ResultData(
                 event_number=event.event_number,
@@ -183,14 +188,16 @@ class Worker(DistributedService):
                     )
                 except Exception as e:
                     self._logger.error("could not dump result %s", e.__repr__())
-
+            perf_sent_result = time.perf_counter()
             proced += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)
+            times = WorkerTimes.from_timestamps(perf_start,perf_got_assignments, perf_got_work,perf_assembled_event,perf_custom_code, perf_sent_result)
             wu = WorkerUpdate(
                         state=WorkerStateEnum.IDLE,
                         completed=work_assignment.event_number,
                         worker=self.state.name,
+                        processing_times=times
                     )
             self._logger.debug("all work done, notify controller with %s", wu)
             await self.redis.xadd(
