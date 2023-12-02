@@ -3,9 +3,10 @@ import asyncio
 import logging
 import os
 import random
+import signal
 import socket
 import string
-from typing import Literal
+from typing import Literal, Coroutine, Any
 
 import uvicorn
 from pydantic_core import Url
@@ -83,9 +84,20 @@ def worker(args):
         name = "Worker-{}-{}".format(socket.gethostname(), randid).encode("ascii")
     print("worker name:", name)
 
+    worker_task = None
+    def stop(*args):
+        global worker_task
+        if worker_task:
+            worker_task.cancel()
+
     async def run() -> None:
+        global worker_task
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGTERM, stop)
+
         w = Worker(name, WorkerSettings(worker_class=args.workerclass))
-        await w.run()
+        worker_task = asyncio.create_task(w.run())
+        await worker_task
         await w.close()
 
     asyncio.run(run())
@@ -96,12 +108,25 @@ def ingester(args):
     ing = globals()[args.ingesterclass]
     sett = globals()[args.ingesterclass.replace("Ingester", "Settings")]
 
+    ingester_task = None
+
+    def stop(*args):
+        global ingester_task
+        if ingester_task:
+            ingester_task.cancel()
+
+
     async def run() -> None:
+        global ingester_task
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGTERM, stop)
+
         i = ing(
             name=args.name,
             settings=sett(upstream_url=args.upstream_url),
         )
-        await i.run()
+        ingester_task = asyncio.create_task(i.run())
+        await ingester_task
         await i.close()
 
     asyncio.run(run())
@@ -194,6 +219,7 @@ def create_parser():
     )
 
     return parser
+
 
 
 def run() -> None:
