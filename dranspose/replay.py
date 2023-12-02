@@ -57,7 +57,13 @@ def replay(wclass, rclass, zmq_files, parameter_file):
                 parameters_uuid=uuid.uuid4(),
             )
 
-            reducer.process_result(rd, parameters=parameters)
+            header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
+            body = pickle.dumps(rd.payload)
+            prelim = json.loads(header)
+            prelim["payload"] = pickle.loads(body)
+            result = ResultData.model_validate(prelim)
+
+            reducer.process_result(result, parameters=parameters)
 
         except StopIteration:
             try:
