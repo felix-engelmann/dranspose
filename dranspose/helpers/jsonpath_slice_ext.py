@@ -60,19 +60,3 @@ class NumpyExtentedJsonPathParser(ExtentedJsonPathParser):
             p[0] = Numpy(p[1])
         else:
             super(NumpyExtentedJsonPathParser, self).p_jsonpath_named_operator(p)
-
-
-if __name__ == "__main__":
-    res = NumpyExtentedJsonPathParser(debug=False).parse("map, meta")
-    print(res.__repr__())
-    dat = {"map": 1, "meta": [1, 2, 3]}
-    result = res.find(dat)
-    print("or result", [r.value for r in result])
-    res = NumpyExtentedJsonPathParser(debug=False).parse("meta,map.`numpy(:,6:8,5)`")
-    print(res.__repr__())
-
-    data = {"map": np.linspace(0, 999, 1000).reshape((10, 10, 10)), "meta": [1, 2, 3]}
-    # print(data)
-
-    result = [r.value for r in res.find(data)]
-    print(result)
