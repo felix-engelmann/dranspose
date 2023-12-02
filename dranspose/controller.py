@@ -143,6 +143,7 @@ class Controller:
         event_no = 0
         self.completed = defaultdict(list)
         self.completed_events = []
+        notify_finish = True
         start = time.perf_counter()
         while True:
             try:
@@ -210,6 +211,7 @@ class Controller:
                 if (
                     len(self.completed_events) > 0
                     and len(self.completed_events) == self.mapping.len()
+                    and notify_finish
                 ):
                     # all events done, send close
                     cupd = ControllerUpdate(
@@ -222,6 +224,7 @@ class Controller:
                         RedisKeys.updates(),
                         {"data": cupd.model_dump_json()},
                     )
+                    notify_finish = False
             except rexceptions.ConnectionError as e:
                 break
 

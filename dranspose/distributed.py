@@ -110,9 +110,9 @@ class DistributedService(abc.ABC):
                             self._logger.error(
                                 "failed to get parameters %s", e.__repr__()
                             )
-                        self._logger.debug("received binary parameters %s", params)
+                        self._logger.debug("received binary parameters %s", len(params))
                         if params:
-                            self._logger.error("set parameters %s", params)
+                            self._logger.error("set parameters %s", len(params))
                             self.parameters = pickle.loads(params)
                             self.state.parameters_uuid = newuuid
                     if update.finished:
