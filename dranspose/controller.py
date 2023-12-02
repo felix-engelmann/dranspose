@@ -41,6 +41,7 @@ from dranspose.protocol import (
     WorkParameters,
     ControllerUpdate,
     ReducerState,
+    WorkerTimes,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,7 @@ class Controller:
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
         self.assign_task: Task[None]
-        self.worker_timing = []
+        self.worker_timing: list[WorkerTimes] = []
 
     async def run(self) -> None:
         logger.debug("started controller run")
@@ -168,7 +169,8 @@ class Controller:
                                 update.worker, [ws.name for ws in cfg.workers]
                             )
                             if not update.new:
-                                self.worker_timing.append(update.processing_times)
+                                if update.processing_times:
+                                    self.worker_timing.append(update.processing_times)
                                 compev = update.completed
                                 self.completed[compev].append(update.worker)
                                 logger.debug(

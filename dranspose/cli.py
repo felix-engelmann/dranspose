@@ -6,7 +6,8 @@ import random
 import signal
 import socket
 import string
-from typing import Literal, Coroutine, Any
+from asyncio import Task
+from typing import Literal, Coroutine, Any, Optional
 
 import uvicorn
 from pydantic_core import Url
@@ -68,7 +69,7 @@ async def main() -> None:
         await i.close()
 
 
-def controller(args):
+def controller(args: argparse.Namespace) -> None:
     try:
         config = uvicorn.Config(app, port=5000, host=args.host, log_level="info")
         server = uvicorn.Server(config)
@@ -77,16 +78,17 @@ def controller(args):
         print("exiting")
 
 
-def worker(args):
+worker_task: Optional[Task[None]] = None
+
+
+def worker(args: argparse.Namespace) -> None:
     name = args.name
     if not name:
         randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
         name = "Worker-{}-{}".format(socket.gethostname(), randid).encode("ascii")
     print("worker name:", name)
 
-    worker_task = None
-
-    def stop(*args):
+    def stop(*args: Any) -> None:
         global worker_task
         if worker_task:
             worker_task.cancel()
@@ -104,14 +106,15 @@ def worker(args):
     asyncio.run(run())
 
 
-def ingester(args):
+ingester_task = None
+
+
+def ingester(args: argparse.Namespace) -> None:
     print(args.ingesterclass)
     ing = globals()[args.ingesterclass]
     sett = globals()[args.ingesterclass.replace("Ingester", "Settings")]
 
-    ingester_task = None
-
-    def stop(*args):
+    def stop(*args: Any) -> None:
         global ingester_task
         if ingester_task:
             ingester_task.cancel()
@@ -132,7 +135,7 @@ def ingester(args):
     asyncio.run(run())
 
 
-def reducer(args):
+def reducer(args: argparse.Namespace) -> None:
     try:
         if args.reducerclass:
             os.environ["REDUCER_CLASS"] = args.reducerclass
@@ -145,15 +148,15 @@ def reducer(args):
         print("exiting")
 
 
-def combined(args):
+def combined(args: argparse.Namespace) -> None:
     asyncio.run(main())
 
 
-def replay(args):
+def replay(args: argparse.Namespace) -> None:
     run_replay(args.workerclass, args.reducerclass, args.files, args.parameters)
 
 
-def create_parser():
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="dranspose", description="Transposes Streams")
 
     subparsers = parser.add_subparsers(title="commands", dest="subcommand")
@@ -223,7 +226,7 @@ def create_parser():
 
 def run() -> None:
     parser = create_parser()
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
 
     # Check if a subcommand is provided
     if not getattr(args, "subcommand", None):

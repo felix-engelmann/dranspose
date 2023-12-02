@@ -1,9 +1,10 @@
 import os
+import pathlib
 import pickle
 from pathlib import PosixPath
 
 import asyncio
-from typing import Awaitable, Callable, Any, Coroutine, Never, Optional
+from typing import Awaitable, Callable, Any, Coroutine, Never, Optional, Generator
 import zmq.asyncio
 
 import aiohttp
@@ -45,7 +46,7 @@ async def test_reduction(
         [zmq.Context[Any], int, os.PathLike[Any], float, int],
         Coroutine[Any, Any, Never],
     ],
-    tmp_path,
+    tmp_path: pathlib.PurePath,
 ) -> None:
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(

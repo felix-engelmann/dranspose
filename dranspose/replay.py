@@ -1,14 +1,16 @@
 import json
 import logging
+import os
 import pickle
 import uuid
-from typing import Iterator
+from typing import Iterator, Any
 
 from dranspose import utils
 from dranspose.event import StreamData, InternalWorkerMessage, EventData, ResultData
+from dranspose.protocol import WorkerName
 
 
-def get_internals(filename) -> Iterator[InternalWorkerMessage]:
+def get_internals(filename: os.PathLike[Any]) -> Iterator[InternalWorkerMessage]:
     with open(filename, "rb") as f:
         while True:
             try:
@@ -22,7 +24,12 @@ def get_internals(filename) -> Iterator[InternalWorkerMessage]:
 logger = logging.getLogger(__name__)
 
 
-def replay(wclass, rclass, zmq_files, parameter_file):
+def replay(
+    wclass: str,
+    rclass: str,
+    zmq_files: list[os.PathLike[Any]],
+    parameter_file: os.PathLike[Any],
+) -> None:
     gens = [get_internals(f) for f in zmq_files]
 
     workercls = utils.import_class(wclass)
@@ -37,8 +44,8 @@ def replay(wclass, rclass, zmq_files, parameter_file):
             with open(parameter_file) as f:
                 parameters = json.load(f)
         except:
-            with open(parameter_file, "rb") as f:
-                parameters = pickle.load(f)
+            with open(parameter_file, "rb") as fb:
+                parameters = pickle.load(fb)
 
     worker = workercls(parameters)
     reducer = reducercls(parameters)
@@ -52,7 +59,7 @@ def replay(wclass, rclass, zmq_files, parameter_file):
 
             rd = ResultData(
                 event_number=event.event_number,
-                worker=b"development",
+                worker=WorkerName("development"),
                 payload=data,
                 parameters_uuid=uuid.uuid4(),
             )

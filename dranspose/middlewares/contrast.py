@@ -1,4 +1,5 @@
 import pickle
+from types import UnionType
 from typing import Any
 
 import zmq
@@ -7,7 +8,7 @@ from dranspose.data.contrast import ContrastPacket
 from dranspose.event import StreamData
 
 
-def parse(data: StreamData) -> ContrastPacket:
+def parse(data: StreamData) -> UnionType:
     """
     Parses a contrast packet, which returns a dict, depending on the status of contrast
 

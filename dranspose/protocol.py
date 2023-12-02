@@ -121,7 +121,13 @@ class WorkerTimes(BaseModel):
 
     @classmethod
     def from_timestamps(
-        cls, start, assignments, messages, event, custom, send
+        cls,
+        start: float,
+        assignments: float,
+        messages: float,
+        event: float,
+        custom: float,
+        send: float,
     ) -> "WorkerTimes":
         return WorkerTimes(
             get_assignments=assignments - start,

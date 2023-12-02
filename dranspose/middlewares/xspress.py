@@ -1,5 +1,6 @@
 import json
 import pickle
+from types import UnionType
 from typing import Any
 
 import numpy as np
@@ -15,7 +16,7 @@ from dranspose.event import StreamData
 
 def parse(
     data: StreamData,
-) -> XspressPacket:
+) -> UnionType:
     """
     Parses a Xspress3 packet, which either gives a start/end message or a tuple with a spectra array
 

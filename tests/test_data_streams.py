@@ -2,7 +2,7 @@ import json
 import pickle
 
 from dranspose.data.contrast import ContrastPacket
-from dranspose.data.xspress3 import XspressPacket
+from dranspose.data.xspress3 import XspressPacket, XspressImage
 
 
 def test_contrast_stream() -> None:
@@ -30,7 +30,7 @@ def test_xspress3_stream() -> None:
                     continue
                 pkg = XspressPacket.validate_json(frames[0])
                 print(pkg)
-                if pkg.htype == "image":
+                if isinstance(pkg, XspressImage):
                     skip = 2
             except EOFError:
                 break
