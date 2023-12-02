@@ -37,6 +37,7 @@ EventNumber = NewType("EventNumber", int)
 strongly typed event number (int)
 """
 
+
 class RedisKeys:
     PREFIX = "dranspose"
 
@@ -110,6 +111,7 @@ class WorkAssignment(BaseModel):
 class WorkerStateEnum(Enum):
     IDLE = "idle"
 
+
 class WorkerTimes(BaseModel):
     get_assignments: float
     get_messages: float
@@ -118,12 +120,17 @@ class WorkerTimes(BaseModel):
     send_result: float
 
     @classmethod
-    def from_timestamps(cls, start, assignments, messages, event, custom, send) -> "WorkerTimes":
-        return WorkerTimes(get_assignments=assignments-start,
-                           get_messages=messages-assignments,
-                           assemble_event=event-messages,
-                           custom_code=custom-event,
-                           send_result=send-custom)
+    def from_timestamps(
+        cls, start, assignments, messages, event, custom, send
+    ) -> "WorkerTimes":
+        return WorkerTimes(
+            get_assignments=assignments - start,
+            get_messages=messages - assignments,
+            assemble_event=event - messages,
+            custom_code=custom - event,
+            send_result=send - custom,
+        )
+
 
 class WorkerUpdate(BaseModel):
     state: WorkerStateEnum

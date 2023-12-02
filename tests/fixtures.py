@@ -117,7 +117,9 @@ async def reducer(
 async def stream_eiger() -> Callable[
     [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
 ]:
-    async def _make_eiger(ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float=0.1) -> None:
+    async def _make_eiger(
+        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1
+    ) -> None:
         socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
         acq = await socket.start(filename="")
         width = 1475

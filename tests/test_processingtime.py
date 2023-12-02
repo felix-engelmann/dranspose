@@ -1,6 +1,12 @@
 import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Never, Optional
-from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName, WorkerTimes
+from dranspose.protocol import (
+    EnsembleState,
+    RedisKeys,
+    StreamName,
+    WorkerName,
+    WorkerTimes,
+)
 from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
@@ -25,13 +31,16 @@ from tests.fixtures import (
     stream_alba,
 )
 
+
 @pytest.mark.asyncio
 async def test_simple(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_eiger: Callable[[zmq.Context[Any], int, int, float], Coroutine[Any, Any, Never]],
+    stream_eiger: Callable[
+        [zmq.Context[Any], int, int, float], Coroutine[Any, Any, Never]
+    ],
 ) -> None:
     await reducer(None)
     await create_worker(WorkerName("w1"))
@@ -77,5 +86,7 @@ async def test_simple(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/status")
         content = await st.json()
-        assert len([WorkerTimes.model_validate(x) for x in content["processing_times"]]) == ntrig + 1
-
+        assert (
+            len([WorkerTimes.model_validate(x) for x in content["processing_times"]])
+            == ntrig + 1
+        )

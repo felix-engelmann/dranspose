@@ -14,6 +14,7 @@ class XspressStart(BaseModel):
         )
         ```
     """
+
     model_config = ConfigDict(extra="allow")
 
     htype: Literal["header"]
@@ -50,6 +51,7 @@ class XspressImage(BaseModel):
         )
         ```
     """
+
     model_config = ConfigDict(extra="allow")
 
     htype: Literal["image"]
@@ -67,6 +69,7 @@ class XspressEnd(BaseModel):
         XspressEnd(htype='series_end')
         ```
     """
+
     model_config = ConfigDict(extra="allow")
 
     htype: Literal["series_end"]

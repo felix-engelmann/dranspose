@@ -20,6 +20,7 @@ class ContrastStarted(BaseModel):
         )
         ```
     """
+
     model_config = ConfigDict(extra="allow")
 
     status: Literal["started"]
@@ -62,6 +63,7 @@ class ContrastRunning(BaseModel):
         )
         ```
     """
+
     model_config = ConfigDict(extra="allow")
 
     status: Literal["running"]
@@ -84,6 +86,7 @@ class ContrastFinished(BaseModel):
         )
         ```
     """
+
     model_config = ConfigDict(extra="allow")
 
     status: Literal["finished"]
@@ -96,6 +99,7 @@ class ContrastHeartbeat(BaseModel):
     """
     Heartbeat message
     """
+
     status: Literal["heartbeat"]
 
 

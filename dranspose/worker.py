@@ -31,7 +31,8 @@ from dranspose.protocol import (
     IngesterName,
     StreamName,
     ReducerState,
-    ZmqUrl, WorkerTimes,
+    ZmqUrl,
+    WorkerTimes,
 )
 
 
@@ -180,31 +181,36 @@ class Worker(DistributedService):
                 try:
                     header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
                     body = pickle.dumps(rd.payload)
-                    self._logger.debug("send result to reducer with header %s, len-payload %d", header, len(body) )
-                    await self.out_socket.send_multipart(
-                        [
-                            header, body
-                        ]
+                    self._logger.debug(
+                        "send result to reducer with header %s, len-payload %d",
+                        header,
+                        len(body),
                     )
+                    await self.out_socket.send_multipart([header, body])
                 except Exception as e:
                     self._logger.error("could not dump result %s", e.__repr__())
             perf_sent_result = time.perf_counter()
             proced += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)
-            times = WorkerTimes.from_timestamps(perf_start,perf_got_assignments, perf_got_work,perf_assembled_event,perf_custom_code, perf_sent_result)
+            times = WorkerTimes.from_timestamps(
+                perf_start,
+                perf_got_assignments,
+                perf_got_work,
+                perf_assembled_event,
+                perf_custom_code,
+                perf_sent_result,
+            )
             wu = WorkerUpdate(
-                        state=WorkerStateEnum.IDLE,
-                        completed=work_assignment.event_number,
-                        worker=self.state.name,
-                        processing_times=times
-                    )
+                state=WorkerStateEnum.IDLE,
+                completed=work_assignment.event_number,
+                worker=self.state.name,
+                processing_times=times,
+            )
             self._logger.debug("all work done, notify controller with %s", wu)
             await self.redis.xadd(
                 RedisKeys.ready(self.state.mapping_uuid),
-                {
-                    "data": wu.model_dump_json()
-                },
+                {"data": wu.model_dump_json()},
             )
 
     async def finish_work(self) -> None:

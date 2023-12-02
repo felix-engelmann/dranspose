@@ -51,7 +51,8 @@ class Reducer(DistributedService):
             except Exception as e:
                 self._logger.warning(
                     "failed to load custom reducer class, discarding results %s trace: %s",
-                    e.__repr__(), traceback.format_exc()
+                    e.__repr__(),
+                    traceback.format_exc(),
                 )
 
     async def run(self) -> None:

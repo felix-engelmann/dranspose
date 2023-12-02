@@ -85,6 +85,7 @@ def worker(args):
     print("worker name:", name)
 
     worker_task = None
+
     def stop(*args):
         global worker_task
         if worker_task:
@@ -114,7 +115,6 @@ def ingester(args):
         global ingester_task
         if ingester_task:
             ingester_task.cancel()
-
 
     async def run() -> None:
         global ingester_task
@@ -219,7 +219,6 @@ def create_parser():
     )
 
     return parser
-
 
 
 def run() -> None:

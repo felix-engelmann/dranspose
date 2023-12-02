@@ -273,7 +273,7 @@ async def get_status() -> dict[str, Any]:
         "assignment": ctrl.mapping.assignments,
         "completed_events": ctrl.completed_events,
         "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
-        "processing_times": ctrl.worker_timing
+        "processing_times": ctrl.worker_timing,
     }
 
 
