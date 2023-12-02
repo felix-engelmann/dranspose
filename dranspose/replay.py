@@ -5,8 +5,8 @@ import pickle
 import uuid
 from typing import Iterator, Any
 
-from dranspose import utils
-from dranspose.event import StreamData, InternalWorkerMessage, EventData, ResultData
+from dranspose.helpers import utils
+from dranspose.event import InternalWorkerMessage, EventData, ResultData
 from dranspose.protocol import WorkerName
 
 

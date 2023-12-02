@@ -1,22 +1,21 @@
 import asyncio
-import importlib
 import json
 import logging
-import os
 import pickle
-import sys
 import traceback
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncGenerator, Any
 
+import numpy as np
 import zmq.asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import UUID4
 from starlette.responses import Response
 
-from dranspose import utils
+from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
+from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.protocol import ReducerState, ZmqUrl, RedisKeys
 
 logger = logging.getLogger(__name__)
@@ -122,3 +121,19 @@ async def get_result() -> Any | bytes:
     except:
         logging.warning("no publishable data")
     return Response(data, media_type="application/x.pickle")
+
+
+@app.get("/api/v1/result/{path:path}")
+async def get_path(path: str) -> Any:
+    if not hasattr(reducer.reducer, "publish"):
+        raise HTTPException(status_code=404, detail="no publishable data")
+    try:
+        if path == "":
+            path = "$"
+        jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
+        print("expr", jsonpath_expr.__repr__())
+        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]
+        data = pickle.dumps(ret)
+        return Response(data, media_type="application/x.pickle")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
