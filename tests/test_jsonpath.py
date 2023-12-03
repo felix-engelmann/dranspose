@@ -3,7 +3,7 @@ import numpy as np
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 
 
-def test_jsonpath():
+def test_jsonpath() -> None:
     res = NumpyExtentedJsonPathParser(debug=False).parse("map, meta")
     print(res.__repr__())
     dat = {"map": 1, "meta": [1, 2, 3]}

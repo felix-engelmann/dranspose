@@ -1,6 +1,8 @@
+from typing import Optional, Any
+
 import numpy as np
-from jsonpath_ng.ext.parser import ExtentedJsonPathParser
-from jsonpath_ng import DatumInContext, This
+from jsonpath_ng.ext.parser import ExtentedJsonPathParser # type: ignore
+from jsonpath_ng import DatumInContext, This # type: ignore
 
 
 class DefintionInvalid(Exception):
@@ -13,7 +15,7 @@ class Numpy(This):
     Concrete syntax is '`slice(numpy slice, multidim)`'
     """
 
-    def _parse_slice(self, slice_str: str):
+    def _parse_slice(self, slice_str: str) -> Any | int | slice:
         if slice_str == "...":
             return Ellipsis
         elif slice_str.isdigit():
@@ -21,9 +23,9 @@ class Numpy(This):
         else:
             return slice(*map(lambda x: int(x) if x else None, slice_str.split(":")))
 
-    def __init__(self, method=None):
-        print("got arguments", method)
-        # m = SPLIT.match(method)
+    def __init__(self, method: Optional[str]=None) -> None:
+        if not method:
+            raise DefintionInvalid("method must be provided")
         method = method[len("numpy(") : -1]
         slice_objects = [self._parse_slice(s.strip()) for s in method.split(",")]
         if slice_objects is []:
@@ -31,7 +33,7 @@ class Numpy(This):
         self.slice = tuple(slice_objects)
         self.method = method
 
-    def find(self, datum):
+    def find(self, datum: DatumInContext) -> list[DatumInContext]:
         # print("datum got", datum)
         # datum = DatumInContext.wrap(datum)
         try:
@@ -41,20 +43,20 @@ class Numpy(This):
             return []
         return [datum]
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return isinstance(other, Numpy) and self.method == other.method
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "%s(%r)" % (self.__class__.__name__, self.method)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "`%s`" % self.method
 
 
 class NumpyExtentedJsonPathParser(ExtentedJsonPathParser):
     """Custom LALR-parser for JsonPath"""
 
-    def p_jsonpath_named_operator(self, p):
+    def p_jsonpath_named_operator(self, p: list[str]) -> None:
         "jsonpath : NAMED_OPERATOR"
         if p[1].startswith("numpy("):
             p[0] = Numpy(p[1])
