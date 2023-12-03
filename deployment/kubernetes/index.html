@@ -9,18 +9,22 @@
       
       
       
+        <link rel="prev" href="../capturing/">
       
       
-      <link rel="icon" href="/assets/images/favicon.png">
+        <link rel="next" href="../../reference/middlewares/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.14">
     
     
       
-        <title>dranspose</title>
+        <title>K8s deployment - dranspose</title>
       
     
     
-      <link rel="stylesheet" href="/assets/stylesheets/main.fad675c6.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.fad675c6.min.css">
       
       
 
@@ -39,9 +43,9 @@
       
     
     
-      <link rel="stylesheet" href="/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -62,6 +66,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#k8s-deployment" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -74,7 +83,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/." title="dranspose" class="md-header__button md-logo" aria-label="dranspose" data-md-component="logo">
+    <a href="../.." title="dranspose" class="md-header__button md-logo" aria-label="dranspose" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
@@ -94,7 +103,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              K8s deployment
             
           </span>
         </div>
@@ -166,7 +175,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/." title="dranspose" class="md-nav__button md-logo" aria-label="dranspose" data-md-component="logo">
+    <a href="../.." title="dranspose" class="md-nav__button md-logo" aria-label="dranspose" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
@@ -184,7 +193,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -241,7 +250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/applications/overview/" class="md-nav__link">
+      <a href="../../applications/overview/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -266,19 +275,21 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -292,7 +303,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Deployment
@@ -306,7 +317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/deployment/capturing/" class="md-nav__link">
+      <a href="../capturing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -324,10 +335,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/deployment/kubernetes/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    K8s deployment
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -336,6 +367,35 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Values
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -392,7 +452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/middlewares/" class="md-nav__link">
+      <a href="../../reference/middlewares/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -413,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/trigger_map/" class="md-nav__link">
+      <a href="../../reference/trigger_map/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -471,7 +531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/internals/distributed_service/" class="md-nav__link">
+      <a href="../../reference/internals/distributed_service/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -492,7 +552,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/internals/ingester/" class="md-nav__link">
+      <a href="../../reference/internals/ingester/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -558,7 +618,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/protocols/contrast/" class="md-nav__link">
+      <a href="../../reference/protocols/contrast/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -579,7 +639,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/protocols/events/" class="md-nav__link">
+      <a href="../../reference/protocols/events/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -600,7 +660,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/reference/protocols/xspress/" class="md-nav__link">
+      <a href="../../reference/protocols/xspress/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -673,7 +733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/tutorials/ingesters/" class="md-nav__link">
+      <a href="../../tutorials/ingesters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -694,7 +754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/tutorials/viewers/" class="md-nav__link">
+      <a href="../../tutorials/viewers/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -732,6 +792,25 @@
   
   
   
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#values" class="md-nav__link">
+    <span class="md-ellipsis">
+      Values
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -743,8 +822,44 @@
             <div class="md-content" data-md-component="content">
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+<h1 id="k8s-deployment">K8s deployment</h1>
+<p>The most easy way to run a distributed version of dranspose is via a helm chart.</p>
+<h2 id="values">Values</h2>
+<p>The required values are a <code>beamline</code> to be able to mount the correct volumes.
+The <code>dump_prefix</code> may be set to a path to which the ingesters dump all stream messages.
+This is useful to get the initial data to develop a worker which can digest these.</p>
+<p>The <code>ingesters</code> map specifies the name of the stream, the <code>connect_url</code> on where to connect to and the class.
+Other ingesters may need additional settings.</p>
+<p>The <code>workers</code> and the <code>reducer</code> run with a custom docker image which contains all the dependencies for the analysis
+<code>worker.class</code> and <code>reducer.class</code> specify the paths to the correct classes in the analysis container. </p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">global</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">beamline</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nanomax</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">dump_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"> </span><span class="c1">#&quot;/data/staff/dummymax/dumps/ingest_dump_&quot;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">ingesters</span><span class="p">:</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">contrast</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">connect_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://172.16.125.30:5556&quot;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">ingester_class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;StreamingContrastIngester&quot;</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">xspress3</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">connect_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://172.16.126.70:9999&quot;</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">ingester_class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;StreamingXspressIngester&quot;</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="nt">science_image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;harbor.maxiv.lu.se/daq/dranspose/nanomax-fluorescence:main&quot;</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">worker</span><span class="p">:</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src.worker:FluorescenceWorker&quot;</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">reducer</span><span class="p">:</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src.worker:FluorescenceReducer&quot;</span>
+</span></code></pre></div>
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -777,10 +892,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "/", "features": [], "search": "/assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="/assets/javascripts/bundle.cd18aaf1.min.js"></script>
+      <script src="../../assets/javascripts/bundle.cd18aaf1.min.js"></script>
       
     
   </body>
