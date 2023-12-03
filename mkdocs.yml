@@ -9,6 +9,7 @@ plugins:
 
 markdown_extensions:
   - admonition
+  - attr_list
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -17,6 +18,9 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences
 
+exclude_docs: |
+  /seminar-2023-11-30
+  !/seminar-2023-11-30/main.pdf
 
 #nav:
 #  - "index.md"
