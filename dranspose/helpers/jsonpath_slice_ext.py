@@ -56,7 +56,7 @@ class Numpy(This):
 class NumpyExtentedJsonPathParser(ExtentedJsonPathParser):
     """Custom LALR-parser for JsonPath"""
 
-    def p_jsonpath_named_operator(self, p: list[str]) -> None:
+    def p_jsonpath_named_operator(self, p: list[Any]) -> None:
         "jsonpath : NAMED_OPERATOR"
         if p[1].startswith("numpy("):
             p[0] = Numpy(p[1])
