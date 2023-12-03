@@ -16,8 +16,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "pyzmq",
-    "redis[hiredis]",
+    "pyzmq >= 25.0.0",
+    "redis[hiredis] >= 5.0.0",
     "fastapi",
     "uvicorn",
     "numpy",
