@@ -15,7 +15,7 @@ from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName
+from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName, VirtualWorker, VirtualConstraint
 
 import redis.asyncio as redis
 
@@ -103,11 +103,13 @@ async def test_dump(
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
             json={
-                "eiger": [[2 * i] for i in range(1, ntrig)],
-                "orca": [[2 * i + 1] for i in range(1, ntrig)],
-                "alba": [[2 * i, 2 * i + 1] for i in range(1, ntrig)],
+                "eiger": [[VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json")] for i in range(1, ntrig)],
+                "orca": [[VirtualWorker(constraint=VirtualConstraint(2 * i + 1)).model_dump(mode="json")] for i in range(1, ntrig)],
+                "alba": [[VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json"),
+                          VirtualWorker(constraint=VirtualConstraint(2 * i + 1)).model_dump(mode="json")] for i in range(1, ntrig)],
                 "slow": [
-                    [2 * i, 2 * i + 1] if i % 4 == 0 else None for i in range(1, ntrig)
+                    [VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json"),
+                     VirtualWorker(constraint=VirtualConstraint(2 * i + 1)).model_dump(mode="json")] if i % 4 == 0 else None for i in range(1, ntrig)
                 ],
             },
         )

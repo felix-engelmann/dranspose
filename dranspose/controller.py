@@ -8,7 +8,7 @@ import os
 import pickle
 from asyncio import Task
 from collections import defaultdict
-from typing import Dict, List, Any, AsyncGenerator, Literal
+from typing import Dict, List, Any, AsyncGenerator, Literal, Optional
 
 import uvicorn
 import zmq.asyncio
@@ -166,7 +166,7 @@ class Controller:
                                 [ws.name for ws in cfg.workers],
                             )
                             virt = self.mapping.assign_next(
-                                update.worker, [ws.name for ws in cfg.workers]
+                                next(w for w in cfg.workers if w.name == update.worker), cfg.workers
                             )
                             if not update.new:
                                 if update.processing_times:
@@ -291,7 +291,7 @@ async def get_progress() -> dict[str, Any]:
 
 @app.post("/api/v1/mapping")
 async def set_mapping(
-    mapping: Dict[StreamName, List[List[VirtualWorker] | Literal["all"] | None]]
+    mapping: Dict[StreamName, List[Optional[List[VirtualWorker]]]]
 ) -> UUID4 | str:
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():
