@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Callable, Optional, Awaitable, Any, Coroutine, Never
+from typing import Callable, Optional, Awaitable
 
 import aiohttp
 import pytest

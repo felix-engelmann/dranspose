@@ -15,8 +15,9 @@ test-python39:
   when: manual
 
 test-python310:
-  allow_failure: true
-  when: manual
+  allow_failure: false
+  services:
+    - redis:latest
 
 test-python311:
   allow_failure: false

@@ -1,5 +1,5 @@
 import asyncio
-from typing import Awaitable, Callable, Any, Coroutine, Never, Optional
+from typing import Awaitable, Callable, Any, Coroutine, Optional
 from dranspose.protocol import (
     EnsembleState,
     RedisKeys,
@@ -41,7 +41,7 @@ async def test_simple(
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_eiger: Callable[
-        [zmq.Context[Any], int, int, float], Coroutine[Any, Any, Never]
+        [zmq.Context[Any], int, int, float], Coroutine[Any, Any, None]
     ],
 ) -> None:
     await reducer(None)

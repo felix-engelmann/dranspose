@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 import pickle
-from typing import Awaitable, Callable, Any, Coroutine, Never, Optional
+from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
 
@@ -83,7 +83,7 @@ async def test_debug(
     debug_worker: Callable[[Optional[str], Optional[list[str]]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, Never]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
 ) -> None:
     await reducer(None)
     await create_worker(WorkerName("w1"))

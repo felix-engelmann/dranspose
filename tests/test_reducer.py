@@ -4,7 +4,7 @@ import pickle
 from pathlib import PosixPath
 
 import asyncio
-from typing import Awaitable, Callable, Any, Coroutine, Never, Optional, Generator
+from typing import Awaitable, Callable, Any, Coroutine, Optional, Generator
 import zmq.asyncio
 
 import aiohttp
@@ -51,7 +51,7 @@ async def test_reduction(
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pkls: Callable[
         [zmq.Context[Any], int, os.PathLike[Any], float, int],
-        Coroutine[Any, Any, Never],
+        Coroutine[Any, Any, None],
     ],
     tmp_path: pathlib.PurePath,
 ) -> None:
