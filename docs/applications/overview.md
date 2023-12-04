@@ -3,7 +3,7 @@
 Unlike sequential processing of data, dranspose leverages parallel processing to achieve the throughput necesary for live processing.
 
 We use the *map reduce* programming model for distributing work.
-Parallel workers unfortunately have to work independently. Therefore, they only have access 
+Parallel workers unfortunately have to work independently. Therefore, they only have access
 to a single event at a time. They may store local state, but don't have access to arbitrary other events.
 
 For data analysis which has to cross all events, there is a secondary *reduce* step which can only cope with reduced data, but gets all events delivered.
@@ -22,7 +22,7 @@ The map phase perform the heavy lifting, e.g. analysing images and then forwards
 To analyse data with dranspose, you need to split your task into a `map` and a `redude` function.
 
 Create a new git repository and create the following structure
-    
+
     .
     ├── Dockerfile
     ├── README.md
@@ -30,7 +30,7 @@ Create a new git repository and create the following structure
     └── src
         ├── reducer.py
         └── worker.py
-   
+
 
 ### `worker.py`
 
@@ -74,7 +74,7 @@ Many streams have the same packet structure and therefore `dranspose` include [m
         except Exception as e:
             logger.error("failed to parse contrast %s", e.__repr__())
             return
-    
+
         try:
             spec = xspress.parse(event.streams["xspress3"])
         except Exception as e:

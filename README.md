@@ -20,4 +20,4 @@ The `dranspose` cli wrapper allows to start different parts of the system or run
 
 To get debug logs for the tests which are useful when debugging use
 
-    pytest --log-cli-level=DEBUG 
+    pytest --log-cli-level=DEBUG

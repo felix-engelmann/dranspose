@@ -10,7 +10,7 @@ To retrieve the data, the reducer exposes a HTTP interface. All data is availabl
 
 and returns pickle objects.
 
-However, if you are only interested in a subset of data for your specific live viewer, 
+However, if you are only interested in a subset of data for your specific live viewer,
 use [JSONpath](https://pypi.org/project/jsonpath-ng/#description) to select the specific data you need. To handle large numpy arrays better,
 there is a special filter `numpy()` which takes numpy slicing syntax.
 

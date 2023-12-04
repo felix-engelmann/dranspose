@@ -13,7 +13,7 @@ The `ingesters` map specifies the name of the stream, the `connect_url` on where
 Other ingesters may need additional settings.
 
 The `workers` and the `reducer` run with a custom docker image which contains all the dependencies for the analysis
-`worker.class` and `reducer.class` specify the paths to the correct classes in the analysis container. 
+`worker.class` and `reducer.class` specify the paths to the correct classes in the analysis container.
 
 ```yaml
 global:
