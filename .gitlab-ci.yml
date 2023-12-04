@@ -8,12 +8,17 @@ include:
 
 variables:
   DOCKER_REGISTRY: "harbor.maxiv.lu.se/daq"
+  REDIS_URL: "redis://redis:6379/0"
 
 test-python39:
   allow_failure: true
+  when: never
 
 test-python310:
   allow_failure: true
+  when: never
 
 test-python311:
   allow_failure: false
+  services:
+    - redis:latest
