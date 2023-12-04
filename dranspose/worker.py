@@ -60,6 +60,7 @@ class Worker(DistributedService):
 
         state = WorkerState(name=self._worker_settings.worker_name, tags=self._worker_settings.worker_tags)
         super().__init__(state, self._worker_settings)
+        self._logger.info("created worker with state %s", state)
         self.state: WorkerState
         self.ctx = zmq.asyncio.Context()
 
@@ -86,7 +87,7 @@ class Worker(DistributedService):
         self.work_task = asyncio.create_task(self.work())
         await self.register()
 
-    async def notify_worker_ready(self):
+    async def notify_worker_ready(self) -> None:
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
             {
@@ -101,7 +102,7 @@ class Worker(DistributedService):
 
         self._logger.info("registered ready message")
 
-    async def get_new_assignments(self, lastev):
+    async def get_new_assignments(self, lastev: str) -> tuple[Optional[str], Optional[set[zmq._future._AsyncSocket]]]:
         sub = RedisKeys.assigned(self.state.mapping_uuid)
         try:
             assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
@@ -129,7 +130,17 @@ class Worker(DistributedService):
         lastev = assignments[0]
         return lastev, ingesterset
 
-    async def build_event(self, done):
+    async def collect_internals(self, ingesterset: set[zmq._future._AsyncSocket]) -> set[Future[list[zmq.Frame]]]:
+        tasks: list[Future[list[zmq.Frame]]] = [
+            sock.recv_multipart(copy=False) for sock in ingesterset  # type: ignore [misc]
+        ]
+        done_pending: tuple[
+            set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
+        ] = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+        done, pending = done_pending
+        return done
+
+    async def build_event(self, done: set[Future[list[zmq.Frame]]]) -> EventData:
         msgs = []
         for res in done:
             prelim = json.loads(res.result()[0].bytes)
@@ -141,6 +152,7 @@ class Worker(DistributedService):
             msgs.append(msg)
 
         return EventData.from_internals(msgs)
+
 
     async def work(self) -> None:
         self._logger.info("started work task")
@@ -156,14 +168,15 @@ class Worker(DistributedService):
 
         await self.notify_worker_ready()
 
-        lastev = "0"
+        lastev: str = "0"
         proced = 0
         while True:
             perf_start = time.perf_counter()
             try:
-                lastev, ingesterset = await self.get_new_assignments(lastev)
-                if lastev is None:
+                newlastev, ingesterset = await self.get_new_assignments(lastev)
+                if newlastev is None or ingesterset is None:
                     continue
+                lastev = newlastev
             except RedisException:
                 self._logger.warning("failed to access redis, exiting worker")
                 break
@@ -171,15 +184,10 @@ class Worker(DistributedService):
 
             if len(ingesterset) == 0:
                 continue
-            tasks: list[Future[list[zmq.Frame]]] = [
-                sock.recv_multipart(copy=False) for sock in ingesterset    # type: ignore [misc]
-            ]
-            done_pending: tuple[
-                set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
-            ] = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+            done = await self.collect_internals(ingesterset)
             # print("done", done, "pending", pending)
             perf_got_work = time.perf_counter()
-            done, pending = done_pending
+
 
             event = await self.build_event(done)
 

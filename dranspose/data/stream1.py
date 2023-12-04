@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, ConfigDict
 
 
 class Stream1(BaseModel):
@@ -8,11 +8,15 @@ class Stream1(BaseModel):
 
 
 class Stream1Start(Stream1):
+    model_config = ConfigDict(extra="allow")
+
     htype: Literal["header"]
     filename: str
 
 
 class Stream1Data(Stream1):
+    model_config = ConfigDict(extra="allow")
+
     htype: Literal["image"]
     frame: int
     shape: list[int]
@@ -21,6 +25,8 @@ class Stream1Data(Stream1):
 
 
 class Stream1End(Stream1):
+    model_config = ConfigDict(extra="allow")
+
     htype: Literal["series_end"]
 
 

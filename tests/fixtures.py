@@ -1,4 +1,6 @@
 import asyncio
+import json
+import logging
 import os
 import pickle
 import random
@@ -23,6 +25,7 @@ from dranspose.ingester import Ingester
 from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
+from dranspose.debug_worker import app as debugworker_app
 from tests.stream1 import AcquisitionSocket
 
 
@@ -112,6 +115,38 @@ async def reducer(
 
     await asyncio.sleep(0.1)
 
+@pytest_asyncio.fixture()
+async def debug_worker(
+    tmp_path: Any,
+) -> AsyncIterator[Callable[[Optional[str]], Coroutine[None, None, None]]]:
+    server_tasks = []
+
+    async def start_debug_worker(tags: Optional[list[str]] = None) -> None:
+        envfile = None
+        if tags:
+            p = tmp_path / "debugworker.env"
+            print(p, type(p))
+            p.write_text(
+                f"""
+                WORKER_TAGS='{json.dumps(tags)}'
+                """
+            )
+            envfile = str(p)
+        config = uvicorn.Config(
+            debugworker_app, port=5002, log_level="debug", env_file=envfile
+        )
+        server = uvicorn.Server(config)
+        server_tasks.append((server, asyncio.create_task(server.serve())))
+        while server.started is False:
+            await asyncio.sleep(0.1)
+
+    yield start_debug_worker
+
+    for server, task in server_tasks:
+        server.should_exit = True
+        await task
+
+    await asyncio.sleep(0.1)
 
 @pytest_asyncio.fixture
 async def stream_eiger() -> Callable[
