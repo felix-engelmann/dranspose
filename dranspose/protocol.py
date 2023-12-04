@@ -29,8 +29,14 @@ strongly typed stream name (str)
 WorkerName = NewType("WorkerName", str)
 _WorkerTagT: TypeAlias = str
 WorkerTag = NewType("WorkerTag", _WorkerTagT)
+"""
+Strongly typed worker tag (str)
+"""
 IngesterName = NewType("IngesterName", str)
 VirtualConstraint = NewType("VirtualConstraint", int)
+"""
+Stronly typed constraint for workers (int)
+"""
 EventNumber = NewType("EventNumber", int)
 """
 strongly typed event number (int)
