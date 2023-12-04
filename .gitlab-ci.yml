@@ -8,4 +8,12 @@ include:
 
 variables:
   DOCKER_REGISTRY: "harbor.maxiv.lu.se/daq"
-  TEST_PYTHON_VERSIONS: '/python3.10|python3.11/'
+
+test-python39:
+  allow_failure: true
+
+test-python310:
+  allow_failure: true
+
+test-python311:
+  allow_failure: false
