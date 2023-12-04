@@ -149,8 +149,8 @@ def reducer(args: argparse.Namespace) -> None:
 
 def debugworker(args: argparse.Namespace) -> None:
     try:
-        if args.reducerclass:
-            os.environ["REDUCER_CLASS"] = args.reducerclass
+        if args.name:
+            os.environ["WORKER_NAME"] = args.name
         config = uvicorn.Config(
             reducer_app, port=5000, host=args.host, log_level="info"
         )

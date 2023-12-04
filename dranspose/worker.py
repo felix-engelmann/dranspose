@@ -32,6 +32,8 @@ from dranspose.protocol import (
     WorkerTimes, GENERIC_WORKER, WorkerTag,
 )
 
+class RedisException(Exception):
+    pass
 
 class ConnectedIngester(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -84,18 +86,7 @@ class Worker(DistributedService):
         self.work_task = asyncio.create_task(self.work())
         await self.register()
 
-    async def work(self) -> None:
-        self._logger.info("started work task")
-
-        self.worker = None
-        if self.custom:
-            try:
-                self.worker = self.custom(self.parameters)
-            except Exception as e:
-                self._logger.error(
-                    "Failed to instantiate custom worker: %s", e.__repr__()
-                )
-
+    async def notify_worker_ready(self):
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
             {
@@ -110,36 +101,74 @@ class Worker(DistributedService):
 
         self._logger.info("registered ready message")
 
+    async def get_new_assignments(self, lastev):
+        sub = RedisKeys.assigned(self.state.mapping_uuid)
+        try:
+            assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
+        except rexceptions.ConnectionError:
+            raise RedisException()
+        if sub not in assignments:
+            return None, None
+        assignments = assignments[sub][0][0]
+        self._logger.debug("got assignments %s", assignments)
+        self._logger.debug("stream map %s", self._stream_map)
+        work_assignment = WorkAssignment.model_validate_json(assignments[1]["data"])
+        ingesterset = set()
+        for stream, workers in work_assignment.assignments.items():
+            if self.state.name in workers:
+                try:
+                    ingesterset.add(self._stream_map[stream])
+                except KeyError:
+                    self._logger.error(
+                        "ingester for stream %s not connected, available: %s",
+                        stream,
+                        self._ingesters,
+                    )
+        self._logger.debug("receive from ingesters %s", ingesterset)
+
+        lastev = assignments[0]
+        return lastev, ingesterset
+
+    async def build_event(self, done):
+        msgs = []
+        for res in done:
+            prelim = json.loads(res.result()[0].bytes)
+            pos = 1
+            for stream, data in prelim["streams"].items():
+                data["frames"] = res.result()[pos: pos + data["length"]]
+                pos += data["length"]
+            msg = InternalWorkerMessage.model_validate(prelim)
+            msgs.append(msg)
+
+        return EventData.from_internals(msgs)
+
+    async def work(self) -> None:
+        self._logger.info("started work task")
+
+        self.worker = None
+        if self.custom:
+            try:
+                self.worker = self.custom(self.parameters)
+            except Exception as e:
+                self._logger.error(
+                    "Failed to instantiate custom worker: %s", e.__repr__()
+                )
+
+        await self.notify_worker_ready()
+
         lastev = "0"
         proced = 0
         while True:
-            sub = RedisKeys.assigned(self.state.mapping_uuid)
             perf_start = time.perf_counter()
             try:
-                assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
-            except rexceptions.ConnectionError:
+                lastev, ingesterset = await self.get_new_assignments(lastev)
+                if lastev is None:
+                    continue
+            except RedisException:
+                self._logger.warning("failed to access redis, exiting worker")
                 break
-            if sub not in assignments:
-                continue
-            assignments = assignments[sub][0][0]
-            self._logger.debug("got assignments %s", assignments)
-            self._logger.debug("stream map %s", self._stream_map)
-            work_assignment = WorkAssignment.model_validate_json(assignments[1]["data"])
-            ingesterset = set()
-            for stream, workers in work_assignment.assignments.items():
-                if self.state.name in workers:
-                    try:
-                        ingesterset.add(self._stream_map[stream])
-                    except KeyError:
-                        self._logger.error(
-                            "ingester for stream %s not connected, available: %s",
-                            stream,
-                            self._ingesters,
-                        )
-            self._logger.debug("receive from ingesters %s", ingesterset)
             perf_got_assignments = time.perf_counter()
 
-            lastev = assignments[0]
             if len(ingesterset) == 0:
                 continue
             tasks: list[Future[list[zmq.Frame]]] = [
@@ -151,17 +180,9 @@ class Worker(DistributedService):
             # print("done", done, "pending", pending)
             perf_got_work = time.perf_counter()
             done, pending = done_pending
-            msgs = []
-            for res in done:
-                prelim = json.loads(res.result()[0].bytes)
-                pos = 1
-                for stream, data in prelim["streams"].items():
-                    data["frames"] = res.result()[pos : pos + data["length"]]
-                    pos += data["length"]
-                msg = InternalWorkerMessage.model_validate(prelim)
-                msgs.append(msg)
 
-            event = EventData.from_internals(msgs)
+            event = await self.build_event(done)
+
             perf_assembled_event = time.perf_counter()
             self._logger.debug("received work %s", event)
             result = None
@@ -207,7 +228,7 @@ class Worker(DistributedService):
             )
             wu = WorkerUpdate(
                 state=WorkerStateEnum.IDLE,
-                completed=work_assignment.event_number,
+                completed=event.event_number,
                 worker=self.state.name,
                 processing_times=times,
             )
