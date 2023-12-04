@@ -12,11 +12,11 @@ variables:
 
 test-python39:
   allow_failure: true
-  when: never
+  when: manual
 
 test-python310:
   allow_failure: true
-  when: never
+  when: manual
 
 test-python311:
   allow_failure: false
