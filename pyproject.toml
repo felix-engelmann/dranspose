@@ -34,7 +34,7 @@ exclude = ["tests*"]  # exclude packages matching these glob patterns (empty by 
 #namespaces = false
 
 [project.optional-dependencies]
-test = [
+tests = [
     "pytest",
     "pytest-asyncio",
     "aiohttp",

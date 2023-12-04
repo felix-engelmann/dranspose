@@ -8,3 +8,4 @@ include:
 
 variables:
   DOCKER_REGISTRY: "harbor.maxiv.lu.se/daq"
+  TEST_PYTHON_VERSIONS: '/python3.10|python3.11/'
