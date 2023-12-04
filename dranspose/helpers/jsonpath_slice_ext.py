@@ -1,6 +1,5 @@
 from typing import Optional, Any
 
-import numpy as np
 from jsonpath_ng.ext.parser import ExtentedJsonPathParser  # type: ignore
 from jsonpath_ng import DatumInContext, This  # type: ignore
 

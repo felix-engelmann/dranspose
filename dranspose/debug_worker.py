@@ -79,6 +79,7 @@ async def get_status() -> bool:
 
 @app.get("/api/v1/last_event")
 async def get_result() -> Response:
+    global worker
     data = b""
     try:
         lev = worker.buffer[-1]

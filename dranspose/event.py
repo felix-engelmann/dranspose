@@ -1,10 +1,9 @@
 from typing import Any, Optional
 
 import zmq
-from pydantic_core.core_schema import ValidationInfo
 
 from dranspose.protocol import EventNumber, StreamName, WorkerName
-from pydantic import BaseModel, ConfigDict, computed_field, field_validator, UUID4
+from pydantic import BaseModel, ConfigDict, computed_field, UUID4
 
 
 class StreamData(BaseModel):

@@ -1,6 +1,5 @@
 import pickle
 from types import UnionType
-from typing import Any
 
 import zmq
 

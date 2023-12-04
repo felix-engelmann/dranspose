@@ -1,7 +1,6 @@
-import json
 import uuid
 from collections import defaultdict
-from typing import List, Dict, Union, Literal, Optional
+from typing import List, Dict, Optional
 
 from pydantic import validate_call
 
@@ -14,7 +13,6 @@ from dranspose.protocol import (
     WorkerTag,
     WorkerState,
     VirtualConstraint,
-    _WorkerTagT,
 )
 
 

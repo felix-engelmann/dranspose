@@ -2,12 +2,9 @@ import argparse
 import asyncio
 import logging
 import os
-import random
 import signal
-import socket
-import string
 from asyncio import Task
-from typing import Literal, Coroutine, Any, Optional
+from typing import Literal, Any, Optional
 
 import uvicorn
 from pydantic_core import Url
@@ -15,16 +12,15 @@ from pydantic_settings import BaseSettings
 
 from dranspose.controller import app
 from dranspose.reducer import app as reducer_app
-from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-from dranspose.ingesters.streaming_contrast import (
+from dranspose.ingesters.streaming_contrast import (  # noqa: F401
     StreamingContrastIngester,
     StreamingContrastSettings,
 )
-from dranspose.ingesters.streaming_xspress3 import (
+from dranspose.ingesters.streaming_xspress3 import (  # noqa: F401
     StreamingXspressIngester,
     StreamingXspressSettings,
 )
@@ -61,7 +57,7 @@ async def main() -> None:
 
     rconfig = uvicorn.Config(reducer_app, port=5001, log_level="info")
     rserver = uvicorn.Server(rconfig)
-    reducer_task = asyncio.create_task(rserver.serve())
+    asyncio.create_task(rserver.serve())
 
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)

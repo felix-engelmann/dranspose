@@ -3,22 +3,16 @@ This is the central service to orchestrate all distributed components
 
 """
 import asyncio
-import json
-import os
 import pickle
 from asyncio import Task
 from collections import defaultdict
-from typing import Dict, List, Any, AsyncGenerator, Literal, Optional
+from typing import Dict, List, Any, AsyncGenerator, Optional
 
-import uvicorn
-import zmq.asyncio
 import logging
 import time
 
-from pydantic import BaseModel, UUID4
-from starlette.requests import Request
+from pydantic import UUID4
 
-from dranspose import protocol
 from dranspose.distributed import DistributedSettings
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
@@ -231,7 +225,7 @@ class Controller:
                         {"data": cupd.model_dump_json()},
                     )
                     notify_finish = False
-            except rexceptions.ConnectionError as e:
+            except rexceptions.ConnectionError:
                 break
 
     async def close(self) -> None:
@@ -265,11 +259,13 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/api/v1/config")
 async def get_configs() -> EnsembleState:
+    global ctrl
     return await ctrl.get_configs()
 
 
 @app.get("/api/v1/status")
 async def get_status() -> dict[str, Any]:
+    global ctrl
     return {
         "work_completed": ctrl.completed,
         "last_assigned": ctrl.mapping.complete_events,
@@ -282,6 +278,7 @@ async def get_status() -> dict[str, Any]:
 
 @app.get("/api/v1/progress")
 async def get_progress() -> dict[str, Any]:
+    global ctrl
     return {
         "last_assigned": ctrl.mapping.complete_events,
         "completed_events": len(ctrl.completed_events),
@@ -294,6 +291,7 @@ async def get_progress() -> dict[str, Any]:
 async def set_mapping(
     mapping: Dict[StreamName, List[Optional[List[VirtualWorker]]]]
 ) -> UUID4 | str:
+    global ctrl
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():
         return (
@@ -308,6 +306,7 @@ async def set_mapping(
 
 @app.post("/api/v1/parameters/json")
 async def set_params(payload: dict[Any, Any] = Body(...)) -> UUID4 | str:
+    global ctrl
     res = pickle.dumps(payload)
     u = await ctrl.set_params(res)
     return u

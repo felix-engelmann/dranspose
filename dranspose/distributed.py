@@ -1,7 +1,7 @@
 import abc
 import logging
 import pickle
-from typing import Literal, Optional
+from typing import Optional
 
 import redis.asyncio as redis
 from pydantic import UUID4, AliasChoices, Field, RedisDsn
@@ -13,8 +13,6 @@ from dranspose.protocol import (
     ControllerUpdate,
     IngesterState,
     WorkerState,
-    WorkerName,
-    IngesterName,
     ReducerState,
 )
 import redis.exceptions as rexceptions
@@ -80,7 +78,7 @@ class DistributedService(abc.ABC):
             elif isinstance(self.state, ReducerState):
                 category = "reducer"
             else:
-                raise NotImplemented(
+                raise NotImplementedError(
                     "Distributed Service not implemented for your Service"
                 )
             await self.redis.setex(
