@@ -1,4 +1,4 @@
-**# Trigger Map
+# Trigger Map
 
 The trigger map is the core part of dranspose and answers the following question:
 

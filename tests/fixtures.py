@@ -21,7 +21,7 @@ from pydantic_core import Url
 from dranspose.controller import app
 from dranspose.ingester import Ingester
 from dranspose.protocol import WorkerName
-from dranspose.worker import Worker
+from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
 from tests.stream1 import AcquisitionSocket
 
@@ -47,7 +47,7 @@ async def create_worker() -> AsyncIterator[
 
     async def _make_worker(name: WorkerName | Worker) -> Worker:
         if not isinstance(name, Worker):
-            worker = Worker(name)
+            worker = Worker(WorkerSettings(worker_name=name))
         else:
             worker = name
         worker_task = asyncio.create_task(worker.run())

@@ -51,8 +51,8 @@ async def test_reduction(
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(
         Worker(
-            name=WorkerName("w1"),
             settings=WorkerSettings(
+                worker_name=WorkerName("w1"),
                 worker_class="examples.dummy.worker:FluorescenceWorker"
             ),
         )

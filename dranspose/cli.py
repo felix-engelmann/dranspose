@@ -51,7 +51,7 @@ async def main() -> None:
             settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
         )
     )
-    wos = [Worker(WorkerName("worker" + str(i))) for i in range(1, 3)]
+    wos = [Worker(WorkerSettings(worker_name=WorkerName("worker" + str(i)))) for i in range(1, 3)]
 
     for i in ins + wos:
         asyncio.create_task(i.run())
@@ -82,11 +82,6 @@ worker_task: Optional[Task[None]] = None
 
 
 def worker(args: argparse.Namespace) -> None:
-    name = args.name
-    if not name:
-        randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
-        name = "Worker-{}-{}".format(socket.gethostname(), randid).encode("ascii")
-    print("worker name:", name)
 
     def stop(*args: Any) -> None:
         global worker_task
@@ -98,7 +93,12 @@ def worker(args: argparse.Namespace) -> None:
         loop = asyncio.get_event_loop()
         loop.add_signal_handler(signal.SIGTERM, stop)
 
-        w = Worker(name, WorkerSettings(worker_class=args.workerclass))
+        if args.name is None:
+            settings = WorkerSettings(worker_class=args.workerclass)
+        else:
+            settings = WorkerSettings(worker_name=args.name, worker_class=args.workerclass)
+
+        w = Worker(settings)
         worker_task = asyncio.create_task(w.run())
         await worker_task
         await w.close()
@@ -147,6 +147,17 @@ def reducer(args: argparse.Namespace) -> None:
     except KeyboardInterrupt:
         print("exiting")
 
+def debugworker(args: argparse.Namespace) -> None:
+    try:
+        if args.reducerclass:
+            os.environ["REDUCER_CLASS"] = args.reducerclass
+        config = uvicorn.Config(
+            reducer_app, port=5000, host=args.host, log_level="info"
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    except KeyboardInterrupt:
+        print("exiting")
 
 def combined(args: argparse.Namespace) -> None:
     asyncio.run(main())
@@ -172,6 +183,15 @@ def create_parser() -> argparse.ArgumentParser:
         "-c",
         "--reducerclass",
         help="reducer class e.g. 'src.reducer:FluorescenceReducer'",
+    )
+
+    parser_debugworker = subparsers.add_parser("debugworker", help="run debugworker")
+    parser_debugworker.set_defaults(func=debugworker)
+    parser_debugworker.add_argument("--host", help="host to listen on")
+    parser_debugworker.add_argument(
+        "-n",
+        "--name",
+        help="debug worker name",
     )
 
     parser_worker = subparsers.add_parser("worker", help="run worker")

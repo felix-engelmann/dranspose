@@ -1,13 +1,16 @@
 import asyncio
 import json
 import pickle
+import random
+import socket
+import string
 import time
 from asyncio import Future
 from typing import Optional
 
 import zmq.asyncio
 
-from pydantic import UUID4, BaseModel, ConfigDict
+from pydantic import UUID4, BaseModel, ConfigDict, Field
 
 from dranspose.helpers import utils
 import redis.exceptions as rexceptions
@@ -26,7 +29,7 @@ from dranspose.protocol import (
     IngesterName,
     StreamName,
     ReducerState,
-    WorkerTimes,
+    WorkerTimes, GENERIC_WORKER, WorkerTag,
 )
 
 
@@ -36,17 +39,24 @@ class ConnectedIngester(BaseModel):
     config: IngesterState
 
 
+def random_worker_name() -> WorkerName:
+    randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
+    name = "Worker-{}-{}".format(socket.gethostname(), randid)
+    return WorkerName(name)
+
 class WorkerSettings(DistributedSettings):
     worker_class: Optional[str] = None
+    worker_name: WorkerName = Field(default_factory=random_worker_name)
+    worker_tags: set[WorkerTag] = {GENERIC_WORKER}
 
 
 class Worker(DistributedService):
-    def __init__(self, name: WorkerName, settings: Optional[WorkerSettings] = None):
+    def __init__(self, settings: Optional[WorkerSettings] = None):
         self._worker_settings = settings
         if self._worker_settings is None:
             self._worker_settings = WorkerSettings()
 
-        state = WorkerState(name=name)
+        state = WorkerState(name=self._worker_settings.worker_name, tags=self._worker_settings.worker_tags)
         super().__init__(state, self._worker_settings)
         self.state: WorkerState
         self.ctx = zmq.asyncio.Context()
@@ -133,7 +143,7 @@ class Worker(DistributedService):
             if len(ingesterset) == 0:
                 continue
             tasks: list[Future[list[zmq.Frame]]] = [
-                sock.recv_multipart(copy=False) for sock in ingesterset
+                sock.recv_multipart(copy=False) for sock in ingesterset    # type: ignore [misc]
             ]
             done_pending: tuple[
                 set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
