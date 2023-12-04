@@ -119,19 +119,27 @@ async def reducer(
 @pytest_asyncio.fixture()
 async def debug_worker(
     tmp_path: Any,
-) -> AsyncIterator[Callable[[Optional[str]], Coroutine[None, None, None]]]:
+) -> AsyncIterator[
+    Callable[[Optional[str], Optional[list[str]]], Coroutine[None, None, None]]
+]:
     server_tasks = []
 
-    async def start_debug_worker(tags: Optional[list[str]] = None) -> None:
+    async def start_debug_worker(
+        name: Optional[str] = None, tags: Optional[list[str]] = None
+    ) -> None:
         envfile = None
         if tags:
             p = tmp_path / "debugworker.env"
             print(p, type(p))
-            p.write_text(
-                f"""
+            text = f"""
                 WORKER_TAGS='{json.dumps(tags)}'
                 """
-            )
+            if name:
+                text += f"""
+                    WORKER_NAME = '{name}'
+                    """
+
+            p.write_text(text)
             envfile = str(p)
         config = uvicorn.Config(
             debugworker_app, port=5002, log_level="debug", env_file=envfile
@@ -140,6 +148,10 @@ async def debug_worker(
         server_tasks.append((server, asyncio.create_task(server.serve())))
         while server.started is False:
             await asyncio.sleep(0.1)
+        if tags:  # turns out uvicorn just dumps the envfile in the process env
+            del os.environ["WORKER_TAGS"]
+            if name:
+                del os.environ["WORKER_NAME"]
 
     yield start_debug_worker
 

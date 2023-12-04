@@ -255,6 +255,7 @@ class Worker(DistributedService):
                 RedisKeys.ready(self.state.mapping_uuid),
                 {"data": wu.model_dump_json()},
             )
+        self._logger.info("work thread finished")
 
     async def finish_work(self) -> None:
         self._logger.info("finishing work")
