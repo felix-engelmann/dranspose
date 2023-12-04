@@ -2,6 +2,7 @@
 .mypy_cache
 .pyre_configuration
 .pyre
+.coverage
 __pycache__
 scratch
 *.egg-info

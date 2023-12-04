@@ -59,6 +59,10 @@ async def test_debugger(
         st = await session.get("http://localhost:5002/api/v1/last_event")
         content = await st.content.read()
         assert content == b""
+
+        st = await session.get("http://localhost:5002/api/v1/status")
+        assert True == await st.json()
+
     await create_worker(WorkerName("w1"))
 
     async with aiohttp.ClientSession() as session:
