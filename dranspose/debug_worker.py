@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class DebugWorker(Worker):
-
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.buffer: deque[EventData] = deque(maxlen=50)
@@ -47,12 +46,13 @@ class DebugWorker(Worker):
             wu = WorkerUpdate(
                 state=WorkerStateEnum.IDLE,
                 completed=event.event_number,
-                worker=self.state.name
+                worker=self.state.name,
             )
             await self.redis.xadd(
                 RedisKeys.ready(self.state.mapping_uuid),
                 {"data": wu.model_dump_json()},
             )
+
 
 worker: DebugWorker
 
@@ -90,4 +90,3 @@ async def get_result() -> Response:
     except Exception as e:
         logging.warning("no publishable data: %s", e.__repr__())
     return Response(data, media_type="application/x.pickle")
-

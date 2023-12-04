@@ -51,7 +51,10 @@ async def main() -> None:
             settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
         )
     )
-    wos = [Worker(WorkerSettings(worker_name=WorkerName("worker" + str(i)))) for i in range(1, 3)]
+    wos = [
+        Worker(WorkerSettings(worker_name=WorkerName("worker" + str(i))))
+        for i in range(1, 3)
+    ]
 
     for i in ins + wos:
         asyncio.create_task(i.run())
@@ -82,7 +85,6 @@ worker_task: Optional[Task[None]] = None
 
 
 def worker(args: argparse.Namespace) -> None:
-
     def stop(*args: Any) -> None:
         global worker_task
         if worker_task:
@@ -96,7 +98,9 @@ def worker(args: argparse.Namespace) -> None:
         if args.name is None:
             settings = WorkerSettings(worker_class=args.workerclass)
         else:
-            settings = WorkerSettings(worker_name=args.name, worker_class=args.workerclass)
+            settings = WorkerSettings(
+                worker_name=args.name, worker_class=args.workerclass
+            )
 
         w = Worker(settings)
         worker_task = asyncio.create_task(w.run())
@@ -147,6 +151,7 @@ def reducer(args: argparse.Namespace) -> None:
     except KeyboardInterrupt:
         print("exiting")
 
+
 def debugworker(args: argparse.Namespace) -> None:
     try:
         if args.name:
@@ -158,6 +163,7 @@ def debugworker(args: argparse.Namespace) -> None:
         server.run()
     except KeyboardInterrupt:
         print("exiting")
+
 
 def combined(args: argparse.Namespace) -> None:
     asyncio.run(main())

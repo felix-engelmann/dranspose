@@ -45,6 +45,7 @@ strongly typed event number (int)
 
 GENERIC_WORKER = WorkerTag("generic")
 
+
 class VirtualWorker(BaseModel):
     """
     virtual worker with a number and tags
@@ -53,6 +54,7 @@ class VirtualWorker(BaseModel):
         tags: set of tags which a worker must have to get this event
         constraint: a VirtualConstraint to which worker this event should be delivered, if None, deliver to all workers with matching tags
     """
+
     tags: set[WorkerTag] = {GENERIC_WORKER}
     constraint: Optional[VirtualConstraint] = None
 

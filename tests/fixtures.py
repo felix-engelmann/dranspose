@@ -115,6 +115,7 @@ async def reducer(
 
     await asyncio.sleep(0.1)
 
+
 @pytest_asyncio.fixture()
 async def debug_worker(
     tmp_path: Any,
@@ -147,6 +148,7 @@ async def debug_worker(
         await task
 
     await asyncio.sleep(0.1)
+
 
 @pytest_asyncio.fixture
 async def stream_eiger() -> Callable[

@@ -132,7 +132,7 @@ async def get_path(path: str) -> Any:
             path = "$"
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]   # type: ignore [union-attr]
+        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
         data = pickle.dumps(ret)
         return Response(data, media_type="application/x.pickle")
     except Exception as e:

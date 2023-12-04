@@ -1,8 +1,8 @@
 from typing import Optional, Any
 
 import numpy as np
-from jsonpath_ng.ext.parser import ExtentedJsonPathParser # type: ignore
-from jsonpath_ng import DatumInContext, This # type: ignore
+from jsonpath_ng.ext.parser import ExtentedJsonPathParser  # type: ignore
+from jsonpath_ng import DatumInContext, This  # type: ignore
 
 
 class DefintionInvalid(Exception):
@@ -23,7 +23,7 @@ class Numpy(This):
         else:
             return slice(*map(lambda x: int(x) if x else None, slice_str.split(":")))
 
-    def __init__(self, method: Optional[str]=None) -> None:
+    def __init__(self, method: Optional[str] = None) -> None:
         if not method:
             raise DefintionInvalid("method must be provided")
         method = method[len("numpy(") : -1]

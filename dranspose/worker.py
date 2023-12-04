@@ -29,11 +29,15 @@ from dranspose.protocol import (
     IngesterName,
     StreamName,
     ReducerState,
-    WorkerTimes, GENERIC_WORKER, WorkerTag,
+    WorkerTimes,
+    GENERIC_WORKER,
+    WorkerTag,
 )
+
 
 class RedisException(Exception):
     pass
+
 
 class ConnectedIngester(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -45,6 +49,7 @@ def random_worker_name() -> WorkerName:
     randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
     name = "Worker-{}-{}".format(socket.gethostname(), randid)
     return WorkerName(name)
+
 
 class WorkerSettings(DistributedSettings):
     worker_class: Optional[str] = None
@@ -58,7 +63,10 @@ class Worker(DistributedService):
         if self._worker_settings is None:
             self._worker_settings = WorkerSettings()
 
-        state = WorkerState(name=self._worker_settings.worker_name, tags=self._worker_settings.worker_tags)
+        state = WorkerState(
+            name=self._worker_settings.worker_name,
+            tags=self._worker_settings.worker_tags,
+        )
         super().__init__(state, self._worker_settings)
         self._logger.info("created worker with state %s", state)
         self.state: WorkerState
@@ -102,7 +110,9 @@ class Worker(DistributedService):
 
         self._logger.info("registered ready message")
 
-    async def get_new_assignments(self, lastev: str) -> tuple[Optional[str], Optional[set[zmq._future._AsyncSocket]]]:
+    async def get_new_assignments(
+        self, lastev: str
+    ) -> tuple[Optional[str], Optional[set[zmq._future._AsyncSocket]]]:
         sub = RedisKeys.assigned(self.state.mapping_uuid)
         try:
             assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
@@ -130,7 +140,9 @@ class Worker(DistributedService):
         lastev = assignments[0]
         return lastev, ingesterset
 
-    async def collect_internals(self, ingesterset: set[zmq._future._AsyncSocket]) -> set[Future[list[zmq.Frame]]]:
+    async def collect_internals(
+        self, ingesterset: set[zmq._future._AsyncSocket]
+    ) -> set[Future[list[zmq.Frame]]]:
         tasks: list[Future[list[zmq.Frame]]] = [
             sock.recv_multipart(copy=False) for sock in ingesterset  # type: ignore [misc]
         ]
@@ -146,13 +158,12 @@ class Worker(DistributedService):
             prelim = json.loads(res.result()[0].bytes)
             pos = 1
             for stream, data in prelim["streams"].items():
-                data["frames"] = res.result()[pos: pos + data["length"]]
+                data["frames"] = res.result()[pos : pos + data["length"]]
                 pos += data["length"]
             msg = InternalWorkerMessage.model_validate(prelim)
             msgs.append(msg)
 
         return EventData.from_internals(msgs)
-
 
     async def work(self) -> None:
         self._logger.info("started work task")
@@ -187,7 +198,6 @@ class Worker(DistributedService):
             done = await self.collect_internals(ingesterset)
             # print("done", done, "pending", pending)
             perf_got_work = time.perf_counter()
-
 
             event = await self.build_event(done)
 

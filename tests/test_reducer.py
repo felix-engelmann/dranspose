@@ -24,7 +24,14 @@ from dranspose.ingesters.streaming_xspress3 import (
     StreamingXspressIngester,
     StreamingXspressSettings,
 )
-from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName, VirtualWorker, VirtualConstraint
+from dranspose.protocol import (
+    EnsembleState,
+    RedisKeys,
+    StreamName,
+    WorkerName,
+    VirtualWorker,
+    VirtualConstraint,
+)
 from dranspose.worker import Worker, WorkerSettings
 
 from tests.fixtures import (
@@ -53,7 +60,7 @@ async def test_reduction(
         Worker(
             settings=WorkerSettings(
                 worker_name=WorkerName("w1"),
-                worker_class="examples.dummy.worker:FluorescenceWorker"
+                worker_class="examples.dummy.worker:FluorescenceWorker",
             ),
         )
     )
@@ -100,8 +107,22 @@ async def test_reduction(
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
             json={
-                "contrast": [[VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")] for i in range(ntrig)],
-                "xspress3": [[VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")] for i in range(ntrig)],
+                "contrast": [
+                    [
+                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
+                            mode="json"
+                        )
+                    ]
+                    for i in range(ntrig)
+                ],
+                "xspress3": [
+                    [
+                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
+                            mode="json"
+                        )
+                    ]
+                    for i in range(ntrig)
+                ],
             },
         )
         assert resp.status == 200

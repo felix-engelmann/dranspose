@@ -10,7 +10,11 @@ from dranspose.protocol import (
     StreamName,
     VirtualWorker,
     WorkerName,
-    EventNumber, WorkerTag, WorkerState, VirtualConstraint, _WorkerTagT,
+    EventNumber,
+    WorkerTag,
+    WorkerState,
+    VirtualConstraint,
+    _WorkerTagT,
 )
 
 
@@ -36,7 +40,9 @@ class Mapping:
         self.mapping = m
         self.uuid = uuid.uuid4()
         self.assignments: dict[VirtualConstraint, WorkerName] = {}
-        self.all_assignments: dict[tuple[EventNumber, StreamName, int], list[WorkerName]] = defaultdict(list)
+        self.all_assignments: dict[
+            tuple[EventNumber, StreamName, int], list[WorkerName]
+        ] = defaultdict(list)
         self.complete_events = 0
 
     def len(self) -> int:
@@ -52,24 +58,35 @@ class Mapping:
         maxassign = EventNumber(self.len() + 1)
         for evnint in range(self.complete_events, self.len()):
             evn = EventNumber(evnint)
-            for stream, v in self.mapping.items(): # first fill the alls
+            for stream, v in self.mapping.items():  # first fill the alls
                 assign = v[evn]
-                if assign is not None and len(assign) > 0: # frame exists and is not discarded
+                if (
+                    assign is not None and len(assign) > 0
+                ):  # frame exists and is not discarded
                     for i, vw in enumerate(assign):
                         if vw.constraint is None:
                             required_tags = vw.tags
-                            all_worker_names_with_required_tags = [ws.name for ws in all_workers if required_tags.issubset(ws.tags)]
+                            all_worker_names_with_required_tags = [
+                                ws.name
+                                for ws in all_workers
+                                if required_tags.issubset(ws.tags)
+                            ]
                             if worker.name in (
-                                set(all_worker_names_with_required_tags) - set(self.all_assignments[(evn,stream, i)])
+                                set(all_worker_names_with_required_tags)
+                                - set(self.all_assignments[(evn, stream, i)])
                             ):
                                 # assign worker to the "all" of the current stream as it is not yet in it
-                                self.all_assignments[(evn,stream, i)].append(worker.name)
+                                self.all_assignments[(evn, stream, i)].append(
+                                    worker.name
+                                )
                                 assigned_to.append(vw)
-                                maxassign = evn # we assigned the worker to this event, don't continue into the future
+                                maxassign = evn  # we assigned the worker to this event, don't continue into the future
 
             for stream, v in self.mapping.items():  # now fill a specific
                 assign = v[evn]
-                if assign is not None and len(assign) > 0:  # frame exists and is not discarded
+                if (
+                    assign is not None and len(assign) > 0
+                ):  # frame exists and is not discarded
                     for vw in assign:
                         if vw.constraint is not None:  # not all
                             if vw.constraint not in self.assignments:
@@ -89,7 +106,9 @@ class Mapping:
             workers = set()
             for val in i:
                 if val is not None:
-                    workers.update([v.constraint for v in val if v.constraint is not None])
+                    workers.update(
+                        [v.constraint for v in val if v.constraint is not None]
+                    )
             minimum = max(minimum, len(workers))
         return minimum
 
@@ -102,16 +121,16 @@ class Mapping:
         return tags
 
     def get_event_workers(self, no: EventNumber) -> WorkAssignment:
-        ret: dict[StreamName,list[WorkerName]] = defaultdict(list)
+        ret: dict[StreamName, list[WorkerName]] = defaultdict(list)
         if no > self.complete_events - 1:
             raise NotYetAssigned()
         for s, v in self.mapping.items():
             assign = v[no]
             if assign is None:
                 continue
-            for i,vw in enumerate(assign):
-                if vw.constraint is None: # get from all
-                    ret[s] += self.all_assignments[(no,s,i)]
+            for i, vw in enumerate(assign):
+                if vw.constraint is None:  # get from all
+                    ret[s] += self.all_assignments[(no, s, i)]
                 else:
                     ret[s].append(self.assignments[vw.constraint])
         return WorkAssignment(event_number=no, assignments=ret)
@@ -124,13 +143,17 @@ class Mapping:
                 if assign is None:
                     continue
                 for i, vw in enumerate(assign):
-                    if vw.constraint is None: # all worker with tags
+                    if vw.constraint is None:  # all worker with tags
                         required_tags = vw.tags
-                        all_worker_names_with_required_tags = [ws.name for ws in all_workers if
-                                                               required_tags.issubset(ws.tags)]
+                        all_worker_names_with_required_tags = [
+                            ws.name
+                            for ws in all_workers
+                            if required_tags.issubset(ws.tags)
+                        ]
 
-
-                        if set(all_worker_names_with_required_tags) != set(self.all_assignments[(evn, stream,i)]):
+                        if set(all_worker_names_with_required_tags) != set(
+                            self.all_assignments[(evn, stream, i)]
+                        ):
                             return
                     else:
                         if vw.constraint not in self.assignments:
@@ -157,7 +180,11 @@ class Mapping:
                     s = []
                     for i, vw in enumerate(val):
                         if vw.constraint is None:
-                            el = ",".join(map(str,vw.tags))+":"+" ".join(self.all_assignments[(evn,stream,i)])
+                            el = (
+                                ",".join(map(str, vw.tags))
+                                + ":"
+                                + " ".join(self.all_assignments[(evn, stream, i)])
+                            )
                         else:
                             el = self.assignments.get(vw.constraint, str(vw.constraint))
                         s.append(el)

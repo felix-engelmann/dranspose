@@ -166,7 +166,8 @@ class Controller:
                                 [ws.name for ws in cfg.workers],
                             )
                             virt = self.mapping.assign_next(
-                                next(w for w in cfg.workers if w.name == update.worker), cfg.workers
+                                next(w for w in cfg.workers if w.name == update.worker),
+                                cfg.workers,
                             )
                             if not update.new:
                                 if update.processing_times:

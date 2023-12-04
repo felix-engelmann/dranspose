@@ -18,7 +18,14 @@ from dranspose.ingesters.streaming_single import (
     StreamingSingleSettings,
 )
 from dranspose.middlewares import stream1
-from dranspose.protocol import EnsembleState, RedisKeys, StreamName, WorkerName, VirtualWorker, VirtualConstraint
+from dranspose.protocol import (
+    EnsembleState,
+    RedisKeys,
+    StreamName,
+    WorkerName,
+    VirtualWorker,
+    VirtualConstraint,
+)
 
 import redis.asyncio as redis
 
@@ -34,6 +41,7 @@ from tests.fixtures import (
     stream_orca,
     stream_alba,
 )
+
 
 @pytest.mark.asyncio
 async def test_debug(
@@ -68,10 +76,21 @@ async def test_debug(
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
             json={
-                "eiger": [[VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json")]
-                          if i % 4 != 0 else [VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json"),
-                                              VirtualWorker(tags={"debug"}).model_dump(mode="json")]
-                          for i in range(1, ntrig)],
+                "eiger": [
+                    [
+                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
+                            mode="json"
+                        )
+                    ]
+                    if i % 4 != 0
+                    else [
+                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
+                            mode="json"
+                        ),
+                        VirtualWorker(tags={"debug"}).model_dump(mode="json"),
+                    ]
+                    for i in range(1, ntrig)
+                ],
             },
         )
         assert resp.status == 200
@@ -102,4 +121,3 @@ async def test_debug(
         assert pkg.frame == 7
         assert pkg.shape == [1475, 831]
         assert pkg.type == "uint16"
-
