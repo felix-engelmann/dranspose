@@ -8,3 +8,4 @@ scratch
 *.egg-info
 dist
 site
+build

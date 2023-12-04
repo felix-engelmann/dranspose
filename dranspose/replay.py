@@ -15,7 +15,7 @@ def get_internals(filename: os.PathLike[Any]) -> Iterator[InternalWorkerMessage]
         while True:
             try:
                 frames = pickle.load(f)
-                assert type(frames) == InternalWorkerMessage
+                assert isinstance(frames, InternalWorkerMessage)
                 yield frames
             except EOFError:
                 break
@@ -43,7 +43,7 @@ def replay(
         try:
             with open(parameter_file) as f:
                 parameters = json.load(f)
-        except:
+        except UnicodeDecodeError:
             with open(parameter_file, "rb") as fb:
                 parameters = pickle.load(fb)
 
@@ -75,11 +75,11 @@ def replay(
         except StopIteration:
             try:
                 worker.finish(parameters=parameters)
-            except:
+            except Exception:
                 pass
 
             try:
                 reducer.finish(parameters=parameters)
-            except:
+            except Exception:
                 pass
             break

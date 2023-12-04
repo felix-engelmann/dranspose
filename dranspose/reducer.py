@@ -6,7 +6,6 @@ import traceback
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncGenerator, Any
 
-import numpy as np
 import zmq.asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import UUID4
@@ -114,17 +113,19 @@ async def get_status() -> bool:
 
 @app.get("/api/v1/result/pickle")
 async def get_result() -> Any | bytes:
+    global reducer
     data = b""
     try:
         if hasattr(reducer.reducer, "publish"):
             data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
-    except:
-        logging.warning("no publishable data")
+    except pickle.PicklingError:
+        logging.warning("publishable data cannot be pickled")
     return Response(data, media_type="application/x.pickle")
 
 
 @app.get("/api/v1/result/{path:path}")
 async def get_path(path: str) -> Any:
+    global reducer
     if not hasattr(reducer.reducer, "publish"):
         raise HTTPException(status_code=404, detail="no publishable data")
     try:
