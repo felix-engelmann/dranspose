@@ -2,7 +2,7 @@ import pickle
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import NewType, Literal, Annotated, Optional
+from typing import NewType, Literal, Annotated, Optional, TypeAlias
 
 from pydantic import (
     AnyUrl,
@@ -27,15 +27,28 @@ StreamName = NewType("StreamName", str)
 strongly typed stream name (str)
 """
 WorkerName = NewType("WorkerName", str)
+_WorkerTagT: TypeAlias = str
+WorkerTag = NewType("WorkerTag", _WorkerTagT)
 IngesterName = NewType("IngesterName", str)
-VirtualWorker = NewType("VirtualWorker", int)
-"""
-strongly typed virtual worker (int)
-"""
+VirtualConstraint = NewType("VirtualConstraint", int)
 EventNumber = NewType("EventNumber", int)
 """
 strongly typed event number (int)
 """
+
+
+GENERIC_WORKER = WorkerTag("generic")
+
+class VirtualWorker(BaseModel):
+    """
+    virtual worker with a number and tags
+
+    Attributes:
+        tags: set of tags which a worker must have to get this event
+        constraint: a VirtualConstraint to which worker this event should be delivered, if None, deliver to all workers with matching tags
+    """
+    tags: set[WorkerTag] = {GENERIC_WORKER}
+    constraint: Optional[VirtualConstraint] = None
 
 
 class RedisKeys:
@@ -161,6 +174,7 @@ class IngesterState(DistributedState):
 class WorkerState(DistributedState):
     name: WorkerName
     ingesters: list[IngesterState] = []
+    tags: set[WorkerTag] = {GENERIC_WORKER}
 
 
 class ReducerState(DistributedState):
