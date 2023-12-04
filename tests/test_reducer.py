@@ -4,7 +4,7 @@ import pickle
 from pathlib import PosixPath
 
 import asyncio
-from typing import Awaitable, Callable, Any, Coroutine, Optional, Generator
+from typing import Awaitable, Callable, Any, Coroutine, Optional
 import zmq.asyncio
 
 import aiohttp
@@ -16,31 +16,18 @@ from dranspose.ingesters.streaming_contrast import (
     StreamingContrastIngester,
     StreamingContrastSettings,
 )
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
-)
 from dranspose.ingesters.streaming_xspress3 import (
     StreamingXspressIngester,
     StreamingXspressSettings,
 )
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-
-from tests.fixtures import (
-    controller,
-    reducer,
-    create_worker,
-    create_ingester,
-    stream_pkls,
-)
 
 
 @pytest.mark.asyncio
@@ -101,7 +88,7 @@ async def test_reduction(
             json={"roi1": [0, 10]},
         )
         assert resp.status == 200
-        uuid = await resp.json()
+        await resp.json()
 
         ntrig = 20
         resp = await session.post(
@@ -126,7 +113,7 @@ async def test_reduction(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
+        await resp.json()
 
     context = zmq.asyncio.Context()
 

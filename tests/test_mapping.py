@@ -8,9 +8,7 @@ from dranspose.protocol import (
     EventNumber,
     WorkAssignment,
     WorkerState,
-    WorkerTag,
     VirtualConstraint,
-    GENERIC_WORKER,
 )
 
 

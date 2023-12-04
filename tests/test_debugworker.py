@@ -11,7 +11,7 @@ import zmq.asyncio
 import zmq
 from pydantic_core import Url
 
-from dranspose.data.stream1 import Stream1Data, Stream1Packet
+from dranspose.data.stream1 import Stream1Data
 from dranspose.event import EventData
 from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import (
@@ -21,7 +21,6 @@ from dranspose.ingesters.streaming_single import (
 from dranspose.middlewares import stream1
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -32,17 +31,6 @@ from dranspose.protocol import (
 import redis.asyncio as redis
 
 from dranspose.worker import Worker
-
-from tests.fixtures import (
-    controller,
-    reducer,
-    debug_worker,
-    create_worker,
-    create_ingester,
-    stream_eiger,
-    stream_orca,
-    stream_alba,
-)
 
 
 @pytest.mark.asyncio
@@ -61,7 +49,7 @@ async def test_debugger(
         assert content == b""
 
         st = await session.get("http://localhost:5002/api/v1/status")
-        assert True == await st.json()
+        assert await st.json()
 
     await create_worker(WorkerName("w1"))
 
@@ -130,7 +118,7 @@ async def test_debug(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
+        await resp.json()
 
     context = zmq.asyncio.Context()
 

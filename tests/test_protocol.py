@@ -21,7 +21,7 @@ def test_header_serialisation() -> None:
     )  #: {"frames"}})
 
     buffers = message.get_all_frames()
-    print([b.bytes if type(b) == zmq.Frame else b for b in buffers])
+    print([b.bytes if isinstance(b, zmq.Frame) else b for b in buffers])
     print(dump)
     prelim = json.loads(dump)
     print("prelim", prelim)

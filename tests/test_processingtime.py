@@ -2,7 +2,6 @@ import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     WorkerTimes,
@@ -14,7 +13,6 @@ from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-import pytest
 import aiohttp
 
 import pytest
@@ -23,15 +21,6 @@ import zmq
 from pydantic_core import Url
 
 from dranspose.worker import Worker
-from tests.fixtures import (
-    controller,
-    reducer,
-    create_worker,
-    create_ingester,
-    stream_eiger,
-    stream_orca,
-    stream_alba,
-)
 
 
 @pytest.mark.asyncio
@@ -76,7 +65,7 @@ async def test_simple(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
+        await resp.json()
 
     context = zmq.asyncio.Context()
 

@@ -1,5 +1,5 @@
 import time
-from typing import Any, Optional, Iterator
+from typing import Any, Iterator
 
 import zmq
 import itertools

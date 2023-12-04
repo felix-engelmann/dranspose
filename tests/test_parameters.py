@@ -4,10 +4,7 @@ from typing import Callable, Optional, Awaitable
 
 import aiohttp
 import pytest
-import zmq
-from pydantic import UUID4
 from pydantic_core import Url
-import redis.asyncio as redis
 
 
 from dranspose.ingester import Ingester
@@ -17,13 +14,6 @@ from dranspose.ingesters.streaming_single import (
 )
 from dranspose.protocol import WorkerName, StreamName, EnsembleState
 from dranspose.worker import Worker
-
-from tests.fixtures import (
-    controller,
-    reducer,
-    create_worker,
-    create_ingester,
-)
 
 
 @pytest.mark.asyncio

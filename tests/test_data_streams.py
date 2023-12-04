@@ -1,4 +1,3 @@
-import json
 import pickle
 
 from dranspose.data.contrast import ContrastPacket
