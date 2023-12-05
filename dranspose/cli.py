@@ -12,6 +12,7 @@ from pydantic_settings import BaseSettings
 
 from dranspose.controller import app
 from dranspose.reducer import app as reducer_app
+from dranspose.debug_worker import app as debugworker_app
 from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
@@ -153,7 +154,7 @@ def debugworker(args: argparse.Namespace) -> None:
         if args.name:
             os.environ["WORKER_NAME"] = args.name
         config = uvicorn.Config(
-            reducer_app, port=5000, host=args.host, log_level="info"
+            debugworker_app, port=5000, host=args.host, log_level="info"
         )
         server = uvicorn.Server(config)
         server.run()
