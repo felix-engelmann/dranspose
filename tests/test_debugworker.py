@@ -44,9 +44,10 @@ async def test_debugger(
     assert "WORKER_TAGS" not in os.environ
     logging.warning("ENV %s", envbefore)
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5002/api/v1/last_event")
+        st = await session.get("http://localhost:5002/api/v1/last_events?number=1")
         content = await st.content.read()
-        assert content == b""
+        res: list[EventData] = pickle.loads(content)
+        assert res == []
 
         st = await session.get("http://localhost:5002/api/v1/status")
         assert await st.json()
@@ -137,10 +138,11 @@ async def test_debug(
     await r.aclose()
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5002/api/v1/last_event")
+        st = await session.get("http://localhost:5002/api/v1/last_events")
         content = await st.content.read()
-        res: EventData = pickle.loads(content)
-        pkg = stream1.parse(res.streams[StreamName("eiger")])
+        res: list[EventData] = pickle.loads(content)
+        print("returned result", res)
+        pkg = stream1.parse(res[0].streams[StreamName("eiger")])
         print(pkg)
         if isinstance(pkg, Stream1Data):
             assert pkg.frame == 7

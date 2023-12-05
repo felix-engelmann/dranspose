@@ -77,17 +77,21 @@ async def get_status() -> bool:
     return True
 
 
-@app.get("/api/v1/last_event")
-async def get_result() -> Response:
+@app.get("/api/v1/last_events")
+async def get_result(number: int = 1) -> Response:
     global worker
-    data = b""
-    try:
-        lev = worker.buffer[-1]
-        byteev = EventData(
-            event_number=lev.event_number,
-            streams={k: v.get_bytes() for k, v in lev.streams.items()},
-        )
-        data = pickle.dumps(byteev)
-    except Exception as e:
-        logging.warning("no publishable data: %s", e.__repr__())
+    print("getting ", number, "events")
+    byteevs = []
+    for i in range(-1, -number - 1, -1):
+        try:
+            lev = worker.buffer[i]
+            byteevs.append(
+                EventData(
+                    event_number=lev.event_number,
+                    streams={k: v.get_bytes() for k, v in lev.streams.items()},
+                )
+            )
+        except Exception:
+            pass
+    data = pickle.dumps(byteevs)
     return Response(data, media_type="application/x.pickle")
