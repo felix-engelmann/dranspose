@@ -55,16 +55,16 @@ async def test_params(
         logging.warning("params %s", params)
 
         resp = await session.post(
-            "http://localhost:5000/api/v1/parameters/json",
-            json={"roi1": [0, 10]},
+            "http://localhost:5000/api/v1/parameters/roi",
+            json=[0, 10],
         )
         assert resp.status == 200
-        uuid = await resp.json()
+        hash = await resp.json()
 
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
         print("state", state)
-        while str(state.workers[0].parameters_uuid) != uuid:
+        while str(state.workers[0].parameters_hash) != hash:
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())

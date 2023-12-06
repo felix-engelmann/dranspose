@@ -1,6 +1,5 @@
 import abc
 import logging
-import pickle
 from typing import Optional
 
 import redis.asyncio as redis
@@ -8,12 +7,15 @@ from pydantic import UUID4, AliasChoices, Field, RedisDsn
 from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
+from dranspose.helpers.utils import parameters_hash
 from dranspose.protocol import (
     RedisKeys,
     ControllerUpdate,
     IngesterState,
     WorkerState,
     ReducerState,
+    ParameterName,
+    WorkParameter,
 )
 import redis.exceptions as rexceptions
 import asyncio
@@ -59,9 +61,9 @@ class DistributedService(abc.ABC):
             f"{self._distributed_settings.redis_dsn}?protocol=3"
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
-        self.parameters = None
+        self.parameters: dict[ParameterName, WorkParameter] = {}
 
-    async def publish_config(self):
+    async def publish_config(self) -> None:
         async with self.redis.pipeline() as pipe:
             if isinstance(self.state, IngesterState):
                 category = "ingester"
@@ -107,34 +109,45 @@ class DistributedService(abc.ABC):
         while True:
             await self.publish_config()
             try:
-                update = await self.redis.xread({RedisKeys.updates(): last}, block=6000)
-                if RedisKeys.updates() in update:
-                    update = update[RedisKeys.updates()][0][-1]
-                    last = update[0]
-                    update = ControllerUpdate.model_validate_json(update[1]["data"])
+                update_msgs = await self.redis.xread(
+                    {RedisKeys.updates(): last}, block=6000
+                )
+                if RedisKeys.updates() in update_msgs:
+                    update_msg = update_msgs[RedisKeys.updates()][0][-1]
+                    last = update_msg[0]
+                    update = ControllerUpdate.model_validate_json(update_msg[1]["data"])
                     self._logger.debug("update type %s", update)
                     newuuid = update.mapping_uuid
                     if newuuid != self.state.mapping_uuid:
                         self._logger.info("resetting config to %s", newuuid)
                         await self.restart_work(newuuid)
-                    newuuid = update.parameters_uuid
-                    if newuuid != self.state.parameters_uuid:
-                        self._logger.info("setting parameters to %s", newuuid)
-                        try:
-                            params = await self.raw_redis.get(
-                                RedisKeys.parameters(newuuid)
-                            )
-                            self._logger.debug("received binary parameters")
-                            if params:
-                                self._logger.info(
-                                    "set parameters of length %s", len(params)
+                    paramuuids = update.parameters_version
+                    for name in paramuuids:
+                        if (
+                            name not in self.parameters
+                            or self.parameters[name] != paramuuids[name]
+                        ):
+                            try:
+                                params = await self.raw_redis.get(
+                                    RedisKeys.parameters(name, paramuuids[name])
                                 )
-                                self.parameters = pickle.loads(params)
-                                self.state.parameters_uuid = newuuid
-                        except Exception as e:
-                            self._logger.error(
-                                "failed to get parameters %s", e.__repr__()
-                            )
+                                self._logger.debug(
+                                    "received binary parameters for %s", name
+                                )
+                                if params:
+                                    self._logger.info(
+                                        "set parameter %s of length %s",
+                                        name,
+                                        len(params),
+                                    )
+                                    self.parameters[name] = WorkParameter(
+                                        name=name, uuid=paramuuids[name], data=params
+                                    )
+                            except Exception as e:
+                                self._logger.error(
+                                    "failed to get parameters %s", e.__repr__()
+                                )
+                    self.state.parameters_hash = parameters_hash(self.parameters)
                     if update.finished:
                         self._logger.info("finished messages")
                         await self.finish_work()

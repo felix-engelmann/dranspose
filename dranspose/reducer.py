@@ -47,7 +47,7 @@ class Reducer(DistributedService):
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
                 self._logger.info("custom reducer class %s", self.custom)
                 try:
-                    self.param_descriptions = self.custom.describe_parameters()
+                    self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
                 except AttributeError:
                     self._logger.info(
                         "custom worker class has no describe_parameters staticmethod"

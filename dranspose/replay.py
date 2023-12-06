@@ -2,12 +2,11 @@ import json
 import logging
 import os
 import pickle
-import uuid
 from typing import Iterator, Any
 
 from dranspose.helpers import utils
 from dranspose.event import InternalWorkerMessage, EventData, ResultData
-from dranspose.protocol import WorkerName
+from dranspose.protocol import WorkerName, Digest
 
 
 def get_internals(filename: os.PathLike[Any]) -> Iterator[InternalWorkerMessage]:
@@ -61,7 +60,9 @@ def replay(
                 event_number=event.event_number,
                 worker=WorkerName("development"),
                 payload=data,
-                parameters_uuid=uuid.uuid4(),
+                parameters_hash=Digest(
+                    "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
+                ),
             )
 
             header = rd.model_dump_json(exclude={"payload"}).encode("utf8")

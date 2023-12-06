@@ -84,8 +84,8 @@ async def test_reduction(
             state = EnsembleState.model_validate(await st.json())
 
         resp = await session.post(
-            "http://localhost:5000/api/v1/parameters/json",
-            json={"roi1": [0, 10]},
+            "http://localhost:5000/api/v1/parameters/roi1",
+            json=[0, 10],
         )
         assert resp.status == 200
         await resp.json()

@@ -3,7 +3,6 @@ This is the central service to orchestrate all distributed components
 
 """
 import asyncio
-import pickle
 from asyncio import Task
 from collections import defaultdict
 from typing import Dict, List, Any, AsyncGenerator, Optional
@@ -12,14 +11,17 @@ import logging
 import time
 
 from pydantic import UUID4
+from starlette.requests import Request
+from starlette.responses import Response
 
 from dranspose.distributed import DistributedSettings
+from dranspose.helpers.utils import parameters_hash
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Body
+from fastapi import FastAPI
 
 from dranspose.parameters import Parameter
 from dranspose.protocol import (
@@ -33,10 +35,12 @@ from dranspose.protocol import (
     StreamName,
     EventNumber,
     VirtualWorker,
-    WorkParameters,
+    WorkParameter,
     ControllerUpdate,
     ReducerState,
     WorkerTimes,
+    Digest,
+    ParameterName,
 )
 
 logger = logging.getLogger(__name__)
@@ -56,7 +60,8 @@ class Controller:
             f"{self.settings.redis_dsn}?decode_responses=True&protocol=3"
         )
         self.mapping = Mapping({})
-        self.parameters = WorkParameters(pickle=pickle.dumps({}))
+        self.parameters: dict[ParameterName, WorkParameter] = {}
+        self.parameters_hash = parameters_hash(self.parameters)
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
         self.assign_task: Task[None]
@@ -98,7 +103,8 @@ class Controller:
         # cleaned up
         self.mapping = m
         cupd = ControllerUpdate(
-            mapping_uuid=self.mapping.uuid, parameters_uuid=self.parameters.uuid
+            mapping_uuid=self.mapping.uuid,
+            parameters_version={n: p.uuid for n, p in self.parameters.items()},
         )
         logger.debug("send controller update %s", cupd)
         await self.redis.xadd(
@@ -118,22 +124,23 @@ class Controller:
         logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
         self.assign_task = asyncio.create_task(self.assign_work())
 
-    async def set_params(self, parameters: bytes) -> UUID4:
-        self.parameters = WorkParameters(pickle=parameters)
-        logger.debug("distributing parameters to uuid %s", self.parameters.uuid)
-        await self.redis.set(
-            RedisKeys.parameters(self.parameters.uuid), self.parameters.pickle
-        )
+    async def set_param(self, name: ParameterName, data: bytes) -> Digest:
+        param = WorkParameter(name=name, data=data)
+        logger.debug("distributing parameter %s with uuid %s", param.name, param.uuid)
+        await self.redis.set(RedisKeys.parameters(name, param.uuid), param.data)
+        self.parameters[name] = param
         logger.debug("stored parameters")
+        self.parameters_hash = parameters_hash(self.parameters)
         cupd = ControllerUpdate(
-            mapping_uuid=self.mapping.uuid, parameters_uuid=self.parameters.uuid
+            mapping_uuid=self.mapping.uuid,
+            parameters_version={n: p.uuid for n, p in self.parameters.items()},
         )
         logger.debug("send update %s", cupd)
         await self.redis.xadd(
             RedisKeys.updates(),
             {"data": cupd.model_dump_json()},
         )
-        return self.parameters.uuid
+        return self.parameters_hash
 
     async def describe_parameters(self) -> list[Parameter]:
         desc_keys = await self.redis.keys(RedisKeys.parameter_description())
@@ -223,7 +230,9 @@ class Controller:
                     # all events done, send close
                     cupd = ControllerUpdate(
                         mapping_uuid=self.mapping.uuid,
-                        parameters_uuid=self.parameters.uuid,
+                        parameters_version={
+                            n: p.uuid for n, p in self.parameters.items()
+                        },
                         finished=True,
                     )
                     logger.debug("send finished update %s", cupd)
@@ -243,6 +252,9 @@ class Controller:
         assigned = await self.redis.keys(RedisKeys.assigned("*"))
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
+        params = await self.redis.keys(RedisKeys.parameters("*", "*"))
+        if len(params) > 0:
+            await self.redis.delete(*params)
         await self.redis.aclose()
 
 
@@ -311,12 +323,18 @@ async def set_mapping(
     return m.uuid
 
 
-@app.post("/api/v1/parameters/json")
-async def set_params(payload: dict[Any, Any] = Body(...)) -> UUID4 | str:
-    global ctrl
-    res = pickle.dumps(payload)
-    u = await ctrl.set_params(res)
+@app.post("/api/v1/parameters/{name}")
+async def set_param(request: Request, name: ParameterName) -> Digest:
+    data = await request.body()
+    logger.warning("got %s: %s", name, data)
+    u = await ctrl.set_param(name, data)
     return u
+
+
+@app.get("/api/v1/parameters/{name}")
+async def get_param(name: ParameterName) -> Response:
+    data = ctrl.parameters[name].data
+    return Response(data, media_type="application/x.bytes")
 
 
 @app.get("/api/v1/parameter_descriptions/")

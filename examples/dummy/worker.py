@@ -1,3 +1,4 @@
+import json
 import logging
 
 from dranspose.event import EventData
@@ -15,13 +16,14 @@ class FluorescenceWorker:
     @staticmethod
     def describe_parameters():
         params = [
-            StrParameter(name="string_parameter"),
+            StrParameter(name="roi1"),
             FileParameter(name="file_parameter"),
         ]
         return params
 
     def process_event(self, event: EventData, parameters=None):
         logger.debug("using parameters %s", parameters)
+        roi_slice = json.loads(parameters["roi1"].data)
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
             logger.error(
                 "missing streams for this worker, only present %s", event.streams.keys()
@@ -38,14 +40,14 @@ class FluorescenceWorker:
         except Exception as e:
             logger.error("failed to parse xspress3 %s", e.__repr__())
             return
-        logger.error("contrast: %s", con)
-        logger.error("spectrum: %s", spec)
+        logger.debug("contrast: %s", con)
+        logger.debug("spectrum: %s", spec)
 
         if con.status == "running":
             # new data
             sx, sy = con.pseudo["x"][0], con.pseudo["y"][0]
-            logger.error("process position %s %s", sx, sy)
+            logger.debug("process position %s %s", sx, sy)
 
-            roi1 = spec.data[3][parameters["roi1"][0] : parameters["roi1"][1]].sum()
+            roi1 = spec.data[3][roi_slice[0] : roi_slice[1]].sum()
 
             return {"position": (sx, sy), "concentations": {"roi1": roi1}}

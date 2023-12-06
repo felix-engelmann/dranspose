@@ -37,6 +37,9 @@ EventNumber = NewType("EventNumber", int)
 strongly typed event number (int)
 """
 
+ParameterName = NewType("ParameterName", str)
+
+Digest = NewType("Digest", str)
 
 GENERIC_WORKER = WorkerTag("generic")
 
@@ -89,9 +92,10 @@ class RedisKeys:
     @cache
     @validate_call
     def parameters(
-        uuid: UUID4,
+        name: str,
+        uuid: UUID4 | Literal["*"],
     ) -> str:
-        return f"{RedisKeys.PREFIX}:controller:parameters:{uuid}"
+        return f"{RedisKeys.PREFIX}:parameters:{name}:{uuid}"
 
     @staticmethod
     @cache
@@ -108,12 +112,13 @@ class ProtocolException(Exception):
 
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
-    parameters_uuid: UUID4
+    parameters_version: dict[ParameterName, UUID4]
     finished: bool = False
 
 
-class WorkParameters(BaseModel):
-    pickle: bytes
+class WorkParameter(BaseModel):
+    name: str
+    data: bytes
     uuid: UUID4 = Field(default_factory=uuid4)
 
 
@@ -173,7 +178,7 @@ class WorkerUpdate(BaseModel):
 class DistributedState(BaseModel):
     service_uuid: UUID4 = Field(default_factory=uuid.uuid4)
     mapping_uuid: Optional[UUID4] = None
-    parameters_uuid: Optional[UUID4] = None
+    parameters_hash: Optional[Digest] = None
 
 
 class IngesterState(DistributedState):

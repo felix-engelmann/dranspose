@@ -2,8 +2,8 @@ from typing import Any, Optional
 
 import zmq
 
-from dranspose.protocol import EventNumber, StreamName, WorkerName
-from pydantic import BaseModel, ConfigDict, computed_field, UUID4
+from dranspose.protocol import EventNumber, StreamName, WorkerName, Digest
+from pydantic import BaseModel, ConfigDict, computed_field
 
 
 class StreamData(BaseModel):
@@ -69,13 +69,13 @@ class ResultData(BaseModel):
     Attributes:
         event_number: which event the result belongs to. NB: results may arrive out of order
         worker: which worker processed it.
-        parameters_uuid: which version of parameters was used to process the event
+        parameters_hash: which version of parameters was used to process the event
         payload: the data return from the custom worker function: process_event
     """
 
     event_number: EventNumber
     worker: WorkerName
-    parameters_uuid: Optional[UUID4]
+    parameters_hash: Optional[Digest]
     payload: Any
 
 

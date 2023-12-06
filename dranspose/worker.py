@@ -86,7 +86,7 @@ class Worker(DistributedService):
                 self._logger.info("custom worker class %s", self.custom)
 
                 try:
-                    self.param_descriptions = self.custom.describe_parameters()
+                    self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
                 except AttributeError:
                     self._logger.info(
                         "custom worker class has no describe_parameters staticmethod"
@@ -232,7 +232,7 @@ class Worker(DistributedService):
                 event_number=event.event_number,
                 worker=self.state.name,
                 payload=result,
-                parameters_uuid=self.state.parameters_uuid,
+                parameters_hash=self.state.parameters_hash,
             )
             if self.out_socket:
                 try:
