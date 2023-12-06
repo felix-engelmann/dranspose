@@ -12,7 +12,7 @@ from dranspose.ingesters.streaming_single import (
     StreamingSingleIngester,
     StreamingSingleSettings,
 )
-from dranspose.parameters import ParameterList
+from dranspose.parameters import ParameterList, FileParameter, StrParameter
 from dranspose.protocol import WorkerName, StreamName, EnsembleState
 from dranspose.worker import Worker, WorkerSettings
 
@@ -53,5 +53,9 @@ async def test_params(
         params = ParameterList.validate_python(await par.json())
 
         logging.warning("params %s", params)
-
-        assert False
+        assert params == [
+            FileParameter(name="file_parameter", description=None, dtype="file"),
+            FileParameter(name="other_file_parameter", description=None, dtype="file"),
+            StrParameter(name="roi1", description=None, dtype="str"),
+            StrParameter(name="string_parameter", description=None, dtype="str"),
+        ]
