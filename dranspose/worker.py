@@ -78,11 +78,25 @@ class Worker(DistributedService):
         self._reducer_service_uuid: Optional[UUID4] = None
         self.out_socket: Optional[zmq._future._AsyncSocket] = None
 
+        self.param_descriptions = []
         self.custom = None
         if self._worker_settings.worker_class:
             try:
                 self.custom = utils.import_class(self._worker_settings.worker_class)
                 self._logger.info("custom worker class %s", self.custom)
+
+                try:
+                    self.param_descriptions = self.custom.describe_parameters()
+                except AttributeError:
+                    self._logger.info(
+                        "custom worker class has no describe_parameters staticmethod"
+                    )
+                except Exception as e:
+                    self._logger.error(
+                        "custom worker parameter descripition is broken: %s",
+                        e.__repr__(),
+                    )
+
             except Exception as e:
                 self._logger.error(
                     "no custom worker class loaded, discarding events, err %s",

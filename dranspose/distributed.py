@@ -61,16 +61,8 @@ class DistributedService(abc.ABC):
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         self.parameters = None
 
-    async def register(self) -> None:
-        """
-        Background job in every distributed service to publish the service's configuration.
-        It publishes the `state` every 6 seconds or faster if there are updates from the controller with a new trigger map or parameters.
-        """
-        latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
-        last = 0
-        if len(latest) > 0:
-            last = latest[0][0]
-        while True:
+    async def publish_config(self):
+        async with self.redis.pipeline() as pipe:
             if isinstance(self.state, IngesterState):
                 category = "ingester"
             elif isinstance(self.state, WorkerState):
@@ -81,11 +73,39 @@ class DistributedService(abc.ABC):
                 raise NotImplementedError(
                     "Distributed Service not implemented for your Service"
                 )
-            await self.redis.setex(
+
+            await pipe.setex(
                 RedisKeys.config(category, self.state.name),
                 10,
                 self.state.model_dump_json(),
             )
+            if hasattr(self, "param_descriptions"):
+                for p in self.param_descriptions:
+                    self._logger.debug("register parameter %s", p)
+                    try:
+                        await pipe.setex(
+                            RedisKeys.parameter_description(p.name),
+                            10,
+                            p.model_dump_json(),
+                        )
+                    except Exception as e:
+                        self._logger.error(
+                            "failed to register parameter %s", e.__repr__()
+                        )
+
+            await pipe.execute()
+
+    async def register(self) -> None:
+        """
+        Background job in every distributed service to publish the service's configuration.
+        It publishes the `state` every 6 seconds or faster if there are updates from the controller with a new trigger map or parameters.
+        """
+        latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
+        last = 0
+        if len(latest) > 0:
+            last = latest[0][0]
+        while True:
+            await self.publish_config()
             try:
                 update = await self.redis.xread({RedisKeys.updates(): last}, block=6000)
                 if RedisKeys.updates() in update:
@@ -104,15 +124,17 @@ class DistributedService(abc.ABC):
                             params = await self.raw_redis.get(
                                 RedisKeys.parameters(newuuid)
                             )
+                            self._logger.debug("received binary parameters")
+                            if params:
+                                self._logger.info(
+                                    "set parameters of length %s", len(params)
+                                )
+                                self.parameters = pickle.loads(params)
+                                self.state.parameters_uuid = newuuid
                         except Exception as e:
                             self._logger.error(
                                 "failed to get parameters %s", e.__repr__()
                             )
-                        self._logger.debug("received binary parameters")
-                        if params:
-                            self._logger.error("set parameters %s", len(params))
-                            self.parameters = pickle.loads(params)
-                            self.state.parameters_uuid = newuuid
                     if update.finished:
                         self._logger.info("finished messages")
                         await self.finish_work()

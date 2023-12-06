@@ -21,6 +21,7 @@ import redis.exceptions as rexceptions
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Body
 
+from dranspose.parameters import Parameter
 from dranspose.protocol import (
     IngesterState,
     WorkerState,
@@ -133,6 +134,12 @@ class Controller:
             {"data": cupd.model_dump_json()},
         )
         return self.parameters.uuid
+
+    async def describe_parameters(self) -> list[Parameter]:
+        desc_keys = await self.redis.keys(RedisKeys.parameter_description())
+        param_json = await self.redis.mget(desc_keys)
+
+        return [Parameter.model_validate_json(i) for i in param_json]
 
     async def assign_work(self) -> None:
         last = 0
@@ -310,3 +317,9 @@ async def set_params(payload: dict[Any, Any] = Body(...)) -> UUID4 | str:
     res = pickle.dumps(payload)
     u = await ctrl.set_params(res)
     return u
+
+
+@app.get("/api/v1/parameter_descriptions/")
+async def param_descr() -> list[Parameter]:
+    global ctrl
+    return await ctrl.describe_parameters()

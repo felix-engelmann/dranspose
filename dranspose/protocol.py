@@ -93,6 +93,14 @@ class RedisKeys:
     ) -> str:
         return f"{RedisKeys.PREFIX}:controller:parameters:{uuid}"
 
+    @staticmethod
+    @cache
+    @validate_call
+    def parameter_description(
+        name: str | Literal["*"] = "*",
+    ) -> str:
+        return f"{RedisKeys.PREFIX}:parameter_description:{name}"
+
 
 class ProtocolException(Exception):
     pass

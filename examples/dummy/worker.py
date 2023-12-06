@@ -3,6 +3,7 @@ import logging
 from dranspose.event import EventData
 from dranspose.middlewares import contrast
 from dranspose.middlewares import xspress
+from dranspose.parameters import StrParameter, FileParameter
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,14 @@ logger = logging.getLogger(__name__)
 class FluorescenceWorker:
     def __init__(self, parameters=None):
         self.number = 0
+
+    @staticmethod
+    def describe_parameters():
+        params = [
+            StrParameter(name="string_parameter"),
+            FileParameter(name="file_parameter"),
+        ]
+        return params
 
     def process_event(self, event: EventData, parameters=None):
         logger.debug("using parameters %s", parameters)
