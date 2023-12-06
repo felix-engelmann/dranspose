@@ -15,6 +15,6 @@ def import_class(path: str) -> type:
 
 def parameters_hash(parameters: dict[ParameterName, WorkParameter]) -> Digest:
     m = hashlib.sha256()
-    for n in parameters:
+    for n in sorted(parameters):
         m.update(parameters[n].uuid.bytes)
     return Digest(m.hexdigest())

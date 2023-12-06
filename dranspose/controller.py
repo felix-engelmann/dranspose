@@ -23,7 +23,7 @@ import redis.exceptions as rexceptions
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from dranspose.parameters import Parameter
+from dranspose.parameters import Parameter, StrParameter, FileParameter
 from dranspose.protocol import (
     IngesterState,
     WorkerState,
@@ -142,11 +142,13 @@ class Controller:
         )
         return self.parameters_hash
 
-    async def describe_parameters(self) -> list[Parameter]:
+    async def describe_parameters(self) -> list[StrParameter | FileParameter]:
         desc_keys = await self.redis.keys(RedisKeys.parameter_description())
         param_json = await self.redis.mget(desc_keys)
 
-        return [Parameter.model_validate_json(i) for i in param_json]
+        return sorted(
+            [Parameter.validate_json(i) for i in param_json], key=lambda x: x.name
+        )
 
     async def assign_work(self) -> None:
         last = 0
@@ -331,13 +333,13 @@ async def set_param(request: Request, name: ParameterName) -> Digest:
     return u
 
 
-@app.get("/api/v1/parameters/{name}")
+@app.get("/api/v1/parameter/{name}")
 async def get_param(name: ParameterName) -> Response:
     data = ctrl.parameters[name].data
     return Response(data, media_type="application/x.bytes")
 
 
-@app.get("/api/v1/parameter_descriptions/")
-async def param_descr() -> list[Parameter]:
+@app.get("/api/v1/parameter_descriptions")
+async def param_descr() -> list[StrParameter | FileParameter]:
     global ctrl
     return await ctrl.describe_parameters()
