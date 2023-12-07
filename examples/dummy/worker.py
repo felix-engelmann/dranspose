@@ -48,6 +48,6 @@ class FluorescenceWorker:
             sx, sy = con.pseudo["x"][0], con.pseudo["y"][0]
             logger.debug("process position %s %s", sx, sy)
 
-            roi1 = spec.data[3][roi_slice[0] : roi_slice[1]].sum()
+            roi1 = spec.data[-1][roi_slice[0] : roi_slice[1]].sum()
 
             return {"position": (sx, sy), "concentations": {"roi1": roi1}}

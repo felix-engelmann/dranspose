@@ -119,7 +119,11 @@ async def test_reduction(
 
     asyncio.create_task(
         stream_pkls(
-            context, 9999, PosixPath("tests/data/xspress3-dump.pkls"), 0.001, zmq.PUB
+            context,
+            9999,
+            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            0.001,
+            zmq.PUB,
         )
     )
     asyncio.create_task(

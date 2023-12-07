@@ -37,6 +37,12 @@ class StreamingXspressIngester(Ingester):
         while True:
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)
+            if len(parts) != 1:
+                self._logger.error(
+                    "xpress3 never sends multipart messages, received %d parts",
+                    len(parts),
+                )
+                continue
             try:
                 packet = XspressPacket.validate_json(parts[0].bytes)
             except Exception as e:
@@ -52,7 +58,7 @@ class StreamingXspressIngester(Ingester):
             try:
                 packet = XspressPacket.validate_json(parts[0].bytes)
             except Exception as e:
-                self._logger.error("packet not valid %s", e.__repr__())
+                self._logger.error("packet parsable valid %s", e.__repr__())
                 continue
             if type(packet) is XspressImage:
                 image = await self.in_socket.recv_multipart(copy=False)
