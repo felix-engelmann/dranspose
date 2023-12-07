@@ -49,7 +49,7 @@ async def test_params(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        par = await session.get("http://localhost:5000/api/v1/parameter_descriptions")
+        par = await session.get("http://localhost:5000/api/v1/parameters")
         params = ParameterList.validate_python(await par.json())
 
         logging.warning("params %s", params)

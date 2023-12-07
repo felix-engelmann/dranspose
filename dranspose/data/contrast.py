@@ -23,7 +23,7 @@ class ContrastStarted(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    status: Literal["started"]
+    status: Literal["started"] = "started"
     path: str
     scannr: int
     description: str
@@ -66,7 +66,7 @@ class ContrastRunning(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    status: Literal["running"]
+    status: Literal["running"] = "running"
     dt: float
 
 
@@ -89,7 +89,7 @@ class ContrastFinished(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    status: Literal["finished"]
+    status: Literal["finished"] = "finished"
     path: str
     scannr: int
     description: str

@@ -21,7 +21,7 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from dranspose.parameters import Parameter, StrParameter, FileParameter
 from dranspose.protocol import (
@@ -325,7 +325,7 @@ async def set_mapping(
     return m.uuid
 
 
-@app.post("/api/v1/parameters/{name}")
+@app.post("/api/v1/parameter/{name}")
 async def set_param(request: Request, name: ParameterName) -> Digest:
     data = await request.body()
     logger.warning("got %s: %s", name, data)
@@ -335,11 +335,14 @@ async def set_param(request: Request, name: ParameterName) -> Digest:
 
 @app.get("/api/v1/parameter/{name}")
 async def get_param(name: ParameterName) -> Response:
+    if name not in ctrl.parameters:
+        raise HTTPException(status_code=404, detail="Parameter not found")
+
     data = ctrl.parameters[name].data
     return Response(data, media_type="application/x.bytes")
 
 
-@app.get("/api/v1/parameter_descriptions")
+@app.get("/api/v1/parameters")
 async def param_descr() -> list[StrParameter | FileParameter]:
     global ctrl
     return await ctrl.describe_parameters()

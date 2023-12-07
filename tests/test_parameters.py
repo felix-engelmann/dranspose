@@ -49,17 +49,35 @@ async def test_params(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        par = await session.get("http://localhost:5000/api/v1/parameter_descriptions")
+        par = await session.get("http://localhost:5000/api/v1/parameters")
+        assert par.status == 200
         params = ParameterList.validate_python(await par.json())
 
         logging.warning("params %s", params)
 
         resp = await session.post(
-            "http://localhost:5000/api/v1/parameters/roi",
+            "http://localhost:5000/api/v1/parameter/roi",
             json=[0, 10],
         )
         assert resp.status == 200
+
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/additional",
+            data=b"asdasd",
+        )
+        assert resp.status == 200
         hash = await resp.json()
+
+        resp = await session.get(
+            "http://localhost:5000/api/v1/parameter/additional",
+        )
+        assert resp.status == 200
+        assert await resp.content.read() == b"asdasd"
+
+        resp = await session.get(
+            "http://localhost:5000/api/v1/parameter/nonexistant",
+        )
+        assert resp.status == 404
 
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
