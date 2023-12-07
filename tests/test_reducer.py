@@ -37,7 +37,7 @@ async def test_reduction(
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pkls: Callable[
-        [zmq.Context[Any], int, os.PathLike[Any], float, int],
+        [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
     tmp_path: pathlib.PurePath,

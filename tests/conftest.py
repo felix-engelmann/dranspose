@@ -186,12 +186,13 @@ async def stream_eiger() -> Callable[
 
 @pytest_asyncio.fixture
 async def stream_pkls() -> Callable[
-    [zmq.Context[Any], int, os.PathLike[Any], float, int], Coroutine[Any, Any, None]
+    [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
+    Coroutine[Any, Any, None],
 ]:
     async def _make_pkls(
         ctx: zmq.Context[Any],
         port: int,
-        filename: os.PathLike[Any],
+        filename: os.PathLike[Any] | str,
         frame_time: float = 0.1,
         typ: int = zmq.PUSH,
     ) -> None:

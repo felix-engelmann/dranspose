@@ -9,7 +9,7 @@ from dranspose.event import InternalWorkerMessage, EventData, ResultData
 from dranspose.protocol import WorkerName, Digest
 
 
-def get_internals(filename: os.PathLike[Any]) -> Iterator[InternalWorkerMessage]:
+def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
     with open(filename, "rb") as f:
         while True:
             try:
@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 def replay(
     wclass: str,
     rclass: str,
-    zmq_files: list[os.PathLike[Any]],
-    parameter_file: os.PathLike[Any],
+    zmq_files: list[os.PathLike[Any] | str],
+    parameter_file: os.PathLike[Any] | str,
 ) -> None:
     gens = [get_internals(f) for f in zmq_files]
 

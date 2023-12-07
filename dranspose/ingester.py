@@ -22,7 +22,7 @@ from dranspose.protocol import (
 
 class IngesterSettings(DistributedSettings):
     ingester_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
-    dump_path: Optional[os.PathLike[Any]] = None
+    dump_path: Optional[os.PathLike[Any] | str] = None
 
 
 class Ingester(DistributedService):
