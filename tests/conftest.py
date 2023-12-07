@@ -195,18 +195,29 @@ async def stream_pkls() -> Callable[
         filename: os.PathLike[Any] | str,
         frame_time: float = 0.1,
         typ: int = zmq.PUSH,
+        begin: Optional[int] = None,
+        end: Optional[int] = None,
     ) -> None:
         socket: zmq.Socket[Any] = ctx.socket(typ)
         socket.bind(f"tcp://*:{port}")
-        for _ in range(3):
-            await socket.send_multipart([b"emptyness"])
-            await asyncio.sleep(0.1)
+        if begin is None and end is None:
+            for _ in range(3):
+                await socket.send_multipart([b"emptyness"])
+                await asyncio.sleep(0.1)
         with open(filename, "rb") as f:
+            i = 0
             while True:
                 try:
                     frames = pickle.load(f)
-                    await socket.send_multipart(frames)
-                    await asyncio.sleep(frame_time)
+                    send = True
+                    if i < (begin or 0):
+                        send = False
+                    if end:
+                        if i >= end:
+                            send = False
+                    if send:
+                        await socket.send_multipart(frames)
+                        await asyncio.sleep(frame_time)
                 except EOFError:
                     break
 

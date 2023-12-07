@@ -183,6 +183,8 @@ class Ingester(DistributedService):
                     self._logger.debug("sent message to worker %s", worker)
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
+            for stream in self.state.streams:
+                await self.stop_source(stream)
             if self.dump_file:
                 self._logger.info(
                     "closing dump file %s at cancelled work", self.dump_file
@@ -202,6 +204,9 @@ class Ingester(DistributedService):
         """
         yield StreamData(typ="", frames=[])
         return
+
+    async def stop_source(self, stream: StreamName) -> None:
+        pass
 
     async def accept_workers(self) -> None:
         """
