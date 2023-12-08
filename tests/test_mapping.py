@@ -9,6 +9,7 @@ from dranspose.protocol import (
     WorkAssignment,
     WorkerState,
     VirtualConstraint,
+    WorkerTag,
 )
 
 
@@ -212,7 +213,7 @@ def test_multiple() -> None:
     assert m.complete_events == 7
 
     evworkers = m.get_event_workers(EventNumber(m.complete_events - 1))
-
+    print(evworkers)
     assert evworkers == WorkAssignment(
         event_number=EventNumber(6),
         assignments={
@@ -265,3 +266,58 @@ def test_mixed_all() -> None:
     ]
 
     m.print()
+
+
+def test_all_wrap_tags() -> None:
+    ntrig = 10
+    m = Mapping(
+        {
+            StreamName("test"): [
+                [VirtualWorker(constraint=VirtualConstraint(i))]
+                if i % 4
+                else [VirtualWorker(tags={WorkerTag("tag"), WorkerTag("bla")})]
+                for i in range(ntrig)
+            ],
+            StreamName("test2"): [
+                [VirtualWorker(constraint=VirtualConstraint(i))]
+                if i % 4
+                else [VirtualWorker(tags={WorkerTag("tag2")})]
+                for i in range(ntrig)
+            ],
+        },
+        add_start_end=True,
+    )
+    print("before assignment")
+    m.print()
+
+    first_test = m.mapping[StreamName("test")][0]
+    assert first_test is not None
+    assert sorted([tuple(t.tags) for t in first_test]) == sorted(
+        [("generic",), ("tag",), ("bla",), ("tag2",)]
+    )
+
+    all_workers = [
+        WorkerState(
+            name=WorkerName("w1"),
+            tags={WorkerTag("generic"), WorkerTag("tag"), WorkerTag("bla")},
+        ),
+        WorkerState(
+            name=WorkerName("w2"), tags={WorkerTag("tag2"), WorkerTag("generic")}
+        ),
+    ]
+    for i in range(4):
+        print(m.complete_events)
+        m.assign_next(all_workers[0], all_workers)
+        m.assign_next(all_workers[1], all_workers)
+        print(m.complete_events)
+        print("--")
+        # m.assign_next("w3")
+    print(m.assignments)
+    print(m.all_assignments)
+    m.print()
+
+    evworkers = m.get_event_workers(EventNumber(0))
+    print(evworkers)
+    should = {"test": {"w2", "w1"}, "test2": {"w2", "w1"}}
+    for st, wn in evworkers.assignments.items():
+        assert set(wn) == should[st]

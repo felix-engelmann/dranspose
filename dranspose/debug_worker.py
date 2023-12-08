@@ -93,5 +93,5 @@ async def get_result(number: int = 1) -> Response:
             )
         except Exception:
             pass
-    data = pickle.dumps(byteevs)
+    data = pickle.dumps(list(reversed(byteevs)))
     return Response(data, media_type="application/x.pickle")

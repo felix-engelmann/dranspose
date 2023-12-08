@@ -30,9 +30,17 @@ class Mapping:
         if len(set(map(len, m.values()))) > 1:
             raise Exception("length not equal: ", list(map(len, m.values())))
         if add_start_end:
+            # get all tags:
+            tags = set()
             for li in m.values():
-                li.insert(0, [VirtualWorker()])
-                li.append([VirtualWorker()])
+                for frame in li:
+                    if frame:
+                        for vw in frame:
+                            tags.update(vw.tags)
+
+            for li in m.values():
+                li.insert(0, [VirtualWorker(tags={t}) for t in tags])
+                li.append([VirtualWorker(tags={t}) for t in tags])
 
         print("mapping is", m)
         self.mapping = m
@@ -119,7 +127,7 @@ class Mapping:
         return tags
 
     def get_event_workers(self, no: EventNumber) -> WorkAssignment:
-        ret: dict[StreamName, list[WorkerName]] = defaultdict(list)
+        ret: dict[StreamName, set[WorkerName]] = defaultdict(set)
         if no > self.complete_events - 1:
             raise NotYetAssigned()
         for s, v in self.mapping.items():
@@ -128,10 +136,12 @@ class Mapping:
                 continue
             for i, vw in enumerate(assign):
                 if vw.constraint is None:  # get from all
-                    ret[s] += self.all_assignments[(no, s, i)]
+                    ret[s].update(self.all_assignments[(no, s, i)])
                 else:
-                    ret[s].append(self.assignments[vw.constraint])
-        return WorkAssignment(event_number=no, assignments=ret)
+                    ret[s].add(self.assignments[vw.constraint])
+        return WorkAssignment(
+            event_number=no, assignments={s: sorted(v) for s, v in ret.items()}
+        )
 
     def update_filled(self, all_workers: list[WorkerState]) -> None:
         for evnint in range(self.complete_events, self.len()):

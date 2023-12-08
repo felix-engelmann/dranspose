@@ -16,6 +16,16 @@ class FileParameter(ParameterBase):
     dtype: Literal["file"] = "file"
 
 
-Parameter = TypeAdapter(StrParameter | FileParameter)
+class IntParameter(ParameterBase):
+    dtype: Literal["int"] = "int"
 
-ParameterList = TypeAdapter(list[StrParameter | FileParameter])
+
+class FloatParameter(ParameterBase):
+    dtype: Literal["float"] = "float"
+
+
+ParameterType = StrParameter | FileParameter | IntParameter | FloatParameter
+
+Parameter = TypeAdapter(ParameterType)
+
+ParameterList = TypeAdapter(list[ParameterType])

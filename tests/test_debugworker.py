@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 import pickle
 from typing import Awaitable, Callable, Any, Coroutine, Optional
@@ -39,10 +38,8 @@ async def test_debugger(
     debug_worker: Callable[[Optional[str], Optional[list[str]]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
 ) -> None:
-    envbefore = os.environ
     await debug_worker("debugworker", ["debug"])
     assert "WORKER_TAGS" not in os.environ
-    logging.warning("ENV %s", envbefore)
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5002/api/v1/last_events?number=1")
         content = await st.content.read()
@@ -138,10 +135,11 @@ async def test_debug(
     await r.aclose()
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5002/api/v1/last_events")
+        st = await session.get("http://localhost:5002/api/v1/last_events?number=2")
         content = await st.content.read()
         res: list[EventData] = pickle.loads(content)
-        print("returned result", res)
+        for ev in res:
+            print("got event", ev.event_number, ev.streams.keys())
         pkg = stream1.parse(res[0].streams[StreamName("eiger")])
         print(pkg)
         if isinstance(pkg, Stream1Data):

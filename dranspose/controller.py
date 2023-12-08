@@ -23,7 +23,10 @@ import redis.exceptions as rexceptions
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 
-from dranspose.parameters import Parameter, StrParameter, FileParameter
+from dranspose.parameters import (
+    Parameter,
+    ParameterType,
+)
 from dranspose.protocol import (
     IngesterState,
     WorkerState,
@@ -142,13 +145,16 @@ class Controller:
         )
         return self.parameters_hash
 
-    async def describe_parameters(self) -> list[StrParameter | FileParameter]:
+    async def describe_parameters(self) -> list[ParameterType]:
         desc_keys = await self.redis.keys(RedisKeys.parameter_description())
         param_json = await self.redis.mget(desc_keys)
 
-        return sorted(
-            [Parameter.validate_json(i) for i in param_json], key=lambda x: x.name
-        )
+        params: list[ParameterType] = []
+        for i in param_json:
+            val: ParameterType = Parameter.validate_json(i)  # type: ignore
+            params.append(val)
+
+        return sorted(params, key=lambda x: x.name)
 
     async def assign_work(self) -> None:
         last = 0
@@ -310,7 +316,8 @@ async def get_progress() -> dict[str, Any]:
 
 @app.post("/api/v1/mapping")
 async def set_mapping(
-    mapping: Dict[StreamName, List[Optional[List[VirtualWorker]]]]
+    mapping: Dict[StreamName, List[Optional[List[VirtualWorker]]]],
+    all_wrap: bool = True,
 ) -> UUID4 | str:
     global ctrl
     config = await ctrl.get_configs()
@@ -318,7 +325,7 @@ async def set_mapping(
         return (
             f"streams {set(mapping.keys()) - set(config.get_streams())} not available"
         )
-    m = Mapping(mapping)
+    m = Mapping(mapping, add_start_end=all_wrap)
     if len(config.workers) < m.min_workers():
         return f"only {len(config.workers)} workers available, but {m.min_workers()} required"
     await ctrl.set_mapping(m)
@@ -343,6 +350,6 @@ async def get_param(name: ParameterName) -> Response:
 
 
 @app.get("/api/v1/parameters")
-async def param_descr() -> list[StrParameter | FileParameter]:
+async def param_descr() -> list[ParameterType]:
     global ctrl
     return await ctrl.describe_parameters()
