@@ -186,7 +186,15 @@ async def stream_eiger() -> Callable[
 
 @pytest_asyncio.fixture
 async def stream_pkls() -> Callable[
-    [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
+    [
+        zmq.Context[Any],
+        int,
+        os.PathLike[Any] | str,
+        float,
+        int,
+        Optional[int],
+        Optional[int],
+    ],
     Coroutine[Any, Any, None],
 ]:
     async def _make_pkls(

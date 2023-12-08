@@ -21,8 +21,9 @@ class StreamingXspressIngester(Ingester):
     def __init__(
         self, name: StreamName, settings: Optional[StreamingXspressSettings] = None
     ) -> None:
-        self._streaming_xspress_settings = settings
-        if self._streaming_xspress_settings is None:
+        if settings is not None:
+            self._streaming_xspress_settings = settings
+        else:
             self._streaming_xspress_settings = StreamingXspressSettings()
 
         super().__init__(
@@ -30,7 +31,7 @@ class StreamingXspressIngester(Ingester):
         )
         self.state.streams = [name]
 
-        self.in_socket = None
+        self.in_socket: Optional[zmq._future._AsyncSocket] = None
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
         self.in_socket = self.ctx.socket(zmq.SUB)

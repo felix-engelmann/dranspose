@@ -22,15 +22,16 @@ class StreamingContrastIngester(Ingester):
     def __init__(
         self, name: StreamName, settings: Optional[StreamingContrastSettings] = None
     ) -> None:
-        self._streaming_contrast_settings = settings
-        if self._streaming_contrast_settings is None:
+        if settings is not None:
+            self._streaming_contrast_settings = settings
+        else:
             self._streaming_contrast_settings = StreamingContrastSettings()
 
         super().__init__(
             IngesterName(f"{name}_ingester"), settings=self._streaming_contrast_settings
         )
         self.state.streams = [name]
-        self.in_socket = None
+        self.in_socket: Optional[zmq._future._AsyncSocket] = None
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
         self.in_socket = self.ctx.socket(zmq.SUB)

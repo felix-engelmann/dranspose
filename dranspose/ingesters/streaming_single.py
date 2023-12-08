@@ -20,18 +20,24 @@ class StreamingSingleIngester(Ingester):
     def __init__(
         self, name: StreamName, settings: Optional[StreamingSingleSettings] = None
     ) -> None:
-        self._streaming_single_settings = settings
-        if self._streaming_single_settings is None:
+        if settings is not None:
+            self._streaming_single_settings = settings
+        else:
             self._streaming_single_settings = StreamingSingleSettings()
 
         super().__init__(
             IngesterName(f"{name}_ingester"), settings=self._streaming_single_settings
         )
         self.state.streams = [name]
-        self.in_socket = self.ctx.socket(zmq.PULL)
-        self.in_socket.connect(str(self._streaming_single_settings.upstream_url))
+        self.in_socket: Optional[zmq._future._AsyncSocket] = None
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
+        self.in_socket = self.ctx.socket(zmq.PULL)
+        self.in_socket.connect(str(self._streaming_single_settings.upstream_url))
+        self._logger.info(
+            "pulling from %s", self._streaming_single_settings.upstream_url
+        )
+
         while True:
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)
@@ -60,3 +66,9 @@ class StreamingSingleIngester(Ingester):
         while True:
             self._logger.debug("discarding messages until next run")
             await self.in_socket.recv_multipart(copy=False)
+
+    async def stop_source(self, stream: StreamName) -> None:
+        if self.in_socket:
+            self._logger.info("closing socket without linger")
+            self.in_socket.close(linger=0)
+            self.in_socket = None

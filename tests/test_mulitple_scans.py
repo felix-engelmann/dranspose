@@ -156,7 +156,7 @@ async def test_multiple_scans(
         PosixPath("tests/data/xspress3mini-dump20.pkls"),
         0.001,
         zmq.PUB,
-        begin=30,
+        begin=30,  # type: ignore[call-arg]
     )
 
     asyncio.create_task(
