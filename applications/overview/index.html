@@ -894,7 +894,7 @@
 <h1 id="application-development">Application Development</h1>
 <p>Unlike sequential processing of data, dranspose leverages parallel processing to achieve the throughput necesary for live processing.</p>
 <p>We use the <em>map reduce</em> programming model for distributing work.
-Parallel workers unfortunately have to work independently. Therefore, they only have access 
+Parallel workers unfortunately have to work independently. Therefore, they only have access
 to a single event at a time. They may store local state, but don't have access to arbitrary other events.</p>
 <p>For data analysis which has to cross all events, there is a secondary <em>reduce</em> step which can only cope with reduced data, but gets all events delivered.</p>
 <p>A lot of common analysis tasks are easily mapped to this programming model.

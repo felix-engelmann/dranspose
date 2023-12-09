@@ -834,7 +834,7 @@ This is useful to get the initial data to develop a worker which can digest thes
 <p>The <code>ingesters</code> map specifies the name of the stream, the <code>connect_url</code> on where to connect to and the class.
 Other ingesters may need additional settings.</p>
 <p>The <code>workers</code> and the <code>reducer</code> run with a custom docker image which contains all the dependencies for the analysis
-<code>worker.class</code> and <code>reducer.class</code> specify the paths to the correct classes in the analysis container. </p>
+<code>worker.class</code> and <code>reducer.class</code> specify the paths to the correct classes in the analysis container.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">global</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">beamline</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nanomax</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">dump_prefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"> </span><span class="c1">#&quot;/data/staff/dummymax/dumps/ingest_dump_&quot;</span>
