@@ -1,5 +1,8 @@
 import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Optional
+
+from pydantic import TypeAdapter
+
 from dranspose.protocol import (
     EnsembleState,
     StreamName,
@@ -7,6 +10,8 @@ from dranspose.protocol import (
     WorkerTimes,
     VirtualWorker,
     VirtualConstraint,
+    EventNumber,
+    SystemLoadType,
 )
 from dranspose.ingester import Ingester
 from dranspose.ingesters.streaming_single import (
@@ -20,21 +25,44 @@ import zmq.asyncio
 import zmq
 from pydantic_core import Url
 
-from dranspose.worker import Worker
+from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.asyncio
 async def test_simple(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
-    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_worker: Callable[[WorkerName | Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_eiger: Callable[
         [zmq.Context[Any], int, int, float], Coroutine[Any, Any, None]
     ],
 ) -> None:
     await reducer(None)
-    await create_worker(WorkerName("w1"))
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("w1"),
+                worker_class="examples.slow.worker:SlowWorker",
+            ),
+        )
+    )
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("w2"),
+                worker_class="examples.slow.worker:SlowWorker",
+            ),
+        )
+    )
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("w3"),
+                worker_class="examples.slow.worker:SlowWorker",
+            ),
+        )
+    )
     await create_ingester(
         StreamingSingleIngester(
             name=StreamName("eiger"),
@@ -50,7 +78,7 @@ async def test_simple(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        ntrig = 10
+        ntrig = 100
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
             json={
@@ -84,7 +112,18 @@ async def test_simple(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/status")
         content = await st.json()
-        assert (
-            len([WorkerTimes.model_validate(x) for x in content["processing_times"]])
-            == ntrig + 1
+        wtimes = TypeAdapter(dict[WorkerName, dict[EventNumber, WorkerTimes]])
+        times = wtimes.validate_python(content["processing_times"])
+        print(times)
+        st = await session.get(
+            "http://localhost:5000/api/v1/load?intervals=1&intervals=10&scan=True"
         )
+        load = await st.json()
+        lta = TypeAdapter(SystemLoadType)
+        system_load = lta.validate_python(load)
+        print("")
+        print(system_load)
+        for wn, wl in system_load.items():
+            assert wl.last_event == 100
+            assert wl.intervals["scan"].load > 0.8
+        assert sum([len(e) for e in times.values()]) == ntrig - 1 + 2 * 3

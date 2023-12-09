@@ -11,7 +11,7 @@ from pydantic import (
 )
 
 from uuid import uuid4
-from functools import cache
+from functools import cache, cached_property
 
 from pydantic_core import Url
 
@@ -165,6 +165,36 @@ class WorkerTimes(BaseModel):
             custom_code=custom - event,
             send_result=send - custom,
         )
+
+    @cached_property
+    def total(self) -> float:
+        return self.get_assignments + self.get_messages + self.active
+
+    @cached_property
+    def active(self) -> float:
+        return self.assemble_event + self.custom_code + self.send_result
+
+    @cached_property
+    def load(self) -> float:
+        return self.active / self.total
+
+
+class IntervalLoad(BaseModel):
+    total: float
+    active: float
+    events: int
+
+    @cached_property
+    def load(self) -> float:
+        return self.active / self.total
+
+
+class WorkerLoad(BaseModel):
+    last_event: int
+    intervals: dict[int | Literal["scan"], IntervalLoad]
+
+
+SystemLoadType = dict[WorkerName, WorkerLoad]
 
 
 class WorkerUpdate(BaseModel):

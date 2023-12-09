@@ -5,7 +5,7 @@ This is the central service to orchestrate all distributed components
 import asyncio
 from asyncio import Task
 from collections import defaultdict
-from typing import Dict, List, Any, AsyncGenerator, Optional
+from typing import Dict, List, Any, AsyncGenerator, Optional, Annotated, Literal
 
 import logging
 import time
@@ -21,7 +21,7 @@ import redis.asyncio as redis
 import redis.exceptions as rexceptions
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 
 from dranspose.parameters import (
     Parameter,
@@ -44,6 +44,9 @@ from dranspose.protocol import (
     WorkerTimes,
     Digest,
     ParameterName,
+    SystemLoadType,
+    IntervalLoad,
+    WorkerLoad,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,12 +66,15 @@ class Controller:
             f"{self.settings.redis_dsn}?decode_responses=True&protocol=3"
         )
         self.mapping = Mapping({})
+        self.mapping_update_lock = asyncio.Lock()
         self.parameters: dict[ParameterName, WorkParameter] = {}
         self.parameters_hash = parameters_hash(self.parameters)
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
         self.assign_task: Task[None]
-        self.worker_timing: list[WorkerTimes] = []
+        self.worker_timing: dict[
+            WorkerName, dict[EventNumber, WorkerTimes]
+        ] = defaultdict(dict)
 
     async def run(self) -> None:
         logger.debug("started controller run")
@@ -92,40 +98,68 @@ class Controller:
             reducer = ReducerState.model_validate_json(reducer_json)
         return EnsembleState(ingesters=ingesters, workers=workers, reducer=reducer)
 
+    async def get_load(self, intervals: list[int], scan: bool = True) -> SystemLoadType:
+        ret = {}
+        for wn, wt in self.worker_timing.items():
+            last_event = max(wt.keys())
+            itval: dict[int | Literal["scan"], IntervalLoad] = {}
+            for interval in intervals:
+                evs = list(
+                    filter(
+                        lambda x: x >= len(self.completed_events) - interval,
+                        wt.keys(),
+                    )
+                )
+                itval[interval] = IntervalLoad(
+                    total=sum([wt[e].total for e in evs]),
+                    active=sum([wt[e].active for e in evs]),
+                    events=len(evs),
+                )
+            if scan:
+                evs = list(wt.keys())
+                itval["scan"] = IntervalLoad(
+                    total=sum([wt[e].total for e in evs]),
+                    active=sum([wt[e].active for e in evs]),
+                    events=len(evs),
+                )
+            ret[wn] = WorkerLoad(last_event=last_event, intervals=itval)
+        return ret
+
     async def set_mapping(self, m: Mapping) -> None:
-        logger.debug("cancelling assign task")
-        self.assign_task.cancel()
-        logger.debug(
-            "deleting keys %s and %s",
-            RedisKeys.ready(self.mapping.uuid),
-            RedisKeys.assigned(self.mapping.uuid),
-        )
-        await self.redis.delete(RedisKeys.ready(self.mapping.uuid))
-        await self.redis.delete(RedisKeys.assigned(self.mapping.uuid))
+        async with self.mapping_update_lock:
+            logger.debug("cancelling assign task")
+            self.assign_task.cancel()
+            logger.debug(
+                "deleting keys %s and %s",
+                RedisKeys.ready(self.mapping.uuid),
+                RedisKeys.assigned(self.mapping.uuid),
+            )
+            await self.redis.delete(RedisKeys.ready(self.mapping.uuid))
+            await self.redis.delete(RedisKeys.assigned(self.mapping.uuid))
 
-        # cleaned up
-        self.mapping = m
-        cupd = ControllerUpdate(
-            mapping_uuid=self.mapping.uuid,
-            parameters_version={n: p.uuid for n, p in self.parameters.items()},
-        )
-        logger.debug("send controller update %s", cupd)
-        await self.redis.xadd(
-            RedisKeys.updates(),
-            {"data": cupd.model_dump_json()},
-        )
+            # cleaned up
+            self.mapping = m
+            cupd = ControllerUpdate(
+                mapping_uuid=self.mapping.uuid,
+                parameters_version={n: p.uuid for n, p in self.parameters.items()},
+            )
+            logger.debug("send controller update %s", cupd)
+            await self.redis.xadd(
+                RedisKeys.updates(),
+                {"data": cupd.model_dump_json()},
+            )
 
-        cfgs = await self.get_configs()
-        while cfgs.reducer is None or set(
-            [u.mapping_uuid for u in cfgs.ingesters]
-            + [u.mapping_uuid for u in cfgs.workers]
-            + [cfgs.reducer.mapping_uuid]
-        ) != {self.mapping.uuid}:
-            await asyncio.sleep(0.1)
             cfgs = await self.get_configs()
-            # logger.debug("updated configs %s", cfgs)
-        logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
-        self.assign_task = asyncio.create_task(self.assign_work())
+            while cfgs.reducer is None or set(
+                [u.mapping_uuid for u in cfgs.ingesters]
+                + [u.mapping_uuid for u in cfgs.workers]
+                + [cfgs.reducer.mapping_uuid]
+            ) != {self.mapping.uuid}:
+                await asyncio.sleep(0.1)
+                cfgs = await self.get_configs()
+                # logger.debug("updated configs %s", cfgs)
+            logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
+            self.assign_task = asyncio.create_task(self.assign_work())
 
     async def set_param(self, name: ParameterName, data: bytes) -> Digest:
         param = WorkParameter(name=name, data=data)
@@ -161,7 +195,7 @@ class Controller:
         event_no = 0
         self.completed = defaultdict(list)
         self.completed_events = []
-        self.worker_timing = []
+        self.worker_timing = defaultdict(dict)
         notify_finish = True
         start = time.perf_counter()
         while True:
@@ -187,7 +221,9 @@ class Controller:
                             )
                             if not update.new:
                                 if update.processing_times:
-                                    self.worker_timing.append(update.processing_times)
+                                    self.worker_timing[update.worker][
+                                        update.completed
+                                    ] = update.processing_times
                                 compev = update.completed
                                 self.completed[compev].append(update.worker)
                                 logger.debug(
@@ -301,6 +337,16 @@ async def get_status() -> dict[str, Any]:
         "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
         "processing_times": ctrl.worker_timing,
     }
+
+
+@app.get("/api/v1/load")
+async def get_load(
+    intervals: Annotated[list[int] | None, Query()] = None, scan: bool = True
+) -> SystemLoadType:
+    global ctrl
+    if intervals is None:
+        intervals = [1, 10]
+    return await ctrl.get_load(intervals, scan)
 
 
 @app.get("/api/v1/progress")
