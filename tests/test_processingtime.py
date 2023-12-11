@@ -38,6 +38,12 @@ async def test_simple(
         [zmq.Context[Any], int, int, float], Coroutine[Any, Any, None]
     ],
 ) -> None:
+    async with aiohttp.ClientSession() as session:
+        st = await session.get(
+            "http://localhost:5000/api/v1/load?intervals=1&intervals=10&scan=True"
+        )
+        load = await st.json()
+        assert load == {}
     await reducer(None)
     await create_worker(
         Worker(
@@ -77,6 +83,12 @@ async def test_simple(
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
+
+        st = await session.get(
+            "http://localhost:5000/api/v1/load?intervals=1&intervals=10&scan=True"
+        )
+        load = await st.json()
+        assert load == {}
 
         ntrig = 100
         resp = await session.post(
