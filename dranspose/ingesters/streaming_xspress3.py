@@ -10,7 +10,7 @@ from dranspose.data.xspress3 import (
 )
 from dranspose.event import StreamData
 from dranspose.ingester import Ingester, IngesterSettings
-from dranspose.protocol import StreamName, ZmqUrl, IngesterName
+from dranspose.protocol import StreamName, ZmqUrl
 
 
 class StreamingXspressSettings(IngesterSettings):
@@ -18,18 +18,13 @@ class StreamingXspressSettings(IngesterSettings):
 
 
 class StreamingXspressIngester(Ingester):
-    def __init__(
-        self, name: StreamName, settings: Optional[StreamingXspressSettings] = None
-    ) -> None:
+    def __init__(self, settings: Optional[StreamingXspressSettings] = None) -> None:
         if settings is not None:
             self._streaming_xspress_settings = settings
         else:
             self._streaming_xspress_settings = StreamingXspressSettings()
 
-        super().__init__(
-            IngesterName(f"{name}_ingester"), settings=self._streaming_xspress_settings
-        )
-        self.state.streams = [name]
+        super().__init__(settings=self._streaming_xspress_settings)
 
         self.in_socket: Optional[zmq._future._AsyncSocket] = None
 

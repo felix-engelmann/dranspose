@@ -50,16 +50,17 @@ async def test_dump(
 
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("eiger"),
             settings=StreamingSingleSettings(
-                upstream_url=Url("tcp://localhost:9999"), dump_path=p_eiger
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+                dump_path=p_eiger,
             ),
         )
     )
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("orca"),
             settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("orca")],
                 upstream_url=Url("tcp://localhost:9998"),
                 ingester_url=Url("tcp://localhost:10011"),
             ),
@@ -67,8 +68,8 @@ async def test_dump(
     )
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("alba"),
             settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("alba")],
                 upstream_url=Url("tcp://localhost:9997"),
                 ingester_url=Url("tcp://localhost:10012"),
             ),
@@ -76,8 +77,8 @@ async def test_dump(
     )
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("slow"),
             settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("slow")],
                 upstream_url=Url("tcp://localhost:9996"),
                 ingester_url=Url("tcp://localhost:10013"),
             ),

@@ -51,8 +51,8 @@ async def test_multiple_scans(
     )
     await create_ingester(
         StreamingContrastIngester(
-            name=StreamName("contrast"),
             settings=StreamingContrastSettings(
+                ingester_streams=[StreamName("contrast")],
                 upstream_url=Url("tcp://localhost:5556"),
                 ingester_url=Url("tcp://localhost:10000"),
             ),
@@ -60,8 +60,8 @@ async def test_multiple_scans(
     )
     await create_ingester(
         StreamingXspressIngester(
-            name=StreamName("xspress3"),
             settings=StreamingXspressSettings(
+                ingester_streams=[StreamName("xspress3")],
                 upstream_url=Url("tcp://localhost:9999"),
                 ingester_url=Url("tcp://localhost:10001"),
             ),

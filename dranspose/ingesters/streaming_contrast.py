@@ -11,7 +11,7 @@ from dranspose.data.contrast import (
 )
 from dranspose.event import StreamData
 from dranspose.ingester import Ingester, IngesterSettings
-from dranspose.protocol import StreamName, ZmqUrl, IngesterName
+from dranspose.protocol import StreamName, ZmqUrl
 
 
 class StreamingContrastSettings(IngesterSettings):
@@ -19,18 +19,13 @@ class StreamingContrastSettings(IngesterSettings):
 
 
 class StreamingContrastIngester(Ingester):
-    def __init__(
-        self, name: StreamName, settings: Optional[StreamingContrastSettings] = None
-    ) -> None:
+    def __init__(self, settings: Optional[StreamingContrastSettings] = None) -> None:
         if settings is not None:
             self._streaming_contrast_settings = settings
         else:
             self._streaming_contrast_settings = StreamingContrastSettings()
 
-        super().__init__(
-            IngesterName(f"{name}_ingester"), settings=self._streaming_contrast_settings
-        )
-        self.state.streams = [name]
+        super().__init__(settings=self._streaming_contrast_settings)
         self.in_socket: Optional[zmq._future._AsyncSocket] = None
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:

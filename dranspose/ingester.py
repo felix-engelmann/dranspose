@@ -6,7 +6,7 @@ from typing import AsyncGenerator, Optional, Awaitable, Any, IO
 import redis.exceptions as rexceptions
 import zmq.asyncio
 
-from pydantic import UUID4
+from pydantic import UUID4, model_validator
 
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import StreamData, InternalWorkerMessage
@@ -21,8 +21,21 @@ from dranspose.protocol import (
 
 
 class IngesterSettings(DistributedSettings):
+    ingester_streams: list[StreamName]
+    ingester_name: IngesterName
     ingester_url: ZmqUrl = ZmqUrl("tcp://localhost:10000")
     dump_path: Optional[os.PathLike[Any] | str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def create_default_name(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "ingester_name" not in data and "ingester_streams" in data:
+                if isinstance(data["ingester_streams"], list):
+                    data["ingester_name"] = (
+                        "_".join(map(str, data["ingester_streams"])) + "-ingester"
+                    )
+        return data
 
 
 class Ingester(DistributedService):
@@ -32,18 +45,18 @@ class Ingester(DistributedService):
     For the instance to do anything, await `run()`
     """
 
-    def __init__(self, name: IngesterName, settings: Optional[IngesterSettings] = None):
+    def __init__(self, settings: Optional[IngesterSettings] = None):
         if settings is None:
             settings = IngesterSettings()
         self._ingester_settings = settings
-        streams: list[StreamName] = []
         state = IngesterState(
-            name=name,
+            name=self._ingester_settings.ingester_name,
             url=self._ingester_settings.ingester_url,
-            streams=streams,
+            streams=self._ingester_settings.ingester_streams,
         )
 
         super().__init__(state=state, settings=self._ingester_settings)
+        self._logger.info("created ingester with state %s", state)
         self.state: IngesterState
 
         self.dump_file: Optional[IO[bytes]] = None

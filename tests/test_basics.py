@@ -39,8 +39,10 @@ async def test_simple(
     await create_worker(WorkerName("w1"))
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
+            settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+            ),
         )
     )
 
@@ -114,14 +116,16 @@ async def test_map(
     await create_worker(WorkerName("w3"))
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
+            settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+            ),
         )
     )
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("orca"),
             settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("orca")],
                 upstream_url=Url("tcp://localhost:9998"),
                 ingester_url=Url("tcp://localhost:10011"),
             ),
@@ -129,8 +133,8 @@ async def test_map(
     )
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("alba"),
             settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("alba")],
                 upstream_url=Url("tcp://localhost:9997"),
                 ingester_url=Url("tcp://localhost:10012"),
             ),
@@ -138,8 +142,8 @@ async def test_map(
     )
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("slow"),
             settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("slow")],
                 upstream_url=Url("tcp://localhost:9996"),
                 ingester_url=Url("tcp://localhost:10013"),
             ),

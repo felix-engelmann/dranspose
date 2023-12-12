@@ -33,6 +33,7 @@ class Reducer(DistributedService):
 
         state = ReducerState(url=self._reducer_settings.reducer_url)
         super().__init__(state, self._reducer_settings)
+        self._logger.info("created reducer with state %s", state)
         self.state: ReducerState
         self.ctx = zmq.asyncio.Context()
         self.in_socket = self.ctx.socket(zmq.PULL)

@@ -56,8 +56,10 @@ async def test_not_enough_workers(
 ) -> None:
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
+            settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+            ),
         )
     )
     async with aiohttp.ClientSession() as session:

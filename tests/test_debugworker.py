@@ -76,8 +76,10 @@ async def test_debug(
     await debug_worker("debugworker", ["debug"])
     await create_ingester(
         StreamingSingleIngester(
-            name=StreamName("eiger"),
-            settings=StreamingSingleSettings(upstream_url=Url("tcp://localhost:9999")),
+            settings=StreamingSingleSettings(
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+            ),
         )
     )
 
