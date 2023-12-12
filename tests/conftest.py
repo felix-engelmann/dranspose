@@ -11,10 +11,13 @@ from typing import (
     Optional,
 )
 
+import aiohttp
 import numpy as np
 import pytest_asyncio
 import uvicorn
 import zmq
+from fastapi import FastAPI
+from pydantic import HttpUrl
 from pydantic_core import Url
 
 from dranspose.controller import app
@@ -105,6 +108,49 @@ async def reducer(
             await asyncio.sleep(0.1)
 
     yield start_reducer
+
+    for server, task in server_tasks:
+        server.should_exit = True
+        await task
+
+    await asyncio.sleep(0.1)
+
+
+@pytest_asyncio.fixture()
+async def http_ingester(
+    tmp_path: Any,
+) -> AsyncIterator[
+    Callable[[FastAPI, int, dict[str, Any]], Coroutine[None, None, None]]
+]:
+    server_tasks = []
+
+    async def start_ingester(
+        custom_app: FastAPI, port: int = 5002, env: Optional[dict[str, Any]] = None
+    ) -> None:
+        envfile = None
+        if env:
+            p = tmp_path / "http_ingester.env"
+            print(p, type(p))
+            p.write_text(
+                "\n".join(
+                    [
+                        f"""
+                {var.upper()}='{json.dumps(val)}'
+                """
+                        for var, val in env.items()
+                    ]
+                )
+            )
+            envfile = str(p)
+        config = uvicorn.Config(
+            custom_app, port=port, log_level="debug", env_file=envfile
+        )
+        server = uvicorn.Server(config)
+        server_tasks.append((server, asyncio.create_task(server.serve())))
+        while server.started is False:
+            await asyncio.sleep(0.1)
+
+    yield start_ingester
 
     for server, task in server_tasks:
         server.should_exit = True
@@ -272,3 +318,92 @@ async def stream_alba() -> Callable[
         await socket.close()
 
     return _make_alba
+
+
+@pytest_asyncio.fixture
+async def stream_sardana() -> Callable[[HttpUrl, int], Coroutine[Any, Any, None]]:
+    async def _make_sardana(url: HttpUrl, nframes: int) -> None:
+        async with aiohttp.ClientSession() as session:
+            descurl = HttpUrl.build(
+                scheme=url.scheme,
+                username=url.username,
+                password=url.password,
+                host=url.host or "localhost",
+                port=url.port,
+                path="v1/data_desc",
+            )
+            recurl = HttpUrl.build(
+                scheme=url.scheme,
+                username=url.username,
+                password=url.password,
+                host=url.host or "localhost",
+                port=url.port,
+                path="v1/record_data",
+            )
+            endurl = HttpUrl.build(
+                scheme=url.scheme,
+                username=url.username,
+                password=url.password,
+                host=url.host or "localhost",
+                port=url.port,
+                path="v1/record_end",
+            )
+            st = await session.post(
+                str(descurl),
+                json={
+                    "column_desc": [
+                        {
+                            "name": "point_nb",
+                            "label": "#Pt No",
+                            "dtype": "int64",
+                            "shape": [],
+                        },
+                        {
+                            "min_value": 0,
+                            "max_value": 0.1,
+                            "instrument": "",
+                            "name": "dummy_mot_01",
+                            "label": "dummy_mot_01",
+                            "dtype": "float64",
+                            "shape": [],
+                            "is_reference": True,
+                        },
+                        {
+                            "name": "timestamp",
+                            "label": "dt",
+                            "dtype": "float64",
+                            "shape": [],
+                        },
+                    ],
+                    "ref_moveables": ["dummy_mot_01"],
+                    "estimatedtime": -2.6585786096205566,
+                    "total_scan_intervals": 2,
+                    "starttime": "Mon Apr 17 14:19:35 2023",
+                    "title": "burstscan dummy_mot_01 0.0 0.1 2 50",
+                    "counters": [
+                        "tango://b-v-femtomax-csdb-0.maxiv.lu.se:10000/expchan/oscc_02_seq_ctrl/1",
+                        "tango://b-v-femtomax-csdb-0.maxiv.lu.se:10000/expchan/panda_femtopcap_ctrl/4",
+                        "tango://b-v-femtomax-csdb-0.maxiv.lu.se:10000/expchan/panda_femtopcap_ctrl/5",
+                    ],
+                    "scanfile": ["stream.daq", "tests_03.h5"],
+                    "scandir": "/data/staff/femtomax/20230413",
+                    "serialno": 20338,
+                },
+            )
+            assert st.status == 200
+
+            for frameno in range(nframes):
+                st = await session.post(
+                    str(recurl),
+                    json={
+                        "point_nb": frameno,
+                        "dummy_mot_01": 0,
+                        "timestamp": 0.6104741096496582,
+                    },
+                )
+                assert st.status == 200
+                await asyncio.sleep(0.1)
+            st = await session.post(str(endurl), json={})
+            assert st.status == 200
+
+    return _make_sardana
