@@ -341,7 +341,13 @@ class Worker(DistributedService):
                 for ing, conn_ing in self._ingesters.items()
                 for s in conn_ing.config.streams
             }
-            self.state.ingesters = [a.config for a in self._ingesters.values()]
+            new_ingesters = [a.config for a in self._ingesters.values()]
+            if self.state.ingesters != new_ingesters:
+                self.state.ingesters = new_ingesters
+                self._logger.info(
+                    "changed ingester config, fast publish %s", new_ingesters
+                )
+                await self.publish_config()
 
             await asyncio.sleep(2)
 

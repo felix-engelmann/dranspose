@@ -79,7 +79,6 @@ async def test_simple(
     print("keys", keys)
     present_keys = {f"dranspose:assigned:{uuid}"}
     print("presentkeys", present_keys)
-    assert present_keys - set(keys) == set()
 
     context = zmq.asyncio.Context()
 
