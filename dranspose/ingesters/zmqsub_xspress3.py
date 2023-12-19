@@ -13,16 +13,16 @@ from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl
 
 
-class StreamingXspressSettings(IngesterSettings):
+class ZmqSubXspressSettings(IngesterSettings):
     upstream_url: ZmqUrl
 
 
-class StreamingXspressIngester(Ingester):
-    def __init__(self, settings: Optional[StreamingXspressSettings] = None) -> None:
+class ZmqSubXspressIngester(Ingester):
+    def __init__(self, settings: Optional[ZmqSubXspressSettings] = None) -> None:
         if settings is not None:
             self._streaming_xspress_settings = settings
         else:
-            self._streaming_xspress_settings = StreamingXspressSettings()
+            self._streaming_xspress_settings = ZmqSubXspressSettings()
 
         super().__init__(settings=self._streaming_xspress_settings)
 

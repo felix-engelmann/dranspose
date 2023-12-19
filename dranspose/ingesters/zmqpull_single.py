@@ -8,20 +8,20 @@ from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl
 
 
-class StreamingSingleSettings(IngesterSettings):
+class ZmqPullSingleSettings(IngesterSettings):
     upstream_url: ZmqUrl
 
 
-class StreamingSingleIngester(Ingester):
+class ZmqPullSingleIngester(Ingester):
     """
     A simple ingester class to comsume a stream from the streaming-receiver repub port
     """
 
-    def __init__(self, settings: Optional[StreamingSingleSettings] = None) -> None:
+    def __init__(self, settings: Optional[ZmqPullSingleSettings] = None) -> None:
         if settings is not None:
             self._streaming_single_settings = settings
         else:
-            self._streaming_single_settings = StreamingSingleSettings()
+            self._streaming_single_settings = ZmqPullSingleSettings()
 
         super().__init__(settings=self._streaming_single_settings)
         self.in_socket: Optional[zmq._future._AsyncSocket] = None

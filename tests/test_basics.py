@@ -9,9 +9,9 @@ import zmq
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
     EnsembleState,
@@ -38,8 +38,8 @@ async def test_simple(
     await reducer(None)
     await create_worker(WorkerName("w1"))
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),
@@ -114,16 +114,16 @@ async def test_map(
     await create_worker(WorkerName("w2"))
     await create_worker(WorkerName("w3"))
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("orca")],
                 upstream_url=Url("tcp://localhost:9998"),
                 ingester_url=Url("tcp://localhost:10011"),
@@ -131,8 +131,8 @@ async def test_map(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("alba")],
                 upstream_url=Url("tcp://localhost:9997"),
                 ingester_url=Url("tcp://localhost:10012"),
@@ -140,8 +140,8 @@ async def test_map(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("slow")],
                 upstream_url=Url("tcp://localhost:9996"),
                 ingester_url=Url("tcp://localhost:10013"),

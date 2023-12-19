@@ -13,17 +13,17 @@ from pydantic_settings import BaseSettings
 from dranspose.controller import app
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
 )
-from dranspose.ingesters.streaming_contrast import (  # noqa: F401
-    StreamingContrastIngester,
-    StreamingContrastSettings,
+from dranspose.ingesters.zmqsub_contrast import (  # noqa: F401
+    ZmqSubContrastIngester,
+    ZmqSubContrastSettings,
 )
-from dranspose.ingesters.streaming_xspress3 import (  # noqa: F401
-    StreamingXspressIngester,
-    StreamingXspressSettings,
+from dranspose.ingesters.zmqsub_xspress3 import (  # noqa: F401
+    ZmqSubXspressIngester,
+    ZmqSubXspressSettings,
 )
 from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker, WorkerSettings
@@ -43,8 +43,8 @@ logging.basicConfig(level=settings.log_level.upper())
 async def main() -> None:
     ins = []
     ins.append(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),

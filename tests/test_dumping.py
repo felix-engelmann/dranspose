@@ -11,9 +11,9 @@ from pydantic_core import Url
 
 from dranspose.event import InternalWorkerMessage
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
     EnsembleState,
@@ -49,8 +49,8 @@ async def test_dump(
     print(p_eiger, type(p_eiger))
 
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
                 dump_path=p_eiger,
@@ -58,8 +58,8 @@ async def test_dump(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("orca")],
                 upstream_url=Url("tcp://localhost:9998"),
                 ingester_url=Url("tcp://localhost:10011"),
@@ -67,8 +67,8 @@ async def test_dump(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("alba")],
                 upstream_url=Url("tcp://localhost:9997"),
                 ingester_url=Url("tcp://localhost:10012"),
@@ -76,8 +76,8 @@ async def test_dump(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("slow")],
                 upstream_url=Url("tcp://localhost:9996"),
                 ingester_url=Url("tcp://localhost:10013"),

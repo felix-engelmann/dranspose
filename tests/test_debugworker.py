@@ -13,9 +13,9 @@ from pydantic_core import Url
 from dranspose.data.stream1 import Stream1Data
 from dranspose.event import EventData
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
 )
 from dranspose.middlewares import stream1
 from dranspose.protocol import (
@@ -75,8 +75,8 @@ async def test_debug(
     await create_worker(WorkerName("w1"))
     await debug_worker("debugworker", ["debug"])
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),

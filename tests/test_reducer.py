@@ -12,13 +12,13 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_contrast import (
-    StreamingContrastIngester,
-    StreamingContrastSettings,
+from dranspose.ingesters.zmqsub_contrast import (
+    ZmqSubContrastIngester,
+    ZmqSubContrastSettings,
 )
-from dranspose.ingesters.streaming_xspress3 import (
-    StreamingXspressIngester,
-    StreamingXspressSettings,
+from dranspose.ingesters.zmqsub_xspress3 import (
+    ZmqSubXspressIngester,
+    ZmqSubXspressSettings,
 )
 from dranspose.protocol import (
     EnsembleState,
@@ -54,8 +54,8 @@ async def test_reduction(
     p_contrast = tmp_path / "contrast_ingest.pkls"
     print(p_contrast)
     await create_ingester(
-        StreamingContrastIngester(
-            settings=StreamingContrastSettings(
+        ZmqSubContrastIngester(
+            settings=ZmqSubContrastSettings(
                 ingester_streams=[StreamName("contrast")],
                 upstream_url=Url("tcp://localhost:5556"),
                 ingester_url=Url("tcp://localhost:10000"),
@@ -65,8 +65,8 @@ async def test_reduction(
     )
     p_xspress = tmp_path / "xspress_ingest.pkls"
     await create_ingester(
-        StreamingXspressIngester(
-            settings=StreamingXspressSettings(
+        ZmqSubXspressIngester(
+            settings=ZmqSubXspressSettings(
                 ingester_streams=[StreamName("xspress3")],
                 upstream_url=Url("tcp://localhost:9999"),
                 ingester_url=Url("tcp://localhost:10001"),

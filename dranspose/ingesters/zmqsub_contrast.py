@@ -14,16 +14,16 @@ from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl
 
 
-class StreamingContrastSettings(IngesterSettings):
+class ZmqSubContrastSettings(IngesterSettings):
     upstream_url: ZmqUrl
 
 
-class StreamingContrastIngester(Ingester):
-    def __init__(self, settings: Optional[StreamingContrastSettings] = None) -> None:
+class ZmqSubContrastIngester(Ingester):
+    def __init__(self, settings: Optional[ZmqSubContrastSettings] = None) -> None:
         if settings is not None:
             self._streaming_contrast_settings = settings
         else:
-            self._streaming_contrast_settings = StreamingContrastSettings()
+            self._streaming_contrast_settings = ZmqSubContrastSettings()
 
         super().__init__(settings=self._streaming_contrast_settings)
         self.in_socket: Optional[zmq._future._AsyncSocket] = None

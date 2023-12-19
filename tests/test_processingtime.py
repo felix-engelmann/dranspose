@@ -14,9 +14,9 @@ from dranspose.protocol import (
     SystemLoadType,
 )
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
 )
 import aiohttp
 
@@ -70,8 +70,8 @@ async def test_simple(
         )
     )
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),

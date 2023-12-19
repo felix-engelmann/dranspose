@@ -6,9 +6,9 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters.streaming_single import (
-    StreamingSingleIngester,
-    StreamingSingleSettings,
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
     EnsembleState,
@@ -55,8 +55,8 @@ async def test_not_enough_workers(
     controller: None, create_ingester: Callable[[Ingester], Awaitable[Ingester]]
 ) -> None:
     await create_ingester(
-        StreamingSingleIngester(
-            settings=StreamingSingleSettings(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),
