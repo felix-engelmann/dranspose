@@ -13,17 +13,10 @@ from pydantic_settings import BaseSettings
 from dranspose.controller import app
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
+from dranspose.ingesters import *  # noqa: F403, F401
 from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
-)
-from dranspose.ingesters.zmqsub_contrast import (  # noqa: F401
-    ZmqSubContrastIngester,
-    ZmqSubContrastSettings,
-)
-from dranspose.ingesters.zmqsub_xspress3 import (  # noqa: F401
-    ZmqSubXspressIngester,
-    ZmqSubXspressSettings,
 )
 from dranspose.protocol import StreamName, WorkerName
 from dranspose.worker import Worker, WorkerSettings

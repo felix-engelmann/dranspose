@@ -56,7 +56,11 @@ class Ingester(DistributedService):
         )
 
         super().__init__(state=state, settings=self._ingester_settings)
-        self._logger.info("created ingester with state %s", state)
+        self._logger.info(
+            "created ingester with state %s and settings %s",
+            state,
+            self._ingester_settings,
+        )
         self.state: IngesterState
 
         self.dump_file: Optional[IO[bytes]] = None
