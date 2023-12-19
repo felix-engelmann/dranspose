@@ -128,8 +128,7 @@ def ingester(args: argparse.Namespace) -> None:
         loop.add_signal_handler(signal.SIGTERM, stop)
 
         i = ing(
-            name=args.name,
-            settings=sett(upstream_url=args.upstream_url),
+            settings=sett(upstream_url=args.upstream_url, ingester_streams=[args.name]),
         )
         ingester_task = asyncio.create_task(i.run())
         await ingester_task
