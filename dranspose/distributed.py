@@ -64,6 +64,7 @@ class DistributedService(abc.ABC):
         self.parameters: dict[ParameterName, WorkParameter] = {}
 
     async def publish_config(self) -> None:
+        self._logger.debug("publish config %s", self.state)
         async with self.redis.pipeline() as pipe:
             if isinstance(self.state, IngesterState):
                 category = "ingester"
