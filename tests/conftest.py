@@ -1,8 +1,10 @@
 import asyncio
 import json
+import logging
 import os
 import pickle
 import random
+from asyncio import StreamReader, StreamWriter
 from typing import (
     Coroutine,
     AsyncIterator,
@@ -407,3 +409,122 @@ async def stream_sardana() -> Callable[[HttpUrl, int], Coroutine[Any, Any, None]
             assert st.status == 200
 
     return _make_sardana
+
+
+@pytest_asyncio.fixture
+async def stream_pcap() -> AsyncIterator[
+    Callable[[int, int], Coroutine[None, None, None]]
+]:
+    server_tasks = []
+
+    async def _make_pcap(nframes: int = 10, port: int = 8889) -> None:
+        async def handle_client(reader: StreamReader, writer: StreamWriter) -> None:
+            request = (await reader.read(255)).decode("utf8")
+            if request.strip() != "":
+                logging.error("bad initial hello %s", request)
+            writer.write(b"OK\n")
+            await writer.drain()
+
+            header = b"""arm_time: 2023-12-19T07:51:12.754Z
+missed: 0
+process: Scaled
+format: ASCII
+fields:
+ PCAP.BITS0 uint32 Value
+ INENC1.VAL double Min scale: 1 offset: 0 units:
+ INENC1.VAL double Max scale: 1 offset: 0 units:
+ PCAP.TS_TRIG double Value scale: 8e-09 offset: 0 units: s
+ INENC1.VAL double Mean scale: 1 offset: 0 units:
+ SFP3_SYNC_IN.POS1 double Mean scale: 1 offset: 0 units: (null)
+
+"""
+            writer.write(header)
+            await writer.drain()
+
+            data = b""" 301989857 0 0 0.32175968 0 592910924.7
+ 33554401 0 0 0.43175968 0 592910919
+ 33554401 0 0 0.54175968 0 592910930.9
+ 33554401 0 0 0.65175968 0 592910930.2
+ 301989857 0 0 0.76175968 0 592910946.1
+ 301989857 0 0 0.87175968 0 592910969.6
+ 301989857 0 0 0.98175968 0 592911000.4
+ 301989857 0 0 1.09175968 0 592911008.9
+ 301989857 0 0 1.20175968 0 592910962.2
+ 301989857 0 0 1.31175968 0 592910916.7
+ 301989857 0 0 1.42175968 0 592910829.8""".split(
+                b"\n"
+            )
+
+            for i in range(nframes):
+                writer.write(data[i % 11] + b"\n")
+                await writer.drain()
+                await asyncio.sleep(0.1)
+
+            writer.write(f"END {nframes} Disarmed".encode("utf8"))
+            await writer.drain()
+            writer.close()
+
+        server = await asyncio.start_server(handle_client, "localhost", port)
+        server_tasks.append(asyncio.create_task(server.serve_forever()))
+
+        logging.warning("started server %s", server.is_serving())
+        # async with server:
+        #    await server.serve_forever()
+
+    yield _make_pcap
+
+    for task in server_tasks:
+        task.cancel()
+
+
+multiscan_trace = """
+
+OK
+arm_time: 2023-12-19T08:49:51.103Z
+missed: 0
+process: Scaled
+format: ASCII
+fields:
+ PCAP.BITS0 uint32 Value
+ INENC1.VAL double Min scale: 1 offset: 0 units:
+ INENC1.VAL double Max scale: 1 offset: 0 units:
+ PCAP.TS_TRIG double Value scale: 8e-09 offset: 0 units: s
+ INENC1.VAL double Mean scale: 1 offset: 0 units:
+ SFP3_SYNC_IN.POS1 double Mean scale: 1 offset: 0 units: (null)
+
+ 301989857 0 0 0.290445128 0 592659802.5
+ 33554401 0 0 0.400445128 0 592659790.2
+ 301989857 0 0 0.510445128 0 592659777.6
+ 301989857 0 0 0.620445128 0 592659776.1
+ 301989857 0 0 0.730445128 0 592659780.1
+ 301989857 0 0 0.840445128 0 592659786.7
+ 301989857 0 0 0.950445128 0 592659778.1
+ 301989857 0 0 1.060445128 0 592659753.3
+ 33554401 0 0 1.170445128 0 592659740.2
+ 301989857 0 0 1.280445128 0 592659740.5
+ 301989857 0 0 1.390445128 0 592659745.6
+END 11 Disarmed
+arm_time: 2023-12-19T08:49:59.911Z
+missed: 0
+process: Scaled
+format: ASCII
+fields:
+ PCAP.BITS0 uint32 Value
+ INENC1.VAL double Min scale: 1 offset: 0 units:
+ INENC1.VAL double Max scale: 1 offset: 0 units:
+ PCAP.TS_TRIG double Value scale: 8e-09 offset: 0 units: s
+ INENC1.VAL double Mean scale: 1 offset: 0 units:
+ SFP3_SYNC_IN.POS1 double Mean scale: 1 offset: 0 units: (null)
+
+ 301989857 0 0 0.280505096 0 592659819.6
+ 301989857 0 0 0.390505096 0 592659807.4
+ 301989857 0 0 0.500505096 0 592659823.6
+ 33554401 0 0 0.610505096 0 592659827.9
+ 33554401 0 0 0.720505096 0 592659835.1
+ 301989857 0 0 0.830505096 0 592659817.4
+ 301989857 0 0 0.940505096 0 592659828.3
+ 301989857 0 0 1.050505096 0 592659823.2
+ 301989857 0 0 1.160505096 0 592659851.4
+ 33554401 0 0 1.270505096 0 592659838.7
+ 33554401 0 0 1.380505096 0 592659842.7
+END 11 Disarmed"""
