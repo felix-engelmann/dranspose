@@ -18,3 +18,8 @@ test-python311:
   allow_failure: false
   services:
     - redis:latest
+
+test-python311-pytango95:
+  allow_failure: false
+  services:
+    - redis:latest
