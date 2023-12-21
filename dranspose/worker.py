@@ -81,6 +81,7 @@ class Worker(DistributedService):
 
         self.param_descriptions = []
         self.custom = None
+        self.worker = None
         if self._worker_settings.worker_class:
             try:
                 self.custom = utils.import_class(self._worker_settings.worker_class)
