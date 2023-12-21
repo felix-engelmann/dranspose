@@ -17,6 +17,7 @@ import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import InternalWorkerMessage, EventData, ResultData
+from dranspose.helpers.utils import done_callback
 from dranspose.protocol import (
     WorkerState,
     RedisKeys,
@@ -105,8 +106,11 @@ class Worker(DistributedService):
 
     async def run(self) -> None:
         self.manage_ingester_task = asyncio.create_task(self.manage_ingesters())
+        self.manage_ingester_task.add_done_callback(done_callback)
         self.manage_receiver_task = asyncio.create_task(self.manage_receiver())
+        self.manage_receiver_task.add_done_callback(done_callback)
         self.work_task = asyncio.create_task(self.work())
+        self.work_task.add_done_callback(done_callback)
         await self.register()
 
     async def notify_worker_ready(self) -> None:
@@ -284,6 +288,7 @@ class Worker(DistributedService):
         self.work_task.cancel()
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
+        self.work_task.add_done_callback(done_callback)
 
     async def manage_receiver(self) -> None:
         while True:

@@ -13,6 +13,7 @@ from dranspose.data.sardana import (
     SardanaPacketType,
 )
 from dranspose.event import StreamData
+from dranspose.helpers.utils import done_callback
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName
 
@@ -77,6 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global sardana_ingester
     sardana_ingester = HttpSardanaIngester()
     run_task = asyncio.create_task(sardana_ingester.run())
+    run_task.add_done_callback(done_callback)
     yield
     run_task.cancel()
     await sardana_ingester.close()

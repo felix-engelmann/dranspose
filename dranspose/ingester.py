@@ -10,6 +10,7 @@ from pydantic import UUID4, model_validator
 
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import StreamData, InternalWorkerMessage
+from dranspose.helpers.utils import done_callback
 from dranspose.protocol import (
     IngesterState,
     StreamName,
@@ -78,8 +79,11 @@ class Ingester(DistributedService):
         Main function orchestrating the dependent tasks. This needs to be called from an async context once an instance is created.
         """
         self.accept_task = asyncio.create_task(self.accept_workers())
+        self.accept_task.add_done_callback(done_callback)
         self.work_task = asyncio.create_task(self.work())
+        self.work_task.add_done_callback(done_callback)
         self.assign_task = asyncio.create_task(self.manage_assignments())
+        self.assign_task.add_done_callback(done_callback)
         self.assignment_queue: asyncio.Queue[WorkAssignment] = asyncio.Queue()
         await self.register()
 
@@ -95,7 +99,9 @@ class Ingester(DistributedService):
         self.state.mapping_uuid = new_uuid
         self.assignment_queue = asyncio.Queue()
         self.work_task = asyncio.create_task(self.work())
+        self.work_task.add_done_callback(done_callback)
         self.assign_task = asyncio.create_task(self.manage_assignments())
+        self.assign_task.add_done_callback(done_callback)
 
     async def finish_work(self) -> None:
         """

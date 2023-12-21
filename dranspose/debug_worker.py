@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from starlette.responses import Response
 
 from dranspose.event import EventData
+from dranspose.helpers.utils import done_callback
 from dranspose.protocol import WorkerUpdate, WorkerStateEnum, RedisKeys
 from dranspose.worker import Worker, RedisException
 
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global worker
     worker = DebugWorker()
     run_task = asyncio.create_task(worker.run())
+    run_task.add_done_callback(done_callback)
     yield
     run_task.cancel()
     await worker.close()

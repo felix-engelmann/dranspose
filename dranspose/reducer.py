@@ -15,6 +15,7 @@ from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
+from dranspose.helpers.utils import done_callback
 from dranspose.protocol import ReducerState, ZmqUrl, RedisKeys
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ class Reducer(DistributedService):
 
     async def run(self) -> None:
         self.work_task = asyncio.create_task(self.work())
+        self.work_task.add_done_callback(done_callback)
         await self.register()
 
     async def work(self) -> None:
@@ -92,6 +94,7 @@ class Reducer(DistributedService):
         self.work_task.cancel()
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
+        self.work_task.add_done_callback(done_callback)
 
     async def close(self) -> None:
         self.work_task.cancel()
@@ -110,6 +113,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global reducer
     reducer = Reducer()
     run_task = asyncio.create_task(reducer.run())
+    run_task.add_done_callback(done_callback)
     yield
     run_task.cancel()
     await reducer.close()

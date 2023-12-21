@@ -15,7 +15,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from dranspose.distributed import DistributedSettings
-from dranspose.helpers.utils import parameters_hash
+from dranspose.helpers.utils import parameters_hash, done_callback
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
@@ -79,6 +79,7 @@ class Controller:
     async def run(self) -> None:
         logger.debug("started controller run")
         self.assign_task = asyncio.create_task(self.assign_work())
+        self.assign_task.add_done_callback(done_callback)
 
     async def get_configs(self) -> EnsembleState:
         async with self.redis.pipeline() as pipe:
@@ -160,6 +161,7 @@ class Controller:
                 # logger.debug("updated configs %s", cfgs)
             logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
             self.assign_task = asyncio.create_task(self.assign_work())
+            self.assign_task.add_done_callback(done_callback)
 
     async def set_param(self, name: ParameterName, data: bytes) -> Digest:
         param = WorkParameter(name=name, data=data)
@@ -311,6 +313,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     global ctrl
     ctrl = Controller()
     run_task = asyncio.create_task(ctrl.run())
+    run_task.add_done_callback(done_callback)
     yield
     run_task.cancel()
     await ctrl.close()

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import importlib
 import os
@@ -18,3 +19,10 @@ def parameters_hash(parameters: dict[ParameterName, WorkParameter]) -> Digest:
     for n in sorted(parameters):
         m.update(parameters[n].uuid.bytes)
     return Digest(m.hexdigest())
+
+
+def done_callback(futr):
+    try:
+        futr.result()
+    except asyncio.exceptions.CancelledError:
+        pass

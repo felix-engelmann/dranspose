@@ -11,6 +11,7 @@ from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
 from dranspose.controller import app
+from dranspose.helpers.utils import done_callback
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
 from dranspose.ingesters import *  # noqa: F403, F401
@@ -49,11 +50,13 @@ async def main() -> None:
     ]
 
     for i in ins + wos:
-        asyncio.create_task(i.run())
+        t = asyncio.create_task(i.run())
+        t.add_done_callback(done_callback)
 
     rconfig = uvicorn.Config(reducer_app, port=5001, log_level="info")
     rserver = uvicorn.Server(rconfig)
-    asyncio.create_task(rserver.serve())
+    tr = asyncio.create_task(rserver.serve())
+    tr.add_done_callback(done_callback)
 
     config = uvicorn.Config(app, port=5000, log_level="info")
     server = uvicorn.Server(config)
