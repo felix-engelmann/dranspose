@@ -209,6 +209,7 @@ class DistributedState(BaseModel):
     service_uuid: UUID4 = Field(default_factory=uuid.uuid4)
     mapping_uuid: Optional[UUID4] = None
     parameters_hash: Optional[Digest] = None
+    processed_events: int = 0
 
 
 class IngesterState(DistributedState):

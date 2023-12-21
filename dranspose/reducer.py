@@ -85,6 +85,7 @@ class Reducer(DistributedService):
                 except Exception as e:
                     self._logger.error("custom reducer failed: %s", e.__repr__())
             self._logger.debug("received %s", result)
+            self.state.processed_events += 1
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)

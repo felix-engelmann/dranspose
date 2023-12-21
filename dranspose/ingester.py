@@ -198,6 +198,7 @@ class Ingester(DistributedService):
                         + message.get_all_frames()
                     )
                     self._logger.debug("sent message to worker %s", worker)
+                self.state.processed_events += 1
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
             for stream in self.state.streams:

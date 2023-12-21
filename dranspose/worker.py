@@ -248,6 +248,7 @@ class Worker(DistributedService):
                     self._logger.error("could not dump result %s", e.__repr__())
             perf_sent_result = time.perf_counter()
             proced += 1
+            self.state.processed_events += 1
             if proced % 500 == 0:
                 self._logger.info("processed %d events", proced)
             times = WorkerTimes.from_timestamps(

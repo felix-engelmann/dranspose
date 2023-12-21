@@ -52,6 +52,7 @@ class DebugWorker(Worker):
                 RedisKeys.ready(self.state.mapping_uuid),
                 {"data": wu.model_dump_json()},
             )
+            self.state.processed_events += 1
 
 
 worker: DebugWorker
