@@ -5,6 +5,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any
 
+import zmq
 from fastapi import FastAPI
 from starlette.responses import Response
 
@@ -38,9 +39,12 @@ class DebugWorker(Worker):
 
             if len(ingesterset) == 0:
                 continue
-            done = await self.collect_internals(ingesterset)
+            done = await self.poll_internals(ingesterset)
+            if set(done) != {zmq.POLLIN}:
+                self._logger.warning("not all sockets are pollIN %s", done)
+                continue
 
-            event = await self.build_event(done)
+            event = await self.build_event(ingesterset)
             self._logger.debug("adding event %s to buffer", event)
             self.buffer.append(event)
 

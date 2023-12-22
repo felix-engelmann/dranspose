@@ -75,8 +75,7 @@ class Worker(DistributedService):
 
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
         self._stream_map: dict[StreamName, zmq._future._AsyncSocket] = {}
-        self.poll_task = None
-        self.poll_tasks = []
+        self.poll_task: Optional[Future[list[int]]] = None
 
         self._reducer_service_uuid: Optional[UUID4] = None
         self.out_socket: Optional[zmq._future._AsyncSocket] = None
@@ -165,9 +164,7 @@ class Worker(DistributedService):
         self, ingesterset: set[zmq._future._AsyncSocket]
     ) -> list[int]:
         self._logger.debug("poll internal sockets %s", ingesterset)
-        poll_tasks: list[Future[list[zmq.Frame]]] = [
-            sock.poll() for sock in ingesterset  # type: ignore [misc]
-        ]
+        poll_tasks = [sock.poll() for sock in ingesterset]
         self._logger.debug("await poll tasks %s", poll_tasks)
         self.poll_task = asyncio.gather(*poll_tasks)
         done = await self.poll_task
@@ -221,9 +218,9 @@ class Worker(DistributedService):
             if len(ingesterset) == 0:
                 continue
             done = await self.poll_internals(ingesterset)
-            for fut in done:
-                if fut != zmq.POLLIN:
-                    self._logger.warning("not all sockets are pollIN %s", done)
+            if set(done) != {zmq.POLLIN}:
+                self._logger.warning("not all sockets are pollIN %s", done)
+                continue
 
             perf_got_work = time.perf_counter()
 

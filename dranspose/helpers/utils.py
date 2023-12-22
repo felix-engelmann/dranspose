@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 import traceback
+from asyncio import Future
 
 from dranspose.protocol import Digest, WorkParameter, ParameterName
 
@@ -23,7 +24,7 @@ def parameters_hash(parameters: dict[ParameterName, WorkParameter]) -> Digest:
     return Digest(m.hexdigest())
 
 
-def done_callback(futr):
+def done_callback(futr: Future[None]) -> None:
     try:
         futr.result()
     except asyncio.exceptions.CancelledError:

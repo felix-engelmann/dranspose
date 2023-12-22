@@ -1,25 +1,27 @@
 import asyncio
 import logging
+from typing import Callable, Any, Coroutine
 
 import pytest
 import zmq.asyncio
 
 
 @pytest.mark.asyncio
-async def test_zmq_cancel(stream_eiger):
-    async def consume():
+async def test_zmq_cancel(
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]]
+) -> None:
+    async def consume() -> None:
         c = zmq.asyncio.Context()
         s = c.socket(zmq.PULL)
         s.connect("tcp://localhost:9999")
         for i in range(13):
             logging.info("recv %d", i)
-            task = s.poll()  # recv_multipart(copy=False)
-            waiting = asyncio.wait([task], return_when=asyncio.ALL_COMPLETED)
+            task = s.poll()
+            waiting = asyncio.gather(*[task])
             if i == 6:
-                task.cancel()
-                waiting.close()
+                waiting.cancel()
                 continue
-            done, pend = await waiting
+            done = await waiting
             logging.info("done %s", done)
             data = s.recv_multipart(copy=False)
             logging.info("i %d, data %s", i, data)
