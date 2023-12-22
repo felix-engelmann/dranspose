@@ -1,8 +1,10 @@
 import asyncio
 import hashlib
 import importlib
+import logging
 import os
 import sys
+import traceback
 
 from dranspose.protocol import Digest, WorkParameter, ParameterName
 
@@ -26,3 +28,9 @@ def done_callback(futr):
         futr.result()
     except asyncio.exceptions.CancelledError:
         pass
+    except Exception as e:
+        logging.error(
+            "subroutine crashed %s trace: %s",
+            e.__repr__(),
+            traceback.format_exc(),
+        )

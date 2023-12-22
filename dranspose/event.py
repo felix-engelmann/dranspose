@@ -106,7 +106,7 @@ class EventData(BaseModel):
         assert len(msgs) > 0, "merge at least one message"
         assert (
             len(set([m.event_number for m in msgs])) == 1
-        ), "Cannot merge data from different events"
+        ), f"Cannot merge data from events {[m.event_number for m in msgs]}"
         all_stream_names = [stream for m in msgs for stream in m.streams.keys()]
         assert len(all_stream_names) == len(
             set(all_stream_names)

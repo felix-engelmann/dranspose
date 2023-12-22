@@ -121,7 +121,10 @@ class DistributedService(abc.ABC):
                     newuuid = update.mapping_uuid
                     if newuuid != self.state.mapping_uuid:
                         self._logger.info("resetting config to %s", newuuid)
-                        await self.restart_work(newuuid)
+                        try:
+                            await self.restart_work(newuuid)
+                        except Exception as e:
+                            self._logger.error("restart_work failed %s", e.__repr__())
                     paramuuids = update.parameters_version
                     for name in paramuuids:
                         if (

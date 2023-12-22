@@ -75,6 +75,8 @@ class Worker(DistributedService):
 
         self._ingesters: dict[IngesterName, ConnectedIngester] = {}
         self._stream_map: dict[StreamName, zmq._future._AsyncSocket] = {}
+        self.poll_task = None
+        self.poll_tasks = []
 
         self._reducer_service_uuid: Optional[UUID4] = None
         self.out_socket: Optional[zmq._future._AsyncSocket] = None
@@ -159,25 +161,29 @@ class Worker(DistributedService):
         lastev = assignments[0]
         return lastev, ingesterset
 
-    async def collect_internals(
+    async def poll_internals(
         self, ingesterset: set[zmq._future._AsyncSocket]
-    ) -> set[Future[list[zmq.Frame]]]:
-        tasks: list[Future[list[zmq.Frame]]] = [
-            sock.recv_multipart(copy=False) for sock in ingesterset  # type: ignore [misc]
+    ) -> list[int]:
+        self._logger.debug("poll internal sockets %s", ingesterset)
+        poll_tasks: list[Future[list[zmq.Frame]]] = [
+            sock.poll() for sock in ingesterset  # type: ignore [misc]
         ]
-        done_pending: tuple[
-            set[Future[list[zmq.Frame]]], set[Future[list[zmq.Frame]]]
-        ] = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
-        done, pending = done_pending
+        self._logger.debug("await poll tasks %s", poll_tasks)
+        self.poll_task = asyncio.gather(*poll_tasks)
+        done = await self.poll_task
+        self._logger.debug("data is available done: %s", done)
         return done
 
-    async def build_event(self, done: set[Future[list[zmq.Frame]]]) -> EventData:
+    async def build_event(
+        self, ingesterset: set[zmq._future._AsyncSocket]
+    ) -> EventData:
         msgs = []
-        for res in done:
-            prelim = json.loads(res.result()[0].bytes)
+        for sock in ingesterset:
+            res = await sock.recv_multipart(copy=False)
+            prelim = json.loads(res[0].bytes)
             pos = 1
             for stream, data in prelim["streams"].items():
-                data["frames"] = res.result()[pos : pos + data["length"]]
+                data["frames"] = res[pos : pos + data["length"]]
                 pos += data["length"]
             msg = InternalWorkerMessage.model_validate(prelim)
             msgs.append(msg)
@@ -214,11 +220,14 @@ class Worker(DistributedService):
 
             if len(ingesterset) == 0:
                 continue
-            done = await self.collect_internals(ingesterset)
-            # print("done", done, "pending", pending)
+            done = await self.poll_internals(ingesterset)
+            for fut in done:
+                if fut != zmq.POLLIN:
+                    self._logger.warning("not all sockets are pollIN %s", done)
+
             perf_got_work = time.perf_counter()
 
-            event = await self.build_event(done)
+            event = await self.build_event(ingesterset)
 
             perf_assembled_event = time.perf_counter()
             self._logger.debug("received work %s", event)
@@ -286,7 +295,21 @@ class Worker(DistributedService):
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)
+        if self.poll_task:
+            self.poll_task.cancel()
+            self.poll_task = None
+            self._logger.debug("cancelled poll task")
         self.work_task.cancel()
+        self._logger.info("clean up in sockets")
+        for iname, ing in self._ingesters.items():
+            while True:
+                res = await ing.socket.poll(timeout=0.001)
+                if res == zmq.POLLIN:
+                    await ing.socket.recv_multipart(copy=False)
+                    self._logger.debug("discarded internal message from %s", iname)
+                else:
+                    break
+
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
