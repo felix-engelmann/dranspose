@@ -381,6 +381,12 @@ async def set_mapping(
     return m.uuid
 
 
+@app.get("/api/v1/mapping")
+async def get_mapping() -> Dict[StreamName, List[Optional[List[VirtualWorker]]]]:
+    global ctrl
+    return ctrl.mapping.mapping
+
+
 @app.post("/api/v1/sardana_hook")
 async def set_sardana_hook(
     info: Dict[Literal["streams"] | Literal["scan"], Any]

@@ -50,3 +50,6 @@ async def test_not_enough_workers(
         )
         assert resp.status == 200
         await resp.json()
+
+        ma = await session.get("http://localhost:5000/api/v1/mapping")
+        print("generated mapping", await ma.json())
