@@ -324,5 +324,9 @@ def test_all_wrap_tags() -> None:
 
 
 def test_uniform() -> None:
-    m = Mapping.from_uniform({"orca", "panda"}, 10)
-    assert m.mapping["orca"][10][0].constraint == 9
+    m = Mapping.from_uniform({StreamName("orca"), StreamName("panda")}, 10)
+    b = m.mapping[StreamName("orca")][10]
+    assert b is not None
+    a = b[0]
+    assert isinstance(a, VirtualWorker)
+    assert a.constraint == 9

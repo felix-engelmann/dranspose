@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Iterable
 
 from pydantic import validate_call
 
@@ -169,9 +169,12 @@ class Mapping:
             self.complete_events = max(0, evn + 1)
 
     @classmethod
-    def from_uniform(cls, streams, ntriggers):
-        m = {
-            s: [[VirtualWorker(constraint=i)] for i in range(ntriggers)]
+    def from_uniform(cls, streams: Iterable[StreamName], ntriggers: int) -> "Mapping":
+        m: dict[StreamName, list[list[VirtualWorker] | None]] = {
+            s: [
+                [VirtualWorker(constraint=VirtualConstraint(i))]
+                for i in range(ntriggers)
+            ]
             for s in streams
         }
         return Mapping(m)

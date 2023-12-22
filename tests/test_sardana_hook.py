@@ -26,7 +26,7 @@ async def test_not_enough_workers(
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     reducer: Callable[[Optional[str]], Awaitable[None]],
 ) -> None:
-    await reducer()
+    await reducer(None)
     await create_ingester(
         ZmqPullSingleIngester(
             settings=ZmqPullSingleSettings(
