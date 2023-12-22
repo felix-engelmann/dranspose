@@ -168,6 +168,14 @@ class Mapping:
                             return
             self.complete_events = max(0, evn + 1)
 
+    @classmethod
+    def from_uniform(cls, streams, ntriggers):
+        m = {
+            s: [[VirtualWorker(constraint=i)] for i in range(ntriggers)]
+            for s in streams
+        }
+        return Mapping(m)
+
     def print(self) -> None:
         print(" " * 5, end="")
         for name in self.mapping:

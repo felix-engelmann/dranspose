@@ -321,3 +321,8 @@ def test_all_wrap_tags() -> None:
     should = {"test": {"w2", "w1"}, "test2": {"w2", "w1"}}
     for st, wn in evworkers.assignments.items():
         assert set(wn) == should[st]
+
+
+def test_uniform() -> None:
+    m = Mapping.from_uniform({"orca", "panda"}, 10)
+    assert m.mapping["orca"][10][0].constraint == 9

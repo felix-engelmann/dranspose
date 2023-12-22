@@ -158,7 +158,7 @@ class Controller:
             ) != {self.mapping.uuid}:
                 await asyncio.sleep(0.1)
                 cfgs = await self.get_configs()
-                # logger.debug("updated configs %s", cfgs)
+                logger.debug("updated configs %s", cfgs)
             logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
@@ -377,6 +377,31 @@ async def set_mapping(
     m = Mapping(mapping, add_start_end=all_wrap)
     if len(config.workers) < m.min_workers():
         return f"only {len(config.workers)} workers available, but {m.min_workers()} required"
+    await ctrl.set_mapping(m)
+    return m.uuid
+
+
+@app.post("/api/v1/sardana_hook")
+async def set_sardana_hook(
+    info: Dict[Literal["streams"] | Literal["scan"], Any]
+) -> UUID4 | str:
+    global ctrl
+    config = await ctrl.get_configs()
+    print(info)
+    if "scan" not in info:
+        return "no scan info"
+    if "nb_points" not in info["scan"]:
+        return "no nb_points in scan"
+    if "streams" not in info:
+        return "streams required"
+    for st in set(config.get_streams()).intersection(set(info["streams"])):
+        print("use stream", st)
+    logger.debug("create new mapping")
+    m = Mapping.from_uniform(
+        set(config.get_streams()).intersection(set(info["streams"])),
+        info["scan"]["nb_points"],
+    )
+    logger.debug("set mapping")
     await ctrl.set_mapping(m)
     return m.uuid
 
