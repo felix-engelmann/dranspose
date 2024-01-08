@@ -5,6 +5,7 @@ repos:
       - id: check-json
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
+        exclude: ^docs/
       - id: mixed-line-ending
       - id: check-byte-order-marker
       - id: check-executables-have-shebangs
@@ -15,10 +16,12 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
+        exclude: ^docs/
 
   - repo: https://github.com/psf/black
     rev: 23.3.0
     hooks:
       - id: black
+        exclude: ^docs/
         language_version: python3
 

@@ -1,0 +1,17 @@
+ingesters:
+  orca:
+    connect_url: "tcp://danmax-orca-daq-zmq-egress.danmax-orca:5556"
+    ingester_class: "ZmqPullSingleIngester"
+    affinity:
+      namespace: danmax-orca
+      component: daq
+  pcap:
+    connect_url: "tcp://172.16.214.46:8889" # panda main
+    ingester_class: "TcpPcapIngester"
+    stream: "pcap_rot"
+workers: 2
+science_image: "harbor.maxiv.lu.se/daq/dranspose/danmax-fluorescence:main"
+worker:
+  class: "src.worker:FluorescenceWorker"
+reducer:
+  class: "src.reducer:FluorescenceReducer"

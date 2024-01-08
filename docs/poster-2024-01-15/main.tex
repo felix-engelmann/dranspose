@@ -1,0 +1,168 @@
+\documentclass[portrait,a0paper]{tikzposter} %Options for format can be included here, for example portrait.
+
+\usepackage{lutheme}
+\usepackage{graphicx}
+\graphicspath{{logo/}}
+
+\usepackage[british]{babel}
+% \usepackage{silence}
+% \WarningFilter{latexfont}{Font shape}
+% \WarningFilter{latexfont}{Some font}
+
+%References
+\usepackage{csquotes}
+%\usepackage[style=ieee]{biblatex}
+%\addbibresource{refs.bib}
+
+\usepackage{fontawesome5}
+
+ % Title, Author, Institute
+\title{\texttt{dranspose} – A Flexible Live Processing Pipeline}
+\author{Felix Engelmann}
+\institute{Scientific Data, MAX IV}
+
+%Remove LaTeX tag at bottom of the poster
+\tikzposterlatexaffectionproofoff
+
+\newcommand\ttl[1]{\texttt{\lseries#1}}
+\newcommand\ttm[1]{\texttt{\mdseries#1}}
+\newcommand\ttb[1]{\texttt{\bfseries#1}}
+\usepackage{color}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+
+\usepackage{listings}
+
+% Python style for highlighting
+%\newcommand\pythonstyle{
+\lstdefinestyle{mystyle}{
+language=Python,
+basicstyle=\ttfamily\mdseries,
+morekeywords={self},              % Add keywords here
+keywordstyle=\ttfamily\bfseries\color{deepblue},
+emph={EventData, StreamData,__init__},          % Custom highlighting
+emphstyle=\ttfamily\bfseries\color{deepred},    % Custom highlighting style
+stringstyle=\color{deepgreen},
+%frame=tb,                         % Any extra options here
+showstringspaces=false
+}%}
+
+\lstdefinestyle{yaml}{
+     basicstyle=\color{blue}\footnotesize,
+     rulecolor=\color{black},
+     string=[s]{'}{'},
+     stringstyle=\color{blue},
+     comment=[l]{:},
+     commentstyle=\color{black},
+     morecomment=[l]{-}
+ }
+
+
+\lstset{style=mystyle}
+
+% Python environment
+\lstnewenvironment{python}[1][]
+{
+\pythonstyle
+\lstset{#1}
+}
+{}
+
+ %Choose Layout
+\usetheme{LU}
+
+\begin{document}
+
+ % Title block with title, author, logo, etc.
+\maketitle
+
+%Input logos in relation to title node
+%Go to the image bank https://lu-mediaportal.qbank.se for other images and logotypes.
+\node[anchor=west, xshift=15mm] at (TP@title.west) {\includegraphics[width=8cm]{lulogo.pdf}};
+\node[anchor=east,xshift=-15mm] at (TP@title.east) {\includegraphics[width=10cm]{maxivlogo.eps}};
+
+ % First block
+\begin{columns}
+
+   % FIRST column
+  \column{0.5}% Width set relative to text width
+
+  \block{Ingesters}{
+  Ingesters take data from detectors or encoders and forwards them to workers
+
+  \begin{tikzpicture}
+  \node (det1) at (0,0) {\faCamera};
+  \node (mot) at (0,-4) {\faSlidersH}; %\faCameraRetro};
+  \node (temp) at (0,-6) {\faThermometerHalf};
+  \node (det2) at (0,-2) {\faVideo};
+
+
+  \end{tikzpicture}
+  }
+
+  \block{Control System}{
+   A Tango device server presents the status of a pipeline and allows to set parameters. It shows which ingester streams are awailable and the load of workers, allowing to adjust the worker scaling. Pipeline parameters support \texttt{str}, \texttt{int}, \texttt{float} and \texttt{file}.
+   \medskip
+
+   \footnotesize
+   \begin{tabular}{ll}
+    State & CLOSE \\
+   Status & contrast-ingester, streams: ['contrast']\\
+&xspress3-ingester, streams: ['xspress3']\\
+&x3mini-ingester, streams: ['x3mini']\\
+&Worker-VKbSqFyDIU, tags: ['generic'], last:133, evs:19, ld10: 0.06, ld: 0.09 \\
+&Worker-mPfJRkLXjj, tags: ['generic'], last:133, evs:18, ld10: 0.06, ld: 0.09 \\
+completedEvents & 134 \\
+totalEvents&134\\
+mca\_config & /data/xrf/fit\_config\_removed.cfg\\
+\end{tabular}
+  }
+
+  \block{Deployment}{
+  If a kubernetes cluster is available, deployment is handled by a \texttt{helm} chart with values
+
+\footnotesize
+  \lstinputlisting[style=yaml]{Values.yaml}
+
+  \normalsize
+  Without kubernetes, the only dependency is a \texttt{redis} to which all components can connect.
+  }
+
+  \block{Performance}{
+    The throughput of the system is only limited by the underlying kernel and zmq library. With jumbo frames, we successfully processed a single stream of \textbf{23\,GBit/s} from a 16\,bit \texttt{cmos} camera at 120\,Hz.
+    Affinity of ingesters heavily impacts performance.
+
+    The design allows arbitrary \textbf{horizontal scaling} for many ingesters. If a detector supports one stream per module, multiple ingesters are used to reassemble full frames for a worker. We tested up events at \textbf{2000\,Hz}.
+  }
+
+  \block{Development \texttt{pip install dranspose}}{}
+
+  \block{Examples}{}
+
+   % SECOND column
+  \column{0.5}
+   % Second column with first block's top edge aligned with with previous column's top.
+
+   % Second column - first block
+   % Need to reset font, pretty ugly
+  \block{Trigger Map}{
+  }
+  \block{Workers}{
+  \footnotesize
+  \lstinputlisting[language=Python,keywordstyle=\ttfamily\color{deepblue}]{worker.py}
+}
+  \block{Reducer}{}
+
+  \block{Viewer}{}
+
+
+
+
+\end{columns}
+
+\end{document}
+
+\endinput
+%%
+%% End of file `tikzposter-template.tex'.
