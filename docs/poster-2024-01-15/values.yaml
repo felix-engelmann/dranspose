@@ -11,7 +11,5 @@ ingesters:
     stream: "pcap_rot"
 workers: 2
 science_image: "harbor.maxiv.lu.se/daq/dranspose/danmax-fluorescence:main"
-worker:
-  class: "src.worker:FluorescenceWorker"
-reducer:
-  class: "src.reducer:FluorescenceReducer"
+worker: {class: "src.worker:FluorescenceWorker"}
+reducer: {class: "src.reducer:FluorescenceReducer"}
