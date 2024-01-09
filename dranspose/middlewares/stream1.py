@@ -28,7 +28,6 @@ def parse(data: StreamData) -> UnionType:
         raise Exception("invalid StreamData")
 
     packet = Stream1Packet.validate_python(val)
-    print("packet", packet)
     if isinstance(packet, Stream1Data):
         assert data.length == 2
         bufframe = data.frames[1]
