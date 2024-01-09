@@ -1,5 +1,6 @@
 import pickle
 
+from dranspose.data.albaem import AlbaemPacket
 from dranspose.data.contrast import ContrastPacket
 from dranspose.data.xspress3 import XspressPacket, XspressImage
 
@@ -31,5 +32,17 @@ def test_xspress3_stream() -> None:
                 print(pkg)
                 if isinstance(pkg, XspressImage):
                     skip = 2
+            except EOFError:
+                break
+
+
+def test_albaem_stream() -> None:
+    with open("tests/data/albaem-dump.pkls", "rb") as f:
+        while True:
+            try:
+                frames = pickle.load(f)
+                assert len(frames) == 1
+                pkg = AlbaemPacket.validate_json(frames[0])
+                print(pkg)
             except EOFError:
                 break
