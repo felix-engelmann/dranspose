@@ -18,3 +18,7 @@ from dranspose.ingesters.zmqsub_xspress3 import (  # noqa: F401
     ZmqSubXspressIngester,
     ZmqSubXspressSettings,
 )
+from dranspose.ingesters.zmqsub_albaem import (  # noqa: F401
+    ZmqSubAlbaemIngester,
+    ZmqSubAlbaemSettings,
+)
