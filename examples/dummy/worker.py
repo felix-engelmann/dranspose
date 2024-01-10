@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class FluorescenceWorker:
-    def __init__(self, parameters=None):
+    def __init__(self, **kwargs):
         self.number = 0
 
     @staticmethod

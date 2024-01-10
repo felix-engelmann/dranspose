@@ -3,7 +3,7 @@ from dranspose.parameters import StrParameter, FileParameter
 
 
 class FluorescenceReducer:
-    def __init__(self, parameters=None):
+    def __init__(self, **kwargs):
         self.number = 0
         self.publish = {"map": {}}
 

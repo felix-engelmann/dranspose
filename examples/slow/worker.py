@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class SlowWorker:
-    def __init__(self, parameters=None):
+    def __init__(self, **kwargs):
         pass
 
     @staticmethod
