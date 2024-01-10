@@ -18,6 +18,7 @@ from dranspose.protocol import (
     WorkAssignment,
     IngesterName,
     ZmqUrl,
+    ParameterName,
 )
 
 
@@ -146,11 +147,16 @@ class Ingester(DistributedService):
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
         self.dump_file = None
-        if self._ingester_settings.dump_path:
-            self.dump_file = open(self._ingester_settings.dump_path, "ab")
+        self.dump_filename = self._ingester_settings.dump_path
+        if self.dump_filename is None and "dump_prefix" in self.parameters:
+            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+            if len(val) > 0:
+                self.dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.pkls"
+        if self.dump_filename:
+            self.dump_file = open(self.dump_filename, "ab")
             self._logger.info(
                 "dump file %s opened at %s",
-                self._ingester_settings.dump_path,
+                self.dump_filename,
                 self.dump_file,
             )
         try:
@@ -167,9 +173,7 @@ class Ingester(DistributedService):
                     stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
                 }
                 if self.dump_file:
-                    self._logger.debug(
-                        "writing dump to path %s", self._ingester_settings.dump_path
-                    )
+                    self._logger.debug("writing dump to path %s", self.dump_filename)
                     allstr = InternalWorkerMessage(
                         event_number=work_assignment.event_number,
                         streams={k: v.get_bytes() for k, v in zmqparts.items()},

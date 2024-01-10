@@ -97,6 +97,16 @@ async def test_dump(
             state = EnsembleState.model_validate(await st.json())
 
         print("startup done")
+
+        p_prefix = tmp_path / "dump_"
+        print(p_prefix, str(p_prefix).encode("utf8"))
+
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/dump_prefix",
+            data=str(p_prefix).encode("utf8"),
+        )
+        assert resp.status == 200
+
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
@@ -176,6 +186,20 @@ async def test_dump(
         while True:
             try:
                 dat: InternalWorkerMessage = pickle.load(f)
+                evs.append(dat.event_number)
+                print("loaded dump type", type(dat))
+            except EOFError:
+                break
+
+    print(evs)
+    assert evs == list(range(0, ntrig + 1))
+
+    # read prefix dump
+    with open(f"{p_prefix}orca-ingester-{uuid}.pkls", "rb") as f:
+        evs = []
+        while True:
+            try:
+                dat = pickle.load(f)
                 evs.append(dat.event_number)
                 print("loaded dump type", type(dat))
             except EOFError:
