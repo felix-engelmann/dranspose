@@ -26,6 +26,7 @@ from fastapi import FastAPI, HTTPException, Query
 from dranspose.parameters import (
     Parameter,
     ParameterType,
+    StrParameter,
 )
 from dranspose.protocol import (
     IngesterState,
@@ -189,6 +190,12 @@ class Controller:
         for i in param_json:
             val: ParameterType = Parameter.validate_json(i)  # type: ignore
             params.append(val)
+
+        params.append(
+            StrParameter(
+                name="dump_prefix", description="Prefix to dump ingester values"
+            )
+        )
 
         return sorted(params, key=lambda x: x.name)
 
