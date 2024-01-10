@@ -4,9 +4,11 @@ import os
 import pickle
 from typing import Iterator, Any
 
+from pydantic import TypeAdapter
+
 from dranspose.helpers import utils
 from dranspose.event import InternalWorkerMessage, EventData, ResultData
-from dranspose.protocol import WorkerName, Digest
+from dranspose.protocol import WorkerName, Digest, ParameterName, WorkParameter
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
@@ -21,6 +23,8 @@ def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMe
 
 
 logger = logging.getLogger(__name__)
+
+Paramdict = TypeAdapter(dict[ParameterName, WorkParameter])
 
 
 def replay(
@@ -41,13 +45,13 @@ def replay(
     if parameter_file:
         try:
             with open(parameter_file) as f:
-                parameters = json.load(f)
+                parameters = Paramdict.validate_json(f.read())
         except UnicodeDecodeError:
             with open(parameter_file, "rb") as fb:
                 parameters = pickle.load(fb)
 
-    worker = workercls(parameters)
-    reducer = reducercls(parameters)
+    worker = workercls(parameters=parameters)
+    reducer = reducercls(parameters=parameters)
 
     while True:
         try:
