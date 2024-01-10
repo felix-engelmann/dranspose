@@ -56,6 +56,11 @@ async def test_params(
 
         logging.warning("params %s", params)
         assert params == [
+            StrParameter(
+                name="dump_prefix",
+                description="Prefix to dump ingester values",
+                dtype="str",
+            ),
             FileParameter(name="file_parameter", description=None, dtype="file"),
             FileParameter(name="other_file_parameter", description=None, dtype="file"),
             StrParameter(name="roi1", description=None, dtype="str"),
