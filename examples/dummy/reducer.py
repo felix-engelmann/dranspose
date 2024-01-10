@@ -21,3 +21,6 @@ class FluorescenceReducer:
             self.publish["map"][result.payload["position"]] = result.payload[
                 "concentations"
             ]
+
+    def finish(self, parameters=None):
+        print("finished dummy reducer work")

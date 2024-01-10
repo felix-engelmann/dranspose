@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -146,6 +147,18 @@ def reducer(args: argparse.Namespace) -> None:
         print("exiting")
 
 
+def http_ingester(args: argparse.Namespace) -> None:
+    try:
+        os.environ["INGESTER_STREAMS"] = json.dumps([args.name])
+        config = uvicorn.Config(
+            args.ingesterapp, port=args.port or 5000, host=args.host, log_level="info"
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    except KeyboardInterrupt:
+        print("exiting")
+
+
 def debugworker(args: argparse.Namespace) -> None:
     try:
         if args.name:
@@ -210,6 +223,19 @@ def create_parser() -> argparse.ArgumentParser:
         "-u", "--upstream_url", help="Where to connect to upstream", required=True
     )
     parser_ingester.add_argument(
+        "-n", "--name", help="Name of the ingester", required=True
+    )
+
+    parser_http_ingester = subparsers.add_parser(
+        "http_ingester", help="run http ingester"
+    )
+    parser_http_ingester.set_defaults(func=http_ingester)
+    parser_http_ingester.add_argument("--host", help="host to listen on")
+    parser_http_ingester.add_argument(
+        "-c", "--ingesterapp", help="Ingester App", required=True
+    )
+    parser_http_ingester.add_argument("-p", "--port", help="Where to listen on")
+    parser_http_ingester.add_argument(
         "-n", "--name", help="Name of the ingester", required=True
     )
 
