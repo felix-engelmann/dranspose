@@ -44,6 +44,7 @@ class Reducer(DistributedService):
         self.in_socket.bind(f"tcp://*:{self._reducer_settings.reducer_url.port}")
 
         self.custom = None
+        self.custom_context = None
         if self._reducer_settings.reducer_class:
             try:
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
@@ -75,7 +76,9 @@ class Reducer(DistributedService):
         self._logger.info("started work task")
         self.reducer = None
         if self.custom:
-            self.reducer = self.custom(self.parameters)
+            self.reducer = self.custom(
+                parameters=self.parameters, context=self.custom_context
+            )
         while True:
             parts = await self.in_socket.recv_multipart()
             prelim = json.loads(parts[0])
@@ -95,6 +98,13 @@ class Reducer(DistributedService):
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+
+    async def finish_work(self) -> None:
+        self._logger.info("finishing reducer work")
+        if self.reducer:
+            if hasattr(self.reducer, "finish"):
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, self.reducer.finish, self.parameters)
 
     async def close(self) -> None:
         self.work_task.cancel()
