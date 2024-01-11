@@ -20,9 +20,9 @@
 \usepackage{fontawesome5}
 
  % Title, Author, Institute
-\title{\texttt{dranspo}{\sffamily.}\texttt{se} – A Flexible Live Processing Pipeline}
+\title{\texttt{DRANSPO}{\sffamily.}\texttt{SE} – a Flexible Live Processing Pipeline}
 \author{Felix Engelmann}
-\institute{Scientific Data, MAX IV}
+\institute{Scientific Data}
 
 %Remove LaTeX tag at bottom of the poster
 \tikzposterlatexaffectionproofoff
@@ -52,12 +52,12 @@ showstringspaces=false
 }%}
 
 \lstdefinestyle{yaml}{
-     basicstyle=\color{blue}\footnotesize,
+     basicstyle=\ttfamily\color{blue}\footnotesize,
      rulecolor=\color{black},
      string=[s]{'}{'},
-     stringstyle=\color{blue},
+     stringstyle=\ttfamily\color{blue},
      comment=[l]{:},
-     commentstyle=\color{black},
+     commentstyle=\ttfamily\color{black},
      morecomment=[l]{-}
  }
 
@@ -85,8 +85,33 @@ showstringspaces=false
 \node[anchor=west, xshift=15mm] at (TP@title.west) {\includegraphics[width=8cm]{lulogo.pdf}};
 \node[anchor=east,xshift=-15mm] at (TP@title.east) {\includegraphics[width=10cm]{maxivlogo.pdf}};
 
-\node[anchor=center, xshift=-219mm,yshift=-2cm] at (TP@title.center) {\qrcode[height=5cm]{https://dranspo.se/}};
+\node[anchor=center, xshift=-219mm,yshift=-2.2cm] at (TP@title.center) {\qrcode[height=5cm]{https://dranspo.se/}};
 
+\block{Accelerating Scientific Insight Through Rapid Feedback}{
+\centering
+\begin{tikzpicture}
+ \node[below right, text width=15cm] (sc) at (0,0) {{\huge Scanning}\\[1mm]
+ Sardana, Contrast, Hula};
+
+ \node[text width=20cm, below right] at (52,0) {{\huge Analysis}\\[1mm]
+   Event formation, Calibration, Corrections, Fitting, Azimuthal integration, $I_0$ normalisation,
+   Tomography angle augmentation, Sparsification, AI/ML alignment};
+
+ \node[below right] at (30,-3.5) {\huge Visualisation};
+
+ \node[below right] (det) at (22,0) {\huge Detectors};
+
+ \draw[-latex, line width=2mm] (8.5,-1.3) -- node[above]{ orchestration, triggers} +(12.5,0);
+ \draw[-latex, line width=2mm] (31,-1.3) -- node[above]{ unprocessed, separate data streams} +(20,0);
+
+ \draw[-latex, line width=2mm] (51,-4.8) -- node[above]{results} +(-10,0);
+
+ \draw[dash pattern=on 3cm off 1cm, line width=2mm] (29,-4.8) -| node[very near start, above]{scientist's interpretation} (-2,-3.5);
+
+ \draw[-latex,line width=2mm] (51,-7.2) -| node[near start, above]{automatic scanning decision} (-2,-3.5) |- (-1,-1.3);
+
+\end{tikzpicture}
+}
 
  % First block
 \begin{columns}
@@ -94,8 +119,8 @@ showstringspaces=false
    % FIRST column
   \column{0.5}% Width set relative to text width
 
-  \block{Ingesters}{
-  Ingesters connect to different data sources, such as detectors, electrometers and encoders and form events according to the Trigger Map.
+  \block{Source Trigger Map}{
+  \textbf{Ingesters} connect to different data sources, such as detectors, electrometers and encoders and form events according to the Trigger Map.
   \bigskip
 
   \begin{minipage}{0.2\columnwidth}
@@ -131,16 +156,9 @@ showstringspaces=false
   \end{itemize}
 
  \end{minipage}
-
-  }
-
-   % SECOND column
-   % Second column with first block's top edge aligned with with previous column's top.
-
-   % Second column - first block
-   % Need to reset font, pretty ugly
-  \block{Trigger Map}{
-  Which \emph{frames} from which \emph{detectors} belong to the same \emph{event} and have to be processed by the same \emph{worker} with which \emph{tags}?
+\bigskip
+\coloredbox[bgcolor=blocktitlebgcolor, framecolor=blocktitlebgcolor]{
+ Which \emph{frames} from which \emph{detectors} belong to the same \emph{event} and have to be processed by the same \emph{worker} having which \emph{tags}?}
   \medskip
 
   \begin{center}
@@ -152,7 +170,7 @@ showstringspaces=false
   \end{tabular}
   \end{center}
 
-  This supports detectors not producing a frame for a trigger (none) and discarding frames ($\emptyset$). Meta information is easily distributed to all workers by \emph{all}. Tags allow different sets of workers, the debug worker just exposes the last n events.
+  This supports detectors not producing a frame for a trigger (\emph{none}) and discarding frames ($\emptyset$). Meta information is easily distributed to all workers by \emph{all}. Tags allow different sets of workers, the \textbf{debug worker} just exposes the last n events.
 
   The trigger map is provided by the scanning software:
   \begin{description}
@@ -162,30 +180,30 @@ showstringspaces=false
 
 
   }
-  \block{Workers}{
-  Events are dispatched to the next free available worker satisfying the constraints and tags. The fine graind load balancing allows to keep state in the worker. This enables temporal analysis, e.g. calculate the difference of two consecutive exposures. All required parameters need to be described.
+  \block{Map Reduce}{
+  Events are dispatched to the \textbf{next free} available worker satisfying the constraints and tags. The fine grained \textbf{load balancing} allows to keep state in the worker. This enables \textbf{temporal analysis}, e.g. calculate the difference of two consecutive exposures. All required parameters need to be described.
   {\footnotesize
   \lstinputlisting[language=Python]{worker.py}
   }
-  Workers emit arbitrary objects as results. It is important that the output of all workers combined does not exceed a bottleneck of around 10\,Gbit/s.
-}
-  \block{Reducer}{
-  The results of workers are forwarded to a single reducer which has access to the full history of the scan. It has limited capacity and needs to operate at line speed which is fine for simple operations such as appending worker results to a list.
+  Workers emit arbitrary objects as reduced results. It is important that the output of all workers combined does not exceed a bottleneck of around 10\,Gbit/s.
+  \bigskip
+
+  The results of workers are forwarded to a \textbf{single reducer} which has access to the full history of the scan. It has limited capacity and needs to operate at line speed which is fine for simple operations such as appending worker results to a list.
   {\footnotesize
   \lstinputlisting[language=Python]{reducer.py}
   }
-  The reducer has a special attribute \emph{publish} which is exposed through a REST api with JsonPATH selections and numpy slicing.
+  The reducer has a special attribute \texttt{publish} which is exposed through a REST api with JsonPATH selections and numpy slicing.
   }
 
 
-  \block{Viewer}{
+  \block{Visualisation}{
   The most flexible way to view results is to access the reducer data through a Jupyter notebook.
 
 {\footnotesize
   \lstinputlisting[language=Python]{viewer.py}
   }
 
-  Alternatively a custom GUI may be developed which integrates setting parameters or selectively zooming into regions, if the whole data set is too large for the local memory.
+  Alternatively a custom GUI may be developed which integrates setting \textbf{parameters} or selectively zooming into regions, if the whole data set is too large for the local memory.
   }
 
 
@@ -193,7 +211,7 @@ showstringspaces=false
 
 
   \block{Control System Integration}{
-   A Tango device server presents the status of a pipeline and allows to set parameters. It shows which ingester streams are awailable and the load of workers, allowing to adjust the worker scaling. Pipeline parameters support \texttt{str}, \texttt{int}, \texttt{float} and \texttt{file}.
+   A Tango device server presents the status of a pipeline and allows to set parameters. It shows which ingester streams are available and the load of workers, allowing to adjust the worker \textbf{scaling}. Pipeline parameters support \texttt{str}, \texttt{int}, \texttt{float} and \texttt{file}.
    \medskip
 
    \footnotesize
@@ -212,18 +230,20 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
 
   \block{Architecture \& Performance}{
 
-  \begin{tikzpicture}[yscale=2, xscale=3]
-  \node at (-2,1) {Detectors};
-  \node (det1) at (0,1) {\faCamera};
-  \node (mot) at (4,1) {\faSlidersH}; %\faCameraRetro};
-  \node (temp) at (6,1) {\faThermometerHalf};
-  \node (det2) at (2,1) {\faVideo};
+  \begin{tikzpicture}[yscale=2.389, xscale=3]
+  \node[left, color=gray] at (-1,1) {Detectors};
+  \node[color=gray] (det1) at (0,1) {\faCamera};
+  \node[color=gray] (mot) at (4,1) {\faSlidersH}; %\faCameraRetro};
+  \node[color=gray] (temp) at (6,1) {\faThermometerHalf};
+  \node[color=gray] (det2) at (2,1) {\faVideo};
 
-  \node[ left] at (-1,0) {custom zmq};
-  \node[left] at (-1,-2) {wrapped(custom zmq)};
-  \node[ left] at (-1,-4) {pickle in zmq};
+  \node[ left, color=blocktitlefgcolor] at (-1,0) {custom};
+  \node[left, color=blocktitlefgcolor] at (-1,-2) {wrapped(custom)};
+  \node[ left, color=blocktitlefgcolor] at (-1,-4) {\texttt{pickle} in zmq};
 
-  \node at (-2,-1) {Event Formation};
+  \node (redis) at (7.5,-3){\includegraphics[width=1.5cm]{redis}};
+  \node (fast) at (7.5,-1){\includegraphics[width=1.5cm]{fastapi}};
+  \node[left] at (-1,-1) {Ingesters};
   \node (ef1) at (0,-1) {\faHatWizard};
   \node (ef2) at (2,-1) {\faHatWizard};
   \node (ef) at (5,-1) {\faHatWizard};
@@ -234,7 +254,7 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
   \draw (temp.south) -- (ef);
 
 
-  \node at (-2,-3) {Workers};
+  \node[left] at (-1,-3) {Workers};
   \node (crop1) at (0,-3) {\faCrop};
   \node (crop4) at (3,-3) {\faCrop};
   \node (crop7) at (6,-3) {\faCrop};
@@ -245,7 +265,7 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
     \draw (ef2.south) -- (crop\i.north);
   };
 
-  \node at (-2,-5) {Reduce};
+  \node[left] at (-1,-5) {Reduce};
   \node (red) at (3,-5) {\faCog};
 
 
@@ -258,10 +278,13 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
   \node[above of=ef1, yshift=\labeloffset, fill=white] {\small PULL};
   \node[above of=ef, yshift=\labeloffset, fill=white] {\small SUB};
 
-  \node[below of=det1, yshift=-\labeloffset, fill=white] {\small PUSH};
-  \node[below of=det2, yshift=-\labeloffset, fill=white] {\small PUSH};
-  \node[below of=mot, yshift=-\labeloffset, fill=white] {\small PUB};
-  \node[below of=temp, yshift=-\labeloffset, fill=white] {\small PUB};
+  \node[below of=redis, yshift=-\labeloffset, fill=white] {\small redis};
+  \node[below of=fast, yshift=-\labeloffset,] {\small controller};
+
+  \node[below of=det1, yshift=-\labeloffset,color=gray,  fill=white] {\small PUSH};
+  \node[below of=det2, yshift=-\labeloffset,color=gray,  fill=white] {\small PUSH};
+  \node[below of=mot, yshift=-\labeloffset,color=gray,  fill=white] {\small PUB};
+  \node[below of=temp, yshift=-\labeloffset,color=gray,  fill=white] {\small PUB};
 
   \node[below of=ef1, yshift=-\labeloffset, fill=white] {\small ROUTER};
   \node[below of=ef2, yshift=-\labeloffset, fill=white] {\small ROUTER};
@@ -281,7 +304,7 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
  The throughput of the system is only limited by the underlying kernel and zmq library. With jumbo frames, we successfully processed a single stream of \textbf{23\,GBit/s} from a 16\,bit \texttt{cmos} camera at 120\,Hz.
     Affinity of ingesters heavily impacts performance.
 
-    The design allows arbitrary \textbf{horizontal scaling} for many ingesters. If a detector supports one stream per module, multiple ingesters are used to reassemble full frames for a worker. We tested up events at \textbf{2\,kHz}.
+    The design allows arbitrary \textbf{horizontal scaling} for many ingesters. If a detector supports one stream per module, multiple ingesters are used to reassemble full frames for a worker. We tested ingesting events at up to \textbf{2\,kHz}.
 
   }
 
@@ -291,7 +314,7 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
 {\footnotesize
   \lstinputlisting[style=yaml]{Values.yaml}
   }
-  Without kubernetes, the only dependency is a \texttt{redis} to which all components can connect.
+  Without kubernetes, the only dependency is a \texttt{redis} to which all \textbf{containerised} components connect.
   }
 
 
@@ -305,15 +328,6 @@ mca\_config & /data/xrf/fit\_config\_removed.cfg\\
     To get insight into live packets, a \textbf{debug worker} exposes sampled full events over a REST interface.
 
     Documentation at \url{https://dranspo.se/}
-  }
-
-  \block{Examples}{
-  \begin{itemize}
-   \item PyMCA fitting of concentration maps from fluorescence data.
-   \item Azimutal integration of diffraction images with $I_0$ normalisation.
-   \item Augmentation of camera frames with stage rotation angles for live tomographic reconstruction.
-   \item Image sparsification for \texttt{cmos} direct photon detection.
-  \end{itemize}
 
   }
 

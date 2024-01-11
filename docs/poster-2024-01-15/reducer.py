@@ -8,6 +8,4 @@ class FluorescenceReducer:
 
     def process_result(self, result: ResultData, parameters=None):
         if result.payload:
-            self.publish["map"][result.payload["position"]] = result.payload[
-                "concentations"
-            ]
+            self.publish["map"][result.payload["position"]] = result.payload["concentations"]
