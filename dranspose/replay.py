@@ -8,7 +8,7 @@ from pydantic import TypeAdapter
 
 from dranspose.helpers import utils
 from dranspose.event import InternalWorkerMessage, EventData, ResultData
-from dranspose.protocol import WorkerName, Digest, ParameterName, WorkParameter
+from dranspose.protocol import WorkerName, Digest, WorkParameter
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
@@ -24,7 +24,7 @@ def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMe
 
 logger = logging.getLogger(__name__)
 
-Paramdict = TypeAdapter(dict[ParameterName, WorkParameter])
+ParamList = TypeAdapter(list[WorkParameter])
 
 
 def replay(
@@ -45,10 +45,25 @@ def replay(
     if parameter_file:
         try:
             with open(parameter_file) as f:
-                parameters = Paramdict.validate_json(f.read())
+                parameters = {p.name: p for p in ParamList.validate_json(f.read())}
         except UnicodeDecodeError:
             with open(parameter_file, "rb") as fb:
                 parameters = pickle.load(fb)
+
+    param_description = {}
+    try:
+        param_description.update({p.name: p for p in workercls.describe_parameters()})
+    except AttributeError:
+        pass
+    try:
+        param_description.update({p.name: p for p in reducercls.describe_parameters()})
+    except AttributeError:
+        pass
+    logger.info("parameter descriptions %s", param_description)
+
+    for p in parameters:
+        if p in param_description:
+            parameters[p].value = param_description[p].from_bytes(parameters[p].data)
 
     worker = workercls(parameters=parameters)
     reducer = reducercls(parameters=parameters)
