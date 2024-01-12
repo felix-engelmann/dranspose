@@ -21,6 +21,8 @@ markdown_extensions:
 exclude_docs: |
   /seminar-2023-11-30
   !/seminar-2023-11-30/main.pdf
+  /poster-2024-01-15
+  !/poster-2024-01-15/main.pdf
 
 #nav:
 #  - "index.md"

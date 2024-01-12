@@ -5,7 +5,7 @@ The reducer publishes data available for live viewing or to influence the scanni
 To retrieve the data, the reducer exposes a HTTP interface. All data is available at
 
 ```
-/api/v1/result/
+/api/v1/result/$
 ```
 
 and returns pickle objects.

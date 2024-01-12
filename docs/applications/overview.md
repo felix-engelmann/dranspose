@@ -52,7 +52,7 @@ from dranspose.middlewares import xspress
 logger = logging.getLogger(__name__)
 
 class FluorescenceWorker:
-    def __init__(self, parameters=None):
+    def __init__(self, parameters=None, **kwargs):
         self.number = 0
 
 ```
@@ -106,7 +106,7 @@ This attribute is automatically exposed via *http* for live viewers
 from dranspose.event import ResultData
 
 class FluorescenceReducer:
-    def __init__(self, parameters=None):
+    def __init__(self, parameters=None, **kwargs):
         self.number = 0
         self.publish = {"map": {}}
 ```
