@@ -65,6 +65,8 @@ def replay(
         if p in param_description:
             parameters[p].value = param_description[p].from_bytes(parameters[p].data)
 
+    logger.info("use parameters %s", parameters)
+
     worker = workercls(parameters=parameters)
     reducer = reducercls(parameters=parameters)
 

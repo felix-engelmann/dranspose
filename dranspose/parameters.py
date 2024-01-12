@@ -67,7 +67,7 @@ class BoolParameter(ParameterBase):
     @staticmethod
     def from_bytes(by: bytes) -> bool:
         try:
-            return by == b"true"
+            return by == b"True"
         except ValueError:
             return False
 
