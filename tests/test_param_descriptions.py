@@ -63,6 +63,6 @@ async def test_params(
             ),
             FileParameter(name="file_parameter", description=None, dtype="file"),
             FileParameter(name="other_file_parameter", description=None, dtype="file"),
-            StrParameter(name="roi1", description=None, dtype="str"),
+            StrParameter(name="roi1", description=None, dtype="str", default="bla"),
             StrParameter(name="string_parameter", description=None, dtype="str"),
         ]
