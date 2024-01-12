@@ -24,7 +24,13 @@ class FloatParameter(ParameterBase):
     dtype: Literal["float"] = "float"
 
 
-ParameterType = StrParameter | FileParameter | IntParameter | FloatParameter
+class BoolParameter(ParameterBase):
+    dtype: Literal["bool"] = "bool"
+
+
+ParameterType = (
+    StrParameter | FileParameter | IntParameter | FloatParameter | BoolParameter
+)
 
 Parameter = TypeAdapter(ParameterType)
 
