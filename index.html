@@ -237,6 +237,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting started
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      CLI
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#applications" class="md-nav__link">
     <span class="md-ellipsis">
       Applications
@@ -798,6 +816,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#getting-started" class="md-nav__link">
+    <span class="md-ellipsis">
+      Getting started
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      CLI
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#applications" class="md-nav__link">
     <span class="md-ellipsis">
       Applications
@@ -822,11 +858,27 @@
 
 
 <h1 id="dranspose">dranspose</h1>
-<p>dranspose is a framework for distributed live processing.</p>
+<p>Dranspose introduces a novel approach to experimental feedback by enabling direct intervention during scanning. 
+Rather than waiting for a scan to complete, this software allows real-time interruption of suboptimal scans, 
+enhancing efficiency and reducing the likelihood of processing flawed data. 
+Dranspose's capability to intervene during scanning represents a valuable tool for researchers seeking immediate control over experimental outcomes, 
+promoting a more agile and adaptive research process.</p>
+<h2 id="getting-started">Getting started</h2>
+<p>The easiest way to test dranspose is to install the python package</p>
+<div class="language-text highlight"><pre><span></span><code>pip install dranspose
+</code></pre></div>
+<p>To run components, a <code>redis</code> server is required. A convenient way is to use the <a href="https://hub.docker.com/r/redis/redis-stack">docker image</a></p>
+<h2 id="cli">CLI</h2>
+<p>The packet provides a cli <code>dranspose</code> to run the components separately or all combined. </p>
 <div class="admonition info">
 <p class="admonition-title">Presentation</p>
-<p>There is a seminar talk with a general overview available.</p>
+<p>There is a seminar talk with a general overview available. Some details might be out of date.</p>
 <p><a class="md-button" href="seminar-2023-11-30/main.pdf">Slides</a></p>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Poster</p>
+<p>There is a poster with developer information.</p>
+<p><a class="md-button" href="poster-2024-01-15/main.pdf">Poster</a></p>
 </div>
 <h2 id="applications">Applications</h2>
 <p>If you are looking for help with developing an application on top of dranspose, have a look at the <a href="applications/overview/">application section</a></p>

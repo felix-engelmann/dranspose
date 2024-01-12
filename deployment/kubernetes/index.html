@@ -826,13 +826,14 @@
 
 
 <h1 id="k8s-deployment">K8s deployment</h1>
-<p>The most easy way to run a distributed version of dranspose is via a helm chart.</p>
+<p>The most easy way to run a distributed version of dranspose is via a <a href="https://github.com/felix-engelmann/dranspose-helm">helm chart</a>.</p>
 <h2 id="values">Values</h2>
 <p>The required values are a <code>beamline</code> to be able to mount the correct volumes.
 The <code>dump_prefix</code> may be set to a path to which the ingesters dump all stream messages.
 This is useful to get the initial data to develop a worker which can digest these.</p>
-<p>The <code>ingesters</code> map specifies the name of the stream, the <code>connect_url</code> on where to connect to and the class.
-Other ingesters may need additional settings.</p>
+<p>The <code>ingesters</code> map specifies the name of the stream, the <code>upstream_url</code> on where to connect to and the class.
+Other ingesters may need additional settings. 
+If the stream name contains underscores, a separate <code>stream</code> entry can be used as k8s does not allow underscore in deployment names.</p>
 <p>The <code>workers</code> and the <code>reducer</code> run with a custom docker image which contains all the dependencies for the analysis
 <code>worker.class</code> and <code>reducer.class</code> specify the paths to the correct classes in the analysis container.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">global</span><span class="p">:</span>
@@ -841,18 +842,19 @@ Other ingesters may need additional settings.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">ingesters</span><span class="p">:</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">contrast</span><span class="p">:</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">connect_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://172.16.125.30:5556&quot;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">upstream_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://172.16.125.30:5556&quot;</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">ingester_class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;StreamingContrastIngester&quot;</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">xspress3</span><span class="p">:</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">connect_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://172.16.126.70:9999&quot;</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">ingester_class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;StreamingXspressIngester&quot;</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="nt">science_image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;harbor.maxiv.lu.se/daq/dranspose/nanomax-fluorescence:main&quot;</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">worker</span><span class="p">:</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src.worker:FluorescenceWorker&quot;</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">reducer</span><span class="p">:</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src.worker:FluorescenceReducer&quot;</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">stream</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;contrast_one&quot;</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">xspress3</span><span class="p">:</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">upstream_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tcp://172.16.126.70:9999&quot;</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nt">ingester_class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;StreamingXspressIngester&quot;</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="nt">science_image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;harbor.maxiv.lu.se/daq/dranspose/nanomax-fluorescence:main&quot;</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="nt">worker</span><span class="p">:</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src.worker:FluorescenceWorker&quot;</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="nt">reducer</span><span class="p">:</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src.worker:FluorescenceReducer&quot;</span>
 </span></code></pre></div>
 
 
