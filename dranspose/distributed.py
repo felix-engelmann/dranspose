@@ -8,6 +8,7 @@ from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
 from dranspose.helpers.utils import parameters_hash
+from dranspose.parameters import Parameter, ParameterType
 from dranspose.protocol import (
     RedisKeys,
     ControllerUpdate,
@@ -147,6 +148,24 @@ class DistributedService(abc.ABC):
                                     self.parameters[name] = WorkParameter(
                                         name=name, uuid=paramuuids[name], data=params
                                     )
+                                    # check if this parameter has a description and type
+                                    desc = await self.redis.get(
+                                        RedisKeys.parameter_description(name),
+                                    )
+                                    self._logger.debug("description is %s", desc)
+                                    if desc:
+                                        param_desc: ParameterType = Parameter.validate_json(desc)  # type: ignore
+                                        self._logger.info(
+                                            "set paremter has a description %s",
+                                            param_desc,
+                                        )
+                                        self.parameters[
+                                            name
+                                        ].value = param_desc.from_bytes(params)
+                                        self._logger.debug(
+                                            "parsed parameter value %s",
+                                            self.parameters[name].value,
+                                        )
                             except Exception as e:
                                 self._logger.error(
                                     "failed to get parameters %s", e.__repr__()

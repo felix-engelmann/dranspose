@@ -119,6 +119,7 @@ class ControllerUpdate(BaseModel):
 class WorkParameter(BaseModel):
     name: str
     data: bytes
+    value: Optional[int | str | bytes | float | bool] = None
     uuid: UUID4 = Field(default_factory=uuid4)
 
 

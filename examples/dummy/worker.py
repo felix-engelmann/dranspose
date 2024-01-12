@@ -16,7 +16,7 @@ class FluorescenceWorker:
     @staticmethod
     def describe_parameters():
         params = [
-            StrParameter(name="roi1"),
+            StrParameter(name="roi1", default="bla"),
             FileParameter(name="file_parameter"),
         ]
         return params

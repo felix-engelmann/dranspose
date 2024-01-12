@@ -58,7 +58,7 @@ async def test_params(
         logging.warning("params %s", params)
 
         resp = await session.post(
-            "http://localhost:5000/api/v1/parameter/roi",
+            "http://localhost:5000/api/v1/parameter/roi1",
             json=[0, 10],
         )
         assert resp.status == 200
