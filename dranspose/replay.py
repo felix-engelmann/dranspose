@@ -41,7 +41,7 @@ def replay(
     reducercls = utils.import_class(rclass)
     logger.info("custom reducer class %s", reducercls)
 
-    parameters = None
+    parameters = {}
     if parameter_file:
         try:
             with open(parameter_file) as f:
@@ -51,14 +51,10 @@ def replay(
                 parameters = pickle.load(fb)
 
     param_description = {}
-    try:
+    if hasattr(workercls, "describe_parameters"):
         param_description.update({p.name: p for p in workercls.describe_parameters()})
-    except AttributeError:
-        pass
-    try:
+    if hasattr(reducercls, "describe_parameters"):
         param_description.update({p.name: p for p in reducercls.describe_parameters()})
-    except AttributeError:
-        pass
     logger.info("parameter descriptions %s", param_description)
 
     for p in parameters:

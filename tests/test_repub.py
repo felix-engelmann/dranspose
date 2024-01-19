@@ -24,7 +24,7 @@ from pydantic_core import Url
 from dranspose.worker import Worker, WorkerSettings
 
 
-async def consume_repub(ctx, num):
+async def consume_repub(ctx: zmq.Context[Any], num: int) -> int:
     s = ctx.socket(zmq.PULL)
     s.connect("tcp://127.0.0.1:5556")
 
