@@ -82,7 +82,7 @@ class Worker(DistributedService):
 
         self.param_descriptions = []
         self.custom = None
-        self.custom_context = None
+        self.custom_context = {}
         self.worker = None
         if self._worker_settings.worker_class:
             try:
@@ -290,8 +290,13 @@ class Worker(DistributedService):
         self._logger.info("finishing work")
         if self.worker:
             if hasattr(self.worker, "finish"):
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(None, self.worker.finish, self.parameters)
+                try:
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, self.worker.finish, self.parameters
+                    )
+                except Exception as e:
+                    self._logger.error("custom reducer finish failed: %s", e.__repr__())
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)

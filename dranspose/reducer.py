@@ -86,10 +86,13 @@ class Reducer(DistributedService):
             result = ResultData.model_validate(prelim)
             if self.reducer:
                 try:
-                    result = self.reducer.process_result(result, self.parameters)
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, self.reducer.process_result, result, self.parameters
+                    )
                 except Exception as e:
                     self._logger.error("custom reducer failed: %s", e.__repr__())
-            self._logger.debug("received %s", result)
+            self._logger.debug("processed result %s", result)
             self.state.processed_events += 1
 
     async def restart_work(self, new_uuid: UUID4) -> None:
