@@ -91,13 +91,15 @@ def replay(
             reducer.process_result(result, parameters=parameters)
 
         except StopIteration:
-            try:
-                worker.finish(parameters=parameters)
-            except Exception:
-                pass
+            if hasattr(worker, "finish"):
+                try:
+                    worker.finish(parameters=parameters)
+                except Exception as e:
+                    logger.error("worker finished failed with %s", e.__repr__())
 
-            try:
-                reducer.finish(parameters=parameters)
-            except Exception:
-                pass
+            if hasattr(reducer, "finish"):
+                try:
+                    reducer.finish(parameters=parameters)
+                except Exception as e:
+                    print("reducer finish failed with %s", e.__repr__())
             break
