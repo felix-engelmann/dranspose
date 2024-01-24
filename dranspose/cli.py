@@ -177,7 +177,14 @@ def combined(args: argparse.Namespace) -> None:
 
 
 def replay(args: argparse.Namespace) -> None:
-    run_replay(args.workerclass, args.reducerclass, args.files, args.parameters)
+    run_replay(
+        args.workerclass,
+        args.reducerclass,
+        args.files,
+        args.parameters,
+        args.port,
+        args.keep_alive,
+    )
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -265,6 +272,12 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser_replay.add_argument(
         "-p", "--parameters", help="parameter file, json or pickle"
+    )
+    parser_replay.add_argument(
+        "--port", type=int, help="expose the reducer result via http on port"
+    )
+    parser_replay.add_argument(
+        "--keep-alive", action="store_true", help="keep the server alive after finish"
     )
 
     return parser
