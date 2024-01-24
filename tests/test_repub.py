@@ -36,7 +36,7 @@ async def consume_repub(ctx: zmq.Context[Any], num: int) -> int:
 
 
 @pytest.mark.asyncio
-async def test_simple(
+async def test_repub(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName | Worker], Awaitable[Worker]],
