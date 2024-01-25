@@ -49,6 +49,7 @@ from dranspose.protocol import (
     IntervalLoad,
     WorkerLoad,
     DistributedUpdate,
+    ReducerUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,9 @@ class Controller:
         self.parameters: dict[ParameterName, WorkParameter] = {}
         self.parameters_hash = parameters_hash(self.parameters)
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
+        self.reduced: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
+        self.reduced_events: list[int] = []
         self.assign_task: Task[None]
         self.worker_timing: dict[
             WorkerName, dict[EventNumber, WorkerTimes]
@@ -204,7 +207,9 @@ class Controller:
         last = 0
         event_no = 0
         self.completed = defaultdict(list)
+        self.reduced = defaultdict(list)
         self.completed_events = []
+        self.reduced_events = []
         self.worker_timing = defaultdict(dict)
         notify_finish = True
         start = time.perf_counter()
@@ -216,7 +221,7 @@ class Controller:
                 )
                 if RedisKeys.ready(self.mapping.uuid) in workers:
                     for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
-                        update = DistributedUpdate.model_validate_json(ready[1]["data"])
+                        update = DistributedUpdate.validate_json(ready[1]["data"])
                         if isinstance(update, WorkerUpdate):
                             logger.debug("got a ready worker %s", update)
                             if update.state == DistributedStateEnum.IDLE:
@@ -282,15 +287,24 @@ class Controller:
                                             start = time.perf_counter()
                                     await pipe.execute()
                                 event_no = self.mapping.complete_events
-                            last = ready[0]
+                        elif isinstance(update, ReducerUpdate):
+                            compev = update.completed
+                            self.reduced[compev].append(update.worker)
+                            logger.debug("added reduced to set %s", self.reduced)
+                            wa = self.mapping.get_event_workers(compev)
+                            if wa.get_all_workers() == set(self.reduced[compev]):
+                                self.reduced_events.append(compev)
+                        last = ready[0]
                 logger.debug(
-                    "checking if finished, completed %d, len %d",
+                    "checking if finished, completed %d, len %d, reduced %d",
                     len(self.completed_events),
                     self.mapping.len(),
+                    len(self.reduced_events),
                 )
                 if (
                     len(self.completed_events) > 0
                     and len(self.completed_events) == self.mapping.len()
+                    and len(self.reduced_events) == self.mapping.len()
                     and notify_finish
                 ):
                     # all events done, send close
@@ -357,7 +371,8 @@ async def get_status() -> dict[str, Any]:
         "last_assigned": ctrl.mapping.complete_events,
         "assignment": ctrl.mapping.assignments,
         "completed_events": ctrl.completed_events,
-        "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
+        "finished": len(ctrl.completed_events) == ctrl.mapping.len()
+        and len(ctrl.reduced_events) == ctrl.mapping.len(),
         "processing_times": ctrl.worker_timing,
     }
 
@@ -379,7 +394,8 @@ async def get_progress() -> dict[str, Any]:
         "last_assigned": ctrl.mapping.complete_events,
         "completed_events": len(ctrl.completed_events),
         "total_events": ctrl.mapping.len(),
-        "finished": len(ctrl.completed_events) == ctrl.mapping.len(),
+        "finished": len(ctrl.completed_events) == ctrl.mapping.len()
+        and len(ctrl.reduced_events) == ctrl.mapping.len(),
     }
 
 
