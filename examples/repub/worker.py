@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class RepubWorker:
     def __init__(self, context, **kwargs):
-        print("context", context)
+        logger.warning("context is %s", context)
         if "context" not in context:
             context["context"] = zmq.Context()
             context["socket"] = context["context"].socket(zmq.PUSH)
