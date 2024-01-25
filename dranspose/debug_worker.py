@@ -11,7 +11,7 @@ from starlette.responses import Response
 
 from dranspose.event import EventData
 from dranspose.helpers.utils import done_callback
-from dranspose.protocol import WorkerUpdate, WorkerStateEnum, RedisKeys
+from dranspose.protocol import WorkerUpdate, DistributedStateEnum, RedisKeys
 from dranspose.worker import Worker, RedisException
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class DebugWorker(Worker):
             self.buffer.append(event)
 
             wu = WorkerUpdate(
-                state=WorkerStateEnum.IDLE,
+                state=DistributedStateEnum.IDLE,
                 completed=event.event_number,
                 worker=self.state.name,
             )

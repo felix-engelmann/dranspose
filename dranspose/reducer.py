@@ -16,7 +16,13 @@ from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.helpers.utils import done_callback
-from dranspose.protocol import ReducerState, ZmqUrl, RedisKeys
+from dranspose.protocol import (
+    ReducerState,
+    ZmqUrl,
+    RedisKeys,
+    ReducerUpdate,
+    DistributedStateEnum,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +98,16 @@ class Reducer(DistributedService):
                     )
                 except Exception as e:
                     self._logger.error("custom reducer failed: %s", e.__repr__())
+            ru = ReducerUpdate(
+                state=DistributedStateEnum.IDLE,
+                completed=result.event_number,
+                worker=result.worker,
+            )
+            self._logger.debug("result processed, notify controller with %s", ru)
+            await self.redis.xadd(
+                RedisKeys.ready(self.state.mapping_uuid),
+                {"data": ru.model_dump_json()},
+            )
             self._logger.debug("processed result %s", result)
             self.state.processed_events += 1
 

@@ -8,6 +8,7 @@ from pydantic import (
     validate_call,
     UrlConstraints,
     Field,
+    TypeAdapter,
 )
 
 from uuid import uuid4
@@ -138,7 +139,7 @@ class WorkAssignment(BaseModel):
         return set([x for stream in self.assignments.values() for x in stream])
 
 
-class WorkerStateEnum(Enum):
+class DistributedStateEnum(Enum):
     IDLE = "idle"
 
 
@@ -199,11 +200,22 @@ SystemLoadType = dict[WorkerName, WorkerLoad]
 
 
 class WorkerUpdate(BaseModel):
-    state: WorkerStateEnum
+    source: Literal["worker"] = "worker"
+    state: DistributedStateEnum
     completed: EventNumber
     worker: WorkerName
     new: bool = False
     processing_times: Optional[WorkerTimes] = None
+
+
+class ReducerUpdate(BaseModel):
+    source: Literal["reducer"] = "reducer"
+    state: DistributedStateEnum
+    completed: EventNumber
+    worker: WorkerName
+
+
+DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate)
 
 
 class DistributedState(BaseModel):

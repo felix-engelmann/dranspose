@@ -23,7 +23,7 @@ from dranspose.protocol import (
     RedisKeys,
     IngesterState,
     WorkerUpdate,
-    WorkerStateEnum,
+    DistributedStateEnum,
     WorkAssignment,
     WorkerName,
     EventNumber,
@@ -121,7 +121,7 @@ class Worker(DistributedService):
             RedisKeys.ready(self.state.mapping_uuid),
             {
                 "data": WorkerUpdate(
-                    state=WorkerStateEnum.IDLE,
+                    state=DistributedStateEnum.IDLE,
                     new=True,
                     completed=EventNumber(0),
                     worker=self.state.name,
@@ -274,7 +274,7 @@ class Worker(DistributedService):
                 perf_sent_result,
             )
             wu = WorkerUpdate(
-                state=WorkerStateEnum.IDLE,
+                state=DistributedStateEnum.IDLE,
                 completed=event.event_number,
                 worker=self.state.name,
                 processing_times=times,
