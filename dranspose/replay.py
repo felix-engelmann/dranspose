@@ -77,7 +77,9 @@ class Server(uvicorn.Server):
             thread.join()
 
 
-def get_parameters(parameter_file, workercls, reducercls):
+def get_parameters(
+    parameter_file: os.PathLike[Any] | str, workercls: type, reducercls: type
+) -> dict[str, WorkParameter]:
     parameters = {}
     if parameter_file:
         try:
