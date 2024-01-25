@@ -5,6 +5,7 @@ import random
 import socket
 import string
 import time
+import traceback
 from asyncio import Future
 from typing import Optional, Any
 
@@ -103,8 +104,9 @@ class Worker(DistributedService):
 
             except Exception as e:
                 self._logger.error(
-                    "no custom worker class loaded, discarding events, err %s",
+                    "no custom worker class loaded, discarding events, err %s\n%s",
                     e.__repr__(),
+                    traceback.format_exc(),
                 )
 
     async def run(self) -> None:
@@ -239,7 +241,11 @@ class Worker(DistributedService):
                         None, self.worker.process_event, event, self.parameters
                     )
                 except Exception as e:
-                    self._logger.error("custom worker failed: %s", e.__repr__())
+                    self._logger.error(
+                        "custom worker failed: %s\n%s",
+                        e.__repr__(),
+                        traceback.format_exc(),
+                    )
             perf_custom_code = time.perf_counter()
             self._logger.debug("got result %s", result)
             rd = ResultData(
@@ -296,7 +302,11 @@ class Worker(DistributedService):
                         None, self.worker.finish, self.parameters
                     )
                 except Exception as e:
-                    self._logger.error("custom reducer finish failed: %s", e.__repr__())
+                    self._logger.error(
+                        "custom worker finish failed: %s\n%s",
+                        e.__repr__(),
+                        traceback.format_exc(),
+                    )
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)

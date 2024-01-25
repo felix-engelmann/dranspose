@@ -184,6 +184,7 @@ def replay(args: argparse.Namespace) -> None:
         args.parameters,
         args.port,
         args.keep_alive,
+        args.nworkers,
     )
 
 
@@ -278,6 +279,12 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser_replay.add_argument(
         "--keep-alive", action="store_true", help="keep the server alive after finish"
+    )
+    parser_replay.add_argument(
+        "--nworkers",
+        help="number of workers to distribute events to",
+        default=1,
+        type=int,
     )
 
     return parser

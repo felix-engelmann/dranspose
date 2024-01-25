@@ -3,8 +3,10 @@ import json
 import logging
 import os
 import pickle
+import random
 import threading
 import time
+import traceback
 from typing import Iterator, Any, Optional
 
 import uvicorn
@@ -75,22 +77,7 @@ class Server(uvicorn.Server):
             thread.join()
 
 
-def replay(
-    wclass: str,
-    rclass: str,
-    zmq_files: list[os.PathLike[Any] | str],
-    parameter_file: os.PathLike[Any] | str,
-    port: Optional[int] = None,
-    keepalive: bool = False,
-) -> None:
-    gens = [get_internals(f) for f in zmq_files]
-
-    workercls = utils.import_class(wclass)
-    logger.info("custom worker class %s", workercls)
-
-    reducercls = utils.import_class(rclass)
-    logger.info("custom reducer class %s", reducercls)
-
+def get_parameters(parameter_file, workercls, reducercls):
     parameters = {}
     if parameter_file:
         try:
@@ -111,10 +98,32 @@ def replay(
         if p in param_description:
             parameters[p].value = param_description[p].from_bytes(parameters[p].data)
 
+    return parameters
+
+
+def replay(
+    wclass: str,
+    rclass: str,
+    zmq_files: list[os.PathLike[Any] | str],
+    parameter_file: os.PathLike[Any] | str,
+    port: Optional[int] = None,
+    keepalive: bool = False,
+    nworkers: int = 1,
+) -> None:
+    gens = [get_internals(f) for f in zmq_files]
+
+    workercls = utils.import_class(wclass)
+    logger.info("custom worker class %s", workercls)
+
+    reducercls = utils.import_class(rclass)
+    logger.info("custom reducer class %s", reducercls)
+
+    parameters = get_parameters(parameter_file, workercls, reducercls)
+
     logger.info("use parameters %s", parameters)
 
     global reducer
-    worker = workercls(parameters=parameters)
+    workers = [workercls(parameters=parameters) for _ in range(nworkers)]
     reducer = reducercls(parameters=parameters)
 
     config = uvicorn.Config(
@@ -129,11 +138,12 @@ def replay(
                 internals = [next(gen) for gen in gens]
                 event = EventData.from_internals(internals)
 
-                data = worker.process_event(event, parameters=parameters)
+                wi = random.randint(0, len(workers) - 1)
+                data = workers[wi].process_event(event, parameters=parameters)
 
                 rd = ResultData(
                     event_number=event.event_number,
-                    worker=WorkerName("development"),
+                    worker=WorkerName(f"development{wi}"),
                     payload=data,
                     parameters_hash=Digest(
                         "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
@@ -149,17 +159,26 @@ def replay(
                 reducer.process_result(result, parameters=parameters)
 
             except StopIteration:
-                if hasattr(worker, "finish"):
-                    try:
-                        worker.finish(parameters=parameters)
-                    except Exception as e:
-                        logger.error("worker finished failed with %s", e.__repr__())
+                for worker in workers:
+                    if hasattr(worker, "finish"):
+                        try:
+                            worker.finish(parameters=parameters)
+                        except Exception as e:
+                            logger.error(
+                                "worker finished failed with %s\n%s",
+                                e.__repr__(),
+                                traceback.format_exc(),
+                            )
 
                 if hasattr(reducer, "finish"):
                     try:
                         reducer.finish(parameters=parameters)
                     except Exception as e:
-                        print("reducer finish failed with %s", e.__repr__())
+                        logger.error(
+                            "reducer finish failed with %s\n%s",
+                            e.__repr__(),
+                            traceback.format_exc(),
+                        )
                 break
         if keepalive:
             input("press key to stop server")

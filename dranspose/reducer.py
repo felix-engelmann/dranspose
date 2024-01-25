@@ -97,7 +97,11 @@ class Reducer(DistributedService):
                         None, self.reducer.process_result, result, self.parameters
                     )
                 except Exception as e:
-                    self._logger.error("custom reducer failed: %s", e.__repr__())
+                    self._logger.error(
+                        "custom reducer failed: %s\n%s",
+                        e.__repr__(),
+                        traceback.format_exc(),
+                    )
             ru = ReducerUpdate(
                 state=DistributedStateEnum.IDLE,
                 completed=result.event_number,
@@ -122,8 +126,17 @@ class Reducer(DistributedService):
         self._logger.info("finishing reducer work")
         if self.reducer:
             if hasattr(self.reducer, "finish"):
-                loop = asyncio.get_event_loop()
-                await loop.run_in_executor(None, self.reducer.finish, self.parameters)
+                try:
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, self.reducer.finish, self.parameters
+                    )
+                except Exception as e:
+                    self._logger.error(
+                        "custom reducer finish failed: %s\n%s",
+                        e.__repr__(),
+                        traceback.format_exc(),
+                    )
 
     async def close(self) -> None:
         self.work_task.cancel()
