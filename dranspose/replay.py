@@ -48,7 +48,7 @@ async def get_path(path: str) -> Any:
             path = "$"
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]  # type: ignore [union-attr]
+        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]  # type: ignore [attr-defined]
         data = pickle.dumps(ret)
         return Response(data, media_type="application/x.pickle")
     except Exception as e:
@@ -56,11 +56,11 @@ async def get_path(path: str) -> Any:
 
 
 class Server(uvicorn.Server):
-    def install_signal_handlers(self):
+    def install_signal_handlers(self) -> None:
         pass
 
     @contextlib.contextmanager
-    def run_in_thread(self, port):
+    def run_in_thread(self, port: Optional[int]) -> Iterator[None]:
         if port is None:
             yield
             return
@@ -117,7 +117,9 @@ def replay(
     worker = workercls(parameters=parameters)
     reducer = reducercls(parameters=parameters)
 
-    config = uvicorn.Config(reducer_app, port=port, host="localhost", log_level="info")
+    config = uvicorn.Config(
+        reducer_app, port=port or 5000, host="localhost", log_level="info"
+    )
     server = Server(config)
     # server.run()
 

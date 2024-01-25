@@ -17,4 +17,6 @@ class SardanaRecordEnd(BaseModel):
 
 SardanaPacketType = SardanaDataDescription | SardanaRecordData | SardanaRecordEnd
 
-SardanaPacket = TypeAdapter(SardanaPacketType)
+SardanaPacket = TypeAdapter(
+    SardanaDataDescription | SardanaRecordData | SardanaRecordEnd
+)

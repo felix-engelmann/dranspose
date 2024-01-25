@@ -6,7 +6,7 @@ import socket
 import string
 import time
 from asyncio import Future
-from typing import Optional
+from typing import Optional, Any
 
 import zmq.asyncio
 
@@ -82,7 +82,7 @@ class Worker(DistributedService):
 
         self.param_descriptions = []
         self.custom = None
-        self.custom_context = {}
+        self.custom_context: dict[Any, Any] = {}
         self.worker = None
         if self._worker_settings.worker_class:
             try:
