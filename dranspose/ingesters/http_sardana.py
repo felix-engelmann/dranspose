@@ -89,27 +89,27 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/v1/data_desc")
-async def post_data_desc(payload: dict[str, Any] = Body(...)) -> None:
+async def post_data_desc(data: SardanaDataDescription = Body(...)) -> None:
     global sardana_ingester
-    await sardana_ingester.receive(SardanaDataDescription(description=payload))
-    logging.info("data_desc received %s", payload)
+    await sardana_ingester.receive(data)  # SardanaDataDescription(description=payload))
+    logger.info("data_desc received %s", data.__repr__())
 
 
 @app.post("/v1/record_data")
-async def post_record_data(payload: dict[str, Any] = Body(...)) -> None:
+async def post_record_data(data: SardanaRecordData = Body(...)) -> None:
     global sardana_ingester
-    await sardana_ingester.receive(SardanaRecordData(record=payload))
-    logging.debug("record_data received %s", payload)
+    await sardana_ingester.receive(data)
+    logger.debug("record_data received %s", data.__repr__())
 
 
 @app.post("/v1/custom_data")
 async def post_custom_data(payload: dict[str, Any] = Body(...)) -> None:
     global sardana_ingester
-    logging.debug("ignoring custom_data received %s", payload)
+    logger.debug("ignoring custom_data received %s", payload)
 
 
 @app.post("/v1/record_end")
-async def post_record_end(payload: dict[str, Any] = Body(...)) -> None:
+async def post_record_end(data: SardanaRecordEnd = Body(...)) -> None:
     global sardana_ingester
-    await sardana_ingester.receive(SardanaRecordEnd(end=payload))
-    logging.debug("record_end received %s", payload)
+    await sardana_ingester.receive(data)
+    logging.debug("record_end received %s", data.__repr__())
