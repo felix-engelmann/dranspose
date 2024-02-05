@@ -276,7 +276,11 @@ class Controller:
                                         )
                                         if wrks.get_all_workers() == set():
                                             self.completed[wrks.event_number] = []
+                                            self.reduced[wrks.event_number] = []
                                             self.completed_events.append(
+                                                wrks.event_number
+                                            )
+                                            self.reduced_events.append(
                                                 wrks.event_number
                                             )
                                         if evn % 1000 == 0:
