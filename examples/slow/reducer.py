@@ -1,3 +1,4 @@
+import logging
 import time
 
 from dranspose.event import ResultData
@@ -12,6 +13,7 @@ class SlowReducer:
         # if result.payload:
         time.sleep(0.5)
         self.publish["map"][result.event_number] = 1
+        logging.info("updated publish to %s", self.publish)
 
     def finish(self, parameters=None):
         print("finished dummy reducer work")
