@@ -1,7 +1,12 @@
 site_name: dranspose
 
+repo_url: https://github.com/felix-engelmann/dranspose
+edit_uri: edit/main/docs/
+
 theme:
   name: "material"
+  features:
+    - content.action.edit
 
 plugins:
   - mkdocstrings
