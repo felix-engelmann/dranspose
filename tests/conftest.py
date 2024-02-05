@@ -108,6 +108,8 @@ async def reducer(
         server_tasks.append((server, asyncio.create_task(server.serve())))
         while server.started is False:
             await asyncio.sleep(0.1)
+        if custom:
+            del os.environ["REDUCER_CLASS"]
 
     yield start_reducer
 
