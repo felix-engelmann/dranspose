@@ -50,7 +50,7 @@ class Reducer(DistributedService):
         self.in_socket.bind(f"tcp://*:{self._reducer_settings.reducer_url.port}")
 
         self.custom = None
-        self.custom_context = None
+        self.custom_context: dict[Any, Any] = {}
         if self._reducer_settings.reducer_class:
             try:
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
