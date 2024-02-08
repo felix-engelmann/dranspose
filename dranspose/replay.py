@@ -125,8 +125,8 @@ def replay(
     logger.info("use parameters %s", parameters)
 
     global reducer
-    workers = [workercls(parameters=parameters) for _ in range(nworkers)]
-    reducer = reducercls(parameters=parameters)
+    workers = [workercls(parameters=parameters, context={}) for _ in range(nworkers)]
+    reducer = reducercls(parameters=parameters, context={})
 
     config = uvicorn.Config(
         reducer_app, port=port or 5000, host="localhost", log_level="info"
