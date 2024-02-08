@@ -26,7 +26,7 @@ from dranspose.worker import Worker, WorkerSettings
 
 async def consume_repub(ctx: zmq.Context[Any], num: int) -> int:
     s = ctx.socket(zmq.PULL)
-    s.connect("tcp://127.0.0.1:5556")
+    s.connect("tcp://127.0.0.1:5555")
 
     for _ in range(num):
         data = await s.recv_multipart(copy=False)
@@ -49,7 +49,7 @@ async def test_repub(
     await create_worker(
         Worker(
             settings=WorkerSettings(
-                worker_name=WorkerName("w5556"),
+                worker_name=WorkerName("w5555"),
                 worker_class="examples.repub.worker:RepubWorker",
             ),
         )
