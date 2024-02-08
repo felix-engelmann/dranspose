@@ -86,6 +86,8 @@ class Ingester(DistributedService):
         self.assign_task = asyncio.create_task(self.manage_assignments())
         self.assign_task.add_done_callback(done_callback)
         self.assignment_queue: asyncio.Queue[WorkAssignment] = asyncio.Queue()
+        self.metrics_task = asyncio.create_task(self.update_metrics())
+        self.metrics_task.add_done_callback(done_callback)
         await self.register()
 
     async def restart_work(self, new_uuid: UUID4) -> None:

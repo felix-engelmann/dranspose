@@ -1,5 +1,6 @@
 import abc
 import logging
+import time
 from typing import Optional
 
 import redis.asyncio as redis
@@ -179,6 +180,17 @@ class DistributedService(abc.ABC):
                 break
             except asyncio.exceptions.CancelledError:
                 break
+
+    async def update_metrics(self):
+        while True:
+            start = time.time()
+            old = self.state.processed_events
+            await asyncio.sleep(1.0)
+            end = time.time()
+            if (self.state.processed_events - old) > 0:
+                rate = (self.state.processed_events - old) / (end - start)
+                self.state.event_rate = rate
+                self._logger.info("receiving %lf frames per second", rate)
 
     async def restart_work(self, uuid: UUID4) -> None:
         pass

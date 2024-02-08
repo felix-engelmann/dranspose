@@ -76,6 +76,8 @@ class Reducer(DistributedService):
     async def run(self) -> None:
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+        self.metrics_task = asyncio.create_task(self.update_metrics())
+        self.metrics_task.add_done_callback(done_callback)
         await self.register()
 
     async def work(self) -> None:

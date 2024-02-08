@@ -223,6 +223,7 @@ class DistributedState(BaseModel):
     mapping_uuid: Optional[UUID4] = None
     parameters_hash: Optional[Digest] = None
     processed_events: int = 0
+    event_rate: float = 0.0
 
 
 class IngesterState(DistributedState):

@@ -116,6 +116,8 @@ class Worker(DistributedService):
         self.manage_receiver_task.add_done_callback(done_callback)
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+        self.metrics_task = asyncio.create_task(self.update_metrics())
+        self.metrics_task.add_done_callback(done_callback)
         await self.register()
 
     async def notify_worker_ready(self) -> None:
