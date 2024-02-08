@@ -197,7 +197,9 @@ class Worker(DistributedService):
         if self.custom:
             try:
                 self.worker = self.custom(
-                    parameters=self.parameters, context=self.custom_context
+                    parameters=self.parameters,
+                    context=self.custom_context,
+                    state=self.state,
                 )
             except Exception as e:
                 self._logger.error(
