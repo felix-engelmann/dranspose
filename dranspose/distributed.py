@@ -181,7 +181,7 @@ class DistributedService(abc.ABC):
             except asyncio.exceptions.CancelledError:
                 break
 
-    async def update_metrics(self):
+    async def update_metrics(self) -> None:
         while True:
             start = time.time()
             old = self.state.processed_events
