@@ -255,6 +255,9 @@ class Ingester(DistributedService):
                 connected_worker = ConnectedWorker(
                     name=data[0], service_uuid=UUID(bytes=data[1])
                 )
+                fast_publish = False
+                if connected_worker.service_uuid not in self.state.connected_workers:
+                    fast_publish = True
                 self.state.connected_workers[
                     connected_worker.service_uuid
                 ] = connected_worker
@@ -262,9 +265,12 @@ class Ingester(DistributedService):
                 self.state.connected_workers = {
                     uuid: cw
                     for uuid, cw in self.state.connected_workers.items()
-                    if now - cw.last_seen < 10
+                    if now - cw.last_seen < 3
                 }
-                self._logger.debug("new worker connected %s", connected_worker)
+                self._logger.debug("worker pinnged %s", connected_worker)
+                if fast_publish:
+                    self._logger.debug("fast publish")
+                    await self.publish_config()
 
     async def close(self) -> None:
         """

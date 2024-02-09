@@ -45,6 +45,7 @@ class ConnectedIngester(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     socket: zmq.asyncio.Socket
     config: IngesterState
+    pinged_since: float = Field(default_factory=time.time)
 
 
 def random_worker_name() -> WorkerName:
@@ -367,6 +368,22 @@ class Worker(DistributedService):
                         "service_uuid of ingester changed from %s to %s, disconnecting",
                         self._ingesters[iname].config.service_uuid,
                         cfg.service_uuid,
+                    )
+                    self._ingesters[iname].socket.close()
+                    del self._ingesters[iname]
+
+                pinged_for_long = time.time() - self._ingesters[iname].pinged_since > 10
+                reached_ingester = (
+                    self.state.service_uuid in cfg.connected_workers.keys()
+                )
+                if (
+                    iname in self._ingesters
+                    and pinged_for_long
+                    and not reached_ingester
+                ):
+                    self._logger.warning(
+                        "we send pings, but don't reach ingester %s, disconnecting",
+                        iname,
                     )
                     self._ingesters[iname].socket.close()
                     del self._ingesters[iname]
