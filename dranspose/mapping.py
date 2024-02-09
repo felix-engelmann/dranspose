@@ -104,6 +104,8 @@ class Mapping:
             if evn == maxassign:
                 self.update_filled(all_workers)
                 return assigned_to
+        if assigned_to == []:
+            self.update_filled(all_workers)
         return assigned_to
 
     def min_workers(self) -> int:

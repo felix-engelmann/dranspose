@@ -58,6 +58,65 @@ def test_none() -> None:
     assert assign.assignments[StreamName("test")] == [WorkerName("w1")]
 
 
+def test_discard() -> None:
+    ntrig = 10
+    m = Mapping(
+        {StreamName("test"): [[] for i in range(ntrig)]},
+        add_start_end=False,
+    )
+
+    m.print()
+    all_workers = [
+        WorkerState(name=WorkerName("w1")),
+        WorkerState(name=WorkerName("w2")),
+    ]
+    r = m.assign_next(all_workers[0], all_workers)
+    print(r)
+    r = m.assign_next(all_workers[1], all_workers)
+    print(r)
+
+    m.print()
+    print("completed", m.complete_events)
+
+    # m.assign_next(all_workers[0], all_workers)
+
+    assign = m.get_event_workers(EventNumber(8))
+    print("assign is", assign)
+    assert assign.assignments == {}
+
+
+def test_discard_only_one() -> None:
+    ntrig = 10
+    m = Mapping(
+        {
+            StreamName("test"): [[] for i in range(ntrig)],
+            StreamName("test2"): [
+                [VirtualWorker(constraint=VirtualConstraint(i))] for i in range(ntrig)
+            ],
+        },
+        add_start_end=False,
+    )
+
+    m.print()
+    all_workers = [
+        WorkerState(name=WorkerName("w1")),
+        WorkerState(name=WorkerName("w2")),
+    ]
+    m.assign_next(all_workers[0], all_workers)
+    m.assign_next(all_workers[1], all_workers)
+
+    m.print()
+    print("completed", m.complete_events)
+
+    with pytest.raises(NotYetAssigned):
+        m.get_event_workers(EventNumber(8))
+
+    m.assign_next(all_workers[0], all_workers)
+
+    assign = m.get_event_workers(EventNumber(2))
+    assert assign.assignments[StreamName("test2")] == [WorkerName("w1")]
+
+
 def test_auto() -> None:
     ntrig = 10
     m = Mapping(
