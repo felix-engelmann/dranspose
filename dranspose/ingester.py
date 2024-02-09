@@ -1,7 +1,9 @@
 import asyncio
+import time
 import os
 import pickle
 from typing import AsyncGenerator, Optional, Awaitable, Any, IO
+from uuid import UUID
 
 import redis.exceptions as rexceptions
 import zmq.asyncio
@@ -19,6 +21,7 @@ from dranspose.protocol import (
     IngesterName,
     ZmqUrl,
     ParameterName,
+    ConnectedWorker,
 )
 
 
@@ -249,7 +252,19 @@ class Ingester(DistributedService):
             socks = dict(await poller.poll())
             for sock in socks:
                 data = await sock.recv_multipart()
-                self._logger.debug("new worker connected %s", data[0])
+                connected_worker = ConnectedWorker(
+                    name=data[0], service_uuid=UUID(bytes=data[1])
+                )
+                self.state.connected_workers[
+                    connected_worker.service_uuid
+                ] = connected_worker
+                now = time.time()
+                self.state.connected_workers = {
+                    uuid: cw
+                    for uuid, cw in self.state.connected_workers.items()
+                    if now - cw.last_seen < 10
+                }
+                self._logger.debug("new worker connected %s", connected_worker)
 
     async def close(self) -> None:
         """

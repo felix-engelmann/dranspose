@@ -376,10 +376,10 @@ class Worker(DistributedService):
                     sock = self.ctx.socket(zmq.DEALER)
                     sock.setsockopt(zmq.IDENTITY, self.state.name.encode("ascii"))
                     sock.connect(str(cfg.url))
-                    await sock.send(b"")
+                    await sock.send(self.state.service_uuid.bytes)
                     self._ingesters[iname] = ConnectedIngester(config=cfg, socket=sock)
 
-                await self._ingesters[iname].socket.send(b"")
+                await self._ingesters[iname].socket.send(self.state.service_uuid.bytes)
                 self._logger.debug("pinged %s", iname)
             for iname in set(self._ingesters.keys()) - set(processed):
                 self._logger.info("removing stale ingester %s", iname)

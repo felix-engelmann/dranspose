@@ -1,3 +1,4 @@
+import time
 import uuid
 from enum import Enum
 from typing import NewType, Literal, Annotated, Optional, TypeAlias
@@ -226,9 +227,16 @@ class DistributedState(BaseModel):
     event_rate: float = 0.0
 
 
+class ConnectedWorker(BaseModel):
+    name: WorkerName
+    service_uuid: UUID4
+    last_seen: float = Field(default_factory=time.time)
+
+
 class IngesterState(DistributedState):
     name: IngesterName
     url: ZmqUrl
+    connected_workers: dict[UUID4, ConnectedWorker] = {}
     streams: list[StreamName] = []
 
 
