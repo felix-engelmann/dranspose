@@ -403,6 +403,7 @@ class Worker(DistributedService):
     async def close(self) -> None:
         self.manage_ingester_task.cancel()
         self.manage_receiver_task.cancel()
+        self.metrics_task.cancel()
         await self.redis.delete(RedisKeys.config("worker", self.state.name))
         await super().close()
         self.ctx.destroy()

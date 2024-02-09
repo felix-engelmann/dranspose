@@ -142,6 +142,7 @@ class Reducer(DistributedService):
 
     async def close(self) -> None:
         self.work_task.cancel()
+        self.metrics_task.cancel()
         await self.redis.delete(RedisKeys.config("reducer", self.state.name))
         await super().close()
         self.ctx.destroy(linger=0)
