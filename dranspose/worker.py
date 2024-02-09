@@ -360,31 +360,26 @@ class Worker(DistributedService):
                 cfg = IngesterState.model_validate_json(await self.redis.get(key))
                 iname = cfg.name
                 processed.append(iname)
-                if (
-                    iname in self._ingesters
-                    and self._ingesters[iname].config.service_uuid != cfg.service_uuid
-                ):
-                    self._logger.warning(
-                        "service_uuid of ingester changed from %s to %s, disconnecting",
-                        self._ingesters[iname].config.service_uuid,
-                        cfg.service_uuid,
-                    )
-                    self._ingesters[iname].socket.close()
-                    del self._ingesters[iname]
+                if iname in self._ingesters:
+                    if self._ingesters[iname].config.service_uuid != cfg.service_uuid:
+                        self._logger.warning(
+                            "service_uuid of ingester changed from %s to %s, disconnecting",
+                            self._ingesters[iname].config.service_uuid,
+                            cfg.service_uuid,
+                        )
 
-                pinged_for_long = time.time() - self._ingesters[iname].pinged_since > 10
-                reached_ingester = (
-                    self.state.service_uuid in cfg.connected_workers.keys()
-                )
-                if (
-                    iname in self._ingesters
-                    and pinged_for_long
-                    and not reached_ingester
-                ):
-                    self._logger.warning(
-                        "we send pings, but don't reach ingester %s, disconnecting",
-                        iname,
+                    pinged_for_long = (
+                        time.time() - self._ingesters[iname].pinged_since > 10
                     )
+                    reached_ingester = (
+                        self.state.service_uuid in cfg.connected_workers.keys()
+                    )
+                    if pinged_for_long and not reached_ingester:
+                        self._logger.warning(
+                            "we send pings, but don't reach ingester %s, disconnecting",
+                            iname,
+                        )
+
                     self._ingesters[iname].socket.close()
                     del self._ingesters[iname]
 
