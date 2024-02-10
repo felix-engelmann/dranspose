@@ -88,6 +88,8 @@ class Controller:
         self.assign_task.add_done_callback(done_callback)
         self.default_task = asyncio.create_task(self.default_parameters())
         self.default_task.add_done_callback(done_callback)
+        self.consistent_task = asyncio.create_task(self.consistent_parameters())
+        self.consistent_task.add_done_callback(done_callback)
 
     async def get_configs(self) -> EnsembleState:
         async with self.redis.pipeline() as pipe:
@@ -178,6 +180,7 @@ class Controller:
         self.parameters[name] = param
         logger.debug("stored parameters")
         self.parameters_hash = parameters_hash(self.parameters)
+        logger.debug("parameter hash is now %s", self.parameters_hash)
         cupd = ControllerUpdate(
             mapping_uuid=self.mapping.uuid,
             parameters_version={n: p.uuid for n, p in self.parameters.items()},
@@ -215,6 +218,33 @@ class Controller:
                 if val.name not in self.parameters:
                     logger.info("set parameter %s to default %s", val.name, val.default)
                     await self.set_param(val.name, ParameterBase.to_bytes(val.default))
+            await asyncio.sleep(2)
+
+    async def consistent_parameters(self) -> None:
+        while True:
+            consistent = True
+            cfg = await self.get_configs()
+            for ing in cfg.ingesters:
+                if ing.parameters_hash != self.parameters_hash:
+                    consistent = False
+            for wo in cfg.workers:
+                if wo.parameters_hash != self.parameters_hash:
+                    consistent = False
+
+            if not consistent:
+                logger.info(
+                    "inconsistent parameters, redistribute hash %s",
+                    self.parameters_hash,
+                )
+                cupd = ControllerUpdate(
+                    mapping_uuid=self.mapping.uuid,
+                    parameters_version={n: p.uuid for n, p in self.parameters.items()},
+                )
+                logger.debug("send consistency update %s", cupd)
+                await self.redis.xadd(
+                    RedisKeys.updates(),
+                    {"data": cupd.model_dump_json()},
+                )
             await asyncio.sleep(2)
 
     async def assign_work(self) -> None:

@@ -81,6 +81,15 @@ async def test_params(
         )
         assert resp.status == 404
 
+        await asyncio.sleep(3)
+
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/additional",
+            data=b"asdasd",
+        )
+        assert resp.status == 200
+        hash = await resp.json()
+
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
         print("state", state)

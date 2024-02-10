@@ -28,7 +28,7 @@ from dranspose.worker import Worker
 
 
 @pytest.mark.asyncio
-async def test_restart_ingester(
+async def test_restart_worker(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
@@ -107,7 +107,7 @@ async def test_restart_ingester(
     await create_worker(WorkerName("w2"))
     await worker.close()
 
-    await asyncio.sleep(6)
+    await asyncio.sleep(10)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")

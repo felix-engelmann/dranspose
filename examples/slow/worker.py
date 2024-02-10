@@ -21,6 +21,6 @@ class SlowWorker:
     def process_event(self, event: EventData, parameters=None):
         logger.debug("using parameters %s", parameters)
         if "sleep_time" in parameters:
-            time.sleep(float(parameters["sleep_time"]))
+            time.sleep(parameters["sleep_time"].value)
         else:
             time.sleep(0.28)

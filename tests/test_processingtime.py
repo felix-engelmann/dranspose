@@ -86,6 +86,11 @@ async def test_simple(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
+        await session.post(
+            "http://localhost:5000/api/v1/parameter/sleep_time",
+            data=b"0.28",
+        )
+
         st = await session.get(
             "http://localhost:5000/api/v1/load?intervals=1&intervals=10&scan=True"
         )

@@ -65,22 +65,24 @@ class DistributedService(abc.ABC):
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         self.parameters: dict[ParameterName, WorkParameter] = {}
 
+    def get_category(self):
+        if isinstance(self.state, IngesterState):
+            category = "ingester"
+        elif isinstance(self.state, WorkerState):
+            category = "worker"
+        elif isinstance(self.state, ReducerState):
+            category = "reducer"
+        else:
+            raise NotImplementedError(
+                "Distributed Service not implemented for your Service"
+            )
+        return category
+
     async def publish_config(self) -> None:
         self._logger.debug("publish config %s", self.state)
         async with self.redis.pipeline() as pipe:
-            if isinstance(self.state, IngesterState):
-                category = "ingester"
-            elif isinstance(self.state, WorkerState):
-                category = "worker"
-            elif isinstance(self.state, ReducerState):
-                category = "reducer"
-            else:
-                raise NotImplementedError(
-                    "Distributed Service not implemented for your Service"
-                )
-
             await pipe.setex(
-                RedisKeys.config(category, self.state.name),
+                RedisKeys.config(self.get_category(), self.state.name),
                 10,
                 self.state.model_dump_json(),
             )
@@ -140,7 +142,7 @@ class DistributedService(abc.ABC):
                                 self._logger.debug(
                                     "received binary parameters for %s", name
                                 )
-                                if params:
+                                if params is not None:
                                     self._logger.info(
                                         "set parameter %s of length %s",
                                         name,
@@ -172,6 +174,11 @@ class DistributedService(abc.ABC):
                                     "failed to get parameters %s", e.__repr__()
                                 )
                     self.state.parameters_hash = parameters_hash(self.parameters)
+                    self._logger.debug(
+                        "set local parameters to %s with hash %s",
+                        {n: p.uuid for n, p in self.parameters.items()},
+                        self.state.parameters_hash,
+                    )
                     if update.finished:
                         self._logger.info("finished messages")
                         await self.finish_work()
@@ -199,5 +206,10 @@ class DistributedService(abc.ABC):
         pass
 
     async def close(self) -> None:
+        await self.redis.delete(RedisKeys.config(self.get_category(), self.state.name))
+        self._logger.info(
+            "deleted redis key %s",
+            RedisKeys.config(self.get_category(), self.state.name),
+        )
         await self.redis.aclose()
         await self.raw_redis.aclose()
