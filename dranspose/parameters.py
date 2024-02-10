@@ -2,9 +2,11 @@ from typing import Optional, Literal, Any
 
 from pydantic import BaseModel, TypeAdapter
 
+from dranspose.protocol import ParameterName
+
 
 class ParameterBase(BaseModel):
-    name: str
+    name: ParameterName
     description: Optional[str] = None
 
     @staticmethod

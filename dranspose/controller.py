@@ -27,6 +27,7 @@ from dranspose.parameters import (
     Parameter,
     ParameterType,
     StrParameter,
+    ParameterBase,
 )
 from dranspose.protocol import (
     IngesterState,
@@ -85,6 +86,8 @@ class Controller:
         logger.debug("started controller run")
         self.assign_task = asyncio.create_task(self.assign_work())
         self.assign_task.add_done_callback(done_callback)
+        self.default_task = asyncio.create_task(self.default_parameters())
+        self.default_task.add_done_callback(done_callback)
 
     async def get_configs(self) -> EnsembleState:
         async with self.redis.pipeline() as pipe:
@@ -197,11 +200,22 @@ class Controller:
 
         params.append(
             StrParameter(
-                name="dump_prefix", description="Prefix to dump ingester values"
+                name=ParameterName("dump_prefix"),
+                description="Prefix to dump ingester values",
             )
         )
-
         return sorted(params, key=lambda x: x.name)
+
+    async def default_parameters(self) -> None:
+        while True:
+            desc_keys = await self.redis.keys(RedisKeys.parameter_description())
+            param_json = await self.redis.mget(desc_keys)
+            for i in param_json:
+                val: ParameterType = Parameter.validate_json(i)  # type: ignore
+                if val.name not in self.parameters:
+                    logger.info("set parameter %s to default %s", val.name, val.default)
+                    await self.set_param(val.name, ParameterBase.to_bytes(val.default))
+            await asyncio.sleep(2)
 
     async def assign_work(self) -> None:
         last = 0

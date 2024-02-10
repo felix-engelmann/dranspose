@@ -12,13 +12,13 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
 )
-from dranspose.parameters import ParameterList, FileParameter, StrParameter
-from dranspose.protocol import WorkerName, StreamName, EnsembleState, ParameterName
+from dranspose.parameters import ParameterList
+from dranspose.protocol import WorkerName, StreamName, EnsembleState
 from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.asyncio
-async def test_params(
+async def test_default_params(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -52,27 +52,19 @@ async def test_params(
             state = EnsembleState.model_validate(await st.json())
 
         par = await session.get("http://localhost:5000/api/v1/parameters")
+        assert par.status == 200
         params = ParameterList.validate_python(await par.json())
 
         logging.warning("params %s", params)
-        assert params == [
-            StrParameter(
-                name=ParameterName("dump_prefix"),
-                description="Prefix to dump ingester values",
-                dtype="str",
-            ),
-            FileParameter(
-                name=ParameterName("file_parameter"), description=None, dtype="file"
-            ),
-            FileParameter(
-                name=ParameterName("other_file_parameter"),
-                description=None,
-                dtype="file",
-            ),
-            StrParameter(
-                name=ParameterName("roi1"), description=None, dtype="str", default="bla"
-            ),
-            StrParameter(
-                name=ParameterName("string_parameter"), description=None, dtype="str"
-            ),
-        ]
+
+        resp = await session.get(
+            "http://localhost:5000/api/v1/parameter/roi1",
+        )
+        assert resp.status == 200
+        assert await resp.content.read() == b"bla"
+
+        resp = await session.get(
+            "http://localhost:5000/api/v1/parameter/file_parameter",
+        )
+        assert resp.status == 200
+        assert await resp.content.read() == b""
