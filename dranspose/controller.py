@@ -78,6 +78,8 @@ class Controller:
         self.completed_events: list[int] = []
         self.reduced_events: list[int] = []
         self.assign_task: Task[None]
+        self.default_task: Task[None]
+        self.consistent_task: Task[None]
         self.worker_timing: dict[
             WorkerName, dict[EventNumber, WorkerTimes]
         ] = defaultdict(dict)
@@ -211,41 +213,53 @@ class Controller:
 
     async def default_parameters(self) -> None:
         while True:
-            desc_keys = await self.redis.keys(RedisKeys.parameter_description())
-            param_json = await self.redis.mget(desc_keys)
-            for i in param_json:
-                val: ParameterType = Parameter.validate_json(i)  # type: ignore
-                if val.name not in self.parameters:
-                    logger.info("set parameter %s to default %s", val.name, val.default)
-                    await self.set_param(val.name, ParameterBase.to_bytes(val.default))
-            await asyncio.sleep(2)
+            try:
+                desc_keys = await self.redis.keys(RedisKeys.parameter_description())
+                param_json = await self.redis.mget(desc_keys)
+                for i in param_json:
+                    val: ParameterType = Parameter.validate_json(i)  # type: ignore
+                    if val.name not in self.parameters:
+                        logger.info(
+                            "set parameter %s to default %s", val.name, val.default
+                        )
+                        await self.set_param(
+                            val.name, ParameterBase.to_bytes(val.default)
+                        )
+                await asyncio.sleep(2)
+            except asyncio.exceptions.CancelledError:
+                break
 
     async def consistent_parameters(self) -> None:
         while True:
-            consistent = True
-            cfg = await self.get_configs()
-            for ing in cfg.ingesters:
-                if ing.parameters_hash != self.parameters_hash:
-                    consistent = False
-            for wo in cfg.workers:
-                if wo.parameters_hash != self.parameters_hash:
-                    consistent = False
+            try:
+                consistent = True
+                cfg = await self.get_configs()
+                for ing in cfg.ingesters:
+                    if ing.parameters_hash != self.parameters_hash:
+                        consistent = False
+                for wo in cfg.workers:
+                    if wo.parameters_hash != self.parameters_hash:
+                        consistent = False
 
-            if not consistent:
-                logger.info(
-                    "inconsistent parameters, redistribute hash %s",
-                    self.parameters_hash,
-                )
-                cupd = ControllerUpdate(
-                    mapping_uuid=self.mapping.uuid,
-                    parameters_version={n: p.uuid for n, p in self.parameters.items()},
-                )
-                logger.debug("send consistency update %s", cupd)
-                await self.redis.xadd(
-                    RedisKeys.updates(),
-                    {"data": cupd.model_dump_json()},
-                )
-            await asyncio.sleep(2)
+                if not consistent:
+                    logger.info(
+                        "inconsistent parameters, redistribute hash %s",
+                        self.parameters_hash,
+                    )
+                    cupd = ControllerUpdate(
+                        mapping_uuid=self.mapping.uuid,
+                        parameters_version={
+                            n: p.uuid for n, p in self.parameters.items()
+                        },
+                    )
+                    logger.debug("send consistency update %s", cupd)
+                    await self.redis.xadd(
+                        RedisKeys.updates(),
+                        {"data": cupd.model_dump_json()},
+                    )
+                await asyncio.sleep(2)
+            except asyncio.exceptions.CancelledError:
+                break
 
     async def assign_work(self) -> None:
         last = 0
@@ -373,6 +387,8 @@ class Controller:
                 break
 
     async def close(self) -> None:
+        self.default_task.cancel()
+        self.consistent_task.cancel()
         await self.redis.delete(RedisKeys.updates())
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
