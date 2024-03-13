@@ -50,7 +50,7 @@ def test_albaem_stream() -> None:
 
 
 def test_eiger_legacy_stream() -> None:
-    with open("tests/data/eiger-direct.pkls", "rb") as f:
+    with open("tests/data/eiger-small.pkls", "rb") as f:
         while True:
             try:
                 frames = pickle.load(f)
