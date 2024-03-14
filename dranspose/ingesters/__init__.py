@@ -10,6 +10,10 @@ from dranspose.ingesters.zmqpull_single import (  # noqa: F401
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
 )
+from dranspose.ingesters.zmqpull_eiger_legacy import (  # noqa: F401
+    ZmqPullEigerLegacyIngester,
+    ZmqPullEigerLegacySettings,
+)
 from dranspose.ingesters.zmqsub_contrast import (  # noqa: F401
     ZmqSubContrastIngester,
     ZmqSubContrastSettings,
