@@ -18,7 +18,7 @@ import redis.exceptions as rexceptions
 
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import InternalWorkerMessage, EventData, ResultData
-from dranspose.helpers.utils import done_callback
+from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
     WorkerState,
     RedisKeys,
@@ -316,10 +316,10 @@ class Worker(DistributedService):
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)
         if self.poll_task:
-            self.poll_task.cancel()
+            await cancel_and_wait(self.poll_task)
             self.poll_task = None
             self._logger.debug("cancelled poll task")
-        self.work_task.cancel()
+        await cancel_and_wait(self.work_task)
         self._logger.info("clean up in sockets")
         for iname, ing in self._ingesters.items():
             while True:
@@ -415,9 +415,9 @@ class Worker(DistributedService):
             await asyncio.sleep(2)
 
     async def close(self) -> None:
-        self.manage_ingester_task.cancel()
-        self.manage_receiver_task.cancel()
-        self.metrics_task.cancel()
+        await cancel_and_wait(self.manage_ingester_task)
+        await cancel_and_wait(self.manage_receiver_task)
+        await cancel_and_wait(self.metrics_task)
         await self.redis.delete(RedisKeys.config("worker", self.state.name))
         await super().close()
         self.ctx.destroy()

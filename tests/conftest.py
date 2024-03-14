@@ -23,6 +23,7 @@ from pydantic import HttpUrl
 from pydantic_core import Url
 
 from dranspose.controller import app
+from dranspose.helpers.utils import cancel_and_wait
 from dranspose.ingester import Ingester
 from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
@@ -63,7 +64,7 @@ async def create_worker() -> AsyncIterator[
 
     for worker, task in workers:
         await worker.close()
-        task.cancel()
+        await cancel_and_wait(task)
 
 
 @pytest_asyncio.fixture
@@ -81,7 +82,7 @@ async def create_ingester() -> AsyncIterator[
 
     for inst, task in ingesters:
         await inst.close()
-        task.cancel()
+        await cancel_and_wait(task)
 
 
 @pytest_asyncio.fixture()
@@ -476,7 +477,7 @@ fields:
     yield _make_pcap
 
     for task in server_tasks:
-        task.cancel()
+        await cancel_and_wait(task)
 
 
 multiscan_trace = """

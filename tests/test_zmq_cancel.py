@@ -5,6 +5,8 @@ from typing import Callable, Any, Coroutine
 import pytest
 import zmq.asyncio
 
+from dranspose.helpers.utils import cancel_and_wait
+
 
 @pytest.mark.asyncio
 async def test_zmq_cancel(
@@ -19,7 +21,7 @@ async def test_zmq_cancel(
             task = s.poll()
             waiting = asyncio.gather(*[task])
             if i == 6:
-                waiting.cancel()
+                await cancel_and_wait(waiting)
                 continue
             done = await waiting
             logging.info("done %s", done)

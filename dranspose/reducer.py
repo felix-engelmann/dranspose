@@ -15,7 +15,7 @@ from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
-from dranspose.helpers.utils import done_callback
+from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
     ReducerState,
     ZmqUrl,
@@ -119,7 +119,7 @@ class Reducer(DistributedService):
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)
-        self.work_task.cancel()
+        await cancel_and_wait(self.work_task)
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
@@ -141,8 +141,8 @@ class Reducer(DistributedService):
                     )
 
     async def close(self) -> None:
-        self.work_task.cancel()
-        self.metrics_task.cancel()
+        await cancel_and_wait(self.work_task)
+        await cancel_and_wait(self.metrics_task)
         await self.redis.delete(RedisKeys.config("reducer", self.state.name))
         await super().close()
         self.ctx.destroy(linger=0)
@@ -160,7 +160,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
     yield
-    run_task.cancel()
+    await cancel_and_wait(run_task)
     await reducer.close()
     # Clean up the ML models and release the resources
 

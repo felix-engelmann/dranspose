@@ -35,3 +35,16 @@ def done_callback(futr: Future[None]) -> None:
             e.__repr__(),
             traceback.format_exc(),
         )
+
+
+async def cancel_and_wait(task):
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        if asyncio.current_task().cancelling() == 0:
+            raise
+        else:
+            return
+    else:
+        raise RuntimeError("Cancelled task terminated on its own")

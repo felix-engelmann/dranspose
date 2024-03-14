@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from starlette.responses import Response
 
 from dranspose.event import EventData, ResultData
-from dranspose.helpers.utils import done_callback
+from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import WorkerUpdate, DistributedStateEnum, RedisKeys
 from dranspose.worker import Worker, RedisException
 
@@ -91,7 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(worker.run())
     run_task.add_done_callback(done_callback)
     yield
-    run_task.cancel()
+    await cancel_and_wait(run_task)
     await worker.close()
     # Clean up the ML models and release the resources
 

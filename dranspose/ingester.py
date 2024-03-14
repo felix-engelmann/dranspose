@@ -12,7 +12,7 @@ from pydantic import UUID4, model_validator
 
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import StreamData, InternalWorkerMessage
-from dranspose.helpers.utils import done_callback
+from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
     IngesterState,
     StreamName,
@@ -100,8 +100,8 @@ class Ingester(DistributedService):
         Arguments:
             new_uuid: The uuid of the new mapping
         """
-        self.work_task.cancel()
-        self.assign_task.cancel()
+        await cancel_and_wait(self.work_task)
+        await cancel_and_wait(self.assign_task)
         self.state.mapping_uuid = new_uuid
         self.assignment_queue = asyncio.Queue()
         self.work_task = asyncio.create_task(self.work())
@@ -223,6 +223,7 @@ class Ingester(DistributedService):
                     "closing dump file %s at cancelled work", self.dump_file
                 )
                 self.dump_file.close()
+                self.dump_file = None
 
     async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
         """
@@ -276,9 +277,9 @@ class Ingester(DistributedService):
         """
         Clean up any open connections
         """
-        self.accept_task.cancel()
-        self.work_task.cancel()
-        self.metrics_task.cancel()
+        await cancel_and_wait(self.accept_task)
+        await cancel_and_wait(self.work_task)
+        await cancel_and_wait(self.metrics_task)
         await self.redis.delete(RedisKeys.config("ingester", self.state.name))
         await super().close()
         self.ctx.destroy(linger=0)

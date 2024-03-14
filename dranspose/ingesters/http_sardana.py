@@ -13,7 +13,7 @@ from dranspose.data.sardana import (
     SardanaPacketType,
 )
 from dranspose.event import StreamData
-from dranspose.helpers.utils import done_callback
+from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName
 
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(sardana_ingester.run())
     run_task.add_done_callback(done_callback)
     yield
-    run_task.cancel()
+    await cancel_and_wait(run_task)
     await sardana_ingester.close()
     # Clean up the ML models and release the resources
 

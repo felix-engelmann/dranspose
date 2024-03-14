@@ -15,7 +15,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from dranspose.distributed import DistributedSettings
-from dranspose.helpers.utils import parameters_hash, done_callback
+from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
@@ -141,7 +141,7 @@ class Controller:
     async def set_mapping(self, m: Mapping) -> None:
         async with self.mapping_update_lock:
             logger.debug("cancelling assign task")
-            self.assign_task.cancel()
+            await cancel_and_wait(self.assign_task)
             logger.debug(
                 "deleting keys %s and %s",
                 RedisKeys.ready(self.mapping.uuid),
@@ -387,8 +387,8 @@ class Controller:
                 break
 
     async def close(self) -> None:
-        self.default_task.cancel()
-        self.consistent_task.cancel()
+        await cancel_and_wait(self.default_task)
+        await cancel_and_wait(self.consistent_task)
         await self.redis.delete(RedisKeys.updates())
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
@@ -413,7 +413,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(ctrl.run())
     run_task.add_done_callback(done_callback)
     yield
-    run_task.cancel()
+    await cancel_and_wait(run_task)
     await ctrl.close()
     # Clean up the ML models and release the resources
 
