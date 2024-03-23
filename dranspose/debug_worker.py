@@ -9,7 +9,7 @@ import zmq
 from fastapi import FastAPI
 from starlette.responses import Response
 
-from dranspose.event import EventData, ResultData
+from dranspose.event import EventData
 from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import WorkerUpdate, DistributedStateEnum, RedisKeys
 from dranspose.worker import Worker, RedisException
@@ -47,26 +47,6 @@ class DebugWorker(Worker):
             event = await self.build_event(ingesterset)
             self._logger.debug("adding event %s to buffer", event)
             self.buffer.append(event)
-
-            # send none result to reducer as reducer expects it
-            rd = ResultData(
-                event_number=event.event_number,
-                worker=self.state.name,
-                payload=None,
-                parameters_hash=self.state.parameters_hash,
-            )
-            if self.out_socket:
-                try:
-                    header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
-                    body = pickle.dumps(rd.payload)
-                    self._logger.debug(
-                        "send result to reducer with header %s, len-payload %d",
-                        header,
-                        len(body),
-                    )
-                    await self.out_socket.send_multipart([header, body])
-                except Exception as e:
-                    self._logger.error("could not dump result %s", e.__repr__())
 
             wu = WorkerUpdate(
                 state=DistributedStateEnum.IDLE,

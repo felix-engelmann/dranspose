@@ -51,6 +51,7 @@ from dranspose.protocol import (
     WorkerLoad,
     DistributedUpdate,
     ReducerUpdate,
+    IngesterUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -74,9 +75,10 @@ class Controller:
         self.parameters: dict[ParameterName, WorkParameter] = {}
         self.parameters_hash = parameters_hash(self.parameters)
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
+        self.to_reduce: set[tuple[EventNumber, WorkerName]] = set()
         self.reduced: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.completed_events: list[int] = []
-        self.reduced_events: list[int] = []
+        self.finished_components: list[DistributedUpdate] = []
         self.assign_task: Task[None]
         self.config_fetch_time: float = 0
         self.config_cache: EnsembleState
@@ -280,6 +282,14 @@ class Controller:
         wa = self.mapping.get_event_workers(compev)
         if wa.get_all_workers() == set(self.completed[compev]):
             self.completed_events.append(compev)
+        if update.has_result:
+            toadd = True
+            if compev in self.reduced:
+                if update.worker in self.reduced[compev]:
+                    # process worker update very late and already got reduced
+                    toadd = False
+            if toadd:
+                self.to_reduce.add((compev, update.worker))
         # logger.error("time processtime %s", time.perf_counter() - start)
 
     async def _process_worker_update(self, update):
@@ -314,9 +324,7 @@ class Controller:
                     )
                     if wrks.get_all_workers() == set():
                         self.completed[wrks.event_number] = []
-                        self.reduced[wrks.event_number] = []
                         self.completed_events.append(wrks.event_number)
-                        self.reduced_events.append(wrks.event_number)
                     if evn % 1000 == 0:
                         logger.info(
                             "1000 events in %lf",
@@ -330,13 +338,34 @@ class Controller:
             if not update.new:
                 asyncio.create_task(self._update_processing_times(update))
 
+    async def completed_finish(self):
+        fin_workers = set()
+        reducer = False
+        fin_ingesters = set()
+        for upd in self.finished_components:
+            if isinstance(upd, WorkerUpdate):
+                fin_workers.add(upd.worker)
+            elif isinstance(upd, ReducerUpdate):
+                reducer = True
+            elif isinstance(upd, IngesterUpdate):
+                fin_ingesters.add(upd.ingester)
+
+        cfgs = await self.get_configs()
+
+        return (
+            set([w.name for w in cfgs.workers]) == fin_workers
+            and set([i.name for i in cfgs.ingesters]) == fin_ingesters
+            and reducer
+        )
+
     async def assign_work(self) -> None:
         last = 0
         self.processed_event_no = 0
         self.completed = defaultdict(list)
         self.reduced = defaultdict(list)
         self.completed_events = []
-        self.reduced_events = []
+        self.to_reduce = set()
+        self.finished_components = []
         self.worker_timing = defaultdict(dict)
         notify_finish = True
         self.start_time = time.perf_counter()
@@ -358,20 +387,27 @@ class Controller:
                             compev = update.completed
                             self.reduced[compev].append(update.worker)
                             logger.debug("added reduced to set %s", self.reduced)
-                            wa = self.mapping.get_event_workers(compev)
-                            if wa.get_all_workers() == set(self.reduced[compev]):
-                                self.reduced_events.append(compev)
+                            # wa = self.mapping.get_event_workers(compev)
+                            if (compev, update.worker) in self.to_reduce:
+                                self.to_reduce.remove((compev, update.worker))
+                        elif isinstance(update, IngesterUpdate):
+                            pass
+
+                        if update.state == DistributedStateEnum.FINISHED:
+                            logger.info("distributed %s has finished", update)
+                            self.finished_components.append(update)
+
                         last = ready[0]
                 logger.debug(
-                    "checking if finished, completed %d, len %d, reduced %d",
+                    "checking if finished, completed %d, len %d, to_reduce %s",
                     len(self.completed_events),
                     self.mapping.len(),
-                    len(self.reduced_events),
+                    self.to_reduce,
                 )
                 if (
                     len(self.completed_events) > 0
                     and len(self.completed_events) == self.mapping.len()
-                    and len(self.reduced_events) == self.mapping.len()
+                    and len(self.to_reduce) == 0
                     and notify_finish
                 ):
                     # all events done, send close
@@ -440,8 +476,7 @@ async def get_status() -> dict[str, Any]:
         "last_assigned": ctrl.mapping.complete_events,
         "assignment": ctrl.mapping.assignments,
         "completed_events": ctrl.completed_events,
-        "finished": len(ctrl.completed_events) == ctrl.mapping.len()
-        and len(ctrl.reduced_events) == ctrl.mapping.len(),
+        "finished": await ctrl.completed_finish(),
         "processing_times": ctrl.worker_timing,
     }
 
@@ -463,8 +498,7 @@ async def get_progress() -> dict[str, Any]:
         "last_assigned": ctrl.mapping.complete_events,
         "completed_events": len(ctrl.completed_events),
         "total_events": ctrl.mapping.len(),
-        "finished": len(ctrl.completed_events) == ctrl.mapping.len()
-        and len(ctrl.reduced_events) == ctrl.mapping.len(),
+        "finished": await ctrl.completed_finish(),
     }
 
 

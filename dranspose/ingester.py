@@ -22,6 +22,8 @@ from dranspose.protocol import (
     ZmqUrl,
     ParameterName,
     ConnectedWorker,
+    IngesterUpdate,
+    DistributedStateEnum,
 )
 
 
@@ -118,6 +120,16 @@ class Ingester(DistributedService):
             self.dump_file.close()
             self._logger.info("closed dump file at finish %s", self.dump_file)
             self.dump_file = None
+
+        await self.redis.xadd(
+            RedisKeys.ready(self.state.mapping_uuid),
+            {
+                "data": IngesterUpdate(
+                    state=DistributedStateEnum.FINISHED,
+                    ingester=self.state.name,
+                ).model_dump_json()
+            },
+        )
 
     async def manage_assignments(self) -> None:
         """

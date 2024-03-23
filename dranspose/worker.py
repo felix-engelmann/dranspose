@@ -253,24 +253,25 @@ class Worker(DistributedService):
                     )
             perf_custom_code = time.perf_counter()
             self._logger.debug("got result %s", result)
-            rd = ResultData(
-                event_number=event.event_number,
-                worker=self.state.name,
-                payload=result,
-                parameters_hash=self.state.parameters_hash,
-            )
-            if self.out_socket:
-                try:
-                    header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
-                    body = pickle.dumps(rd.payload)
-                    self._logger.debug(
-                        "send result to reducer with header %s, len-payload %d",
-                        header,
-                        len(body),
-                    )
-                    await self.out_socket.send_multipart([header, body])
-                except Exception as e:
-                    self._logger.error("could not dump result %s", e.__repr__())
+            if result is not None:
+                rd = ResultData(
+                    event_number=event.event_number,
+                    worker=self.state.name,
+                    payload=result,
+                    parameters_hash=self.state.parameters_hash,
+                )
+                if self.out_socket:
+                    try:
+                        header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
+                        body = pickle.dumps(rd.payload)
+                        self._logger.debug(
+                            "send result to reducer with header %s, len-payload %d",
+                            header,
+                            len(body),
+                        )
+                        await self.out_socket.send_multipart([header, body])
+                    except Exception as e:
+                        self._logger.error("could not send out result %s", e.__repr__())
             perf_sent_result = time.perf_counter()
             proced += 1
             self.state.processed_events += 1
@@ -288,6 +289,7 @@ class Worker(DistributedService):
                 state=DistributedStateEnum.IDLE,
                 completed=event.event_number,
                 worker=self.state.name,
+                has_result=result is not None,
                 processing_times=times,
             )
             self._logger.debug("all work done, notify controller with %s", wu)
@@ -312,6 +314,17 @@ class Worker(DistributedService):
                         e.__repr__(),
                         traceback.format_exc(),
                     )
+        await self.redis.xadd(
+            RedisKeys.ready(self.state.mapping_uuid),
+            {
+                "data": WorkerUpdate(
+                    state=DistributedStateEnum.FINISHED,
+                    new=False,
+                    completed=EventNumber(0),
+                    worker=self.state.name,
+                ).model_dump_json()
+            },
+        )
 
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)

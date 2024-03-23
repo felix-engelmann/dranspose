@@ -142,6 +142,7 @@ class WorkAssignment(BaseModel):
 
 class DistributedStateEnum(Enum):
     IDLE = "idle"
+    FINISHED = "finished"
 
 
 class WorkerTimes(BaseModel):
@@ -203,8 +204,9 @@ SystemLoadType = dict[WorkerName, WorkerLoad]
 class WorkerUpdate(BaseModel):
     source: Literal["worker"] = "worker"
     state: DistributedStateEnum
-    completed: EventNumber
+    completed: Optional[EventNumber]
     worker: WorkerName
+    has_result: bool = False
     new: bool = False
     processing_times: Optional[WorkerTimes] = None
 
@@ -212,11 +214,17 @@ class WorkerUpdate(BaseModel):
 class ReducerUpdate(BaseModel):
     source: Literal["reducer"] = "reducer"
     state: DistributedStateEnum
-    completed: EventNumber
-    worker: WorkerName
+    completed: Optional[EventNumber] = None
+    worker: Optional[WorkerName] = None
 
 
-DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate)
+class IngesterUpdate(BaseModel):
+    source: Literal["ingester"] = "ingester"
+    state: DistributedStateEnum
+    ingester: IngesterName
+
+
+DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate | IngesterUpdate)
 
 
 class DistributedState(BaseModel):

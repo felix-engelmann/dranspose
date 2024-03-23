@@ -42,7 +42,7 @@ class Mapping:
                 li.insert(0, [VirtualWorker(tags={t}) for t in tags])
                 li.append([VirtualWorker(tags={t}) for t in tags])
 
-        print("mapping is", m)
+        # print("mapping is", m)
         self.mapping = m
         self.uuid = uuid.uuid4()
         self.assignments: dict[VirtualConstraint, WorkerName] = {}

@@ -22,6 +22,7 @@ from dranspose.protocol import (
     RedisKeys,
     ReducerUpdate,
     DistributedStateEnum,
+    EventNumber,
 )
 
 logger = logging.getLogger(__name__)
@@ -139,6 +140,16 @@ class Reducer(DistributedService):
                         e.__repr__(),
                         traceback.format_exc(),
                     )
+        await self.redis.xadd(
+            RedisKeys.ready(self.state.mapping_uuid),
+            {
+                "data": ReducerUpdate(
+                    state=DistributedStateEnum.FINISHED,
+                    completed=EventNumber(0),
+                    worker=self.state.name,
+                ).model_dump_json()
+            },
+        )
 
     async def close(self) -> None:
         await cancel_and_wait(self.work_task)
