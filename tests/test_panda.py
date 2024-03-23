@@ -16,7 +16,7 @@ from dranspose.protocol import (
     VirtualConstraint,
 )
 
-from dranspose.worker import Worker
+from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.asyncio
@@ -48,7 +48,14 @@ async def test_pcapingester(
     stream_pcap: Callable[[int], Coroutine[None, None, None]],
 ) -> None:
     await reducer(None)
-    await create_worker(WorkerName("w1"))
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("w1"),
+                worker_class="examples.parser.positioncap:PcapWorker",
+            ),
+        )
+    )
     await create_ingester(
         TcpPcapIngester(
             settings=TcpPcapSettings(
