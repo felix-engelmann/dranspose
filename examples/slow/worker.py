@@ -24,3 +24,4 @@ class SlowWorker:
             time.sleep(parameters["sleep_time"].value)
         else:
             time.sleep(0.28)
+        return "not empty"
