@@ -22,7 +22,6 @@ from dranspose.protocol import (
     RedisKeys,
     ReducerUpdate,
     DistributedStateEnum,
-    EventNumber,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,8 +144,6 @@ class Reducer(DistributedService):
             {
                 "data": ReducerUpdate(
                     state=DistributedStateEnum.FINISHED,
-                    completed=EventNumber(0),
-                    worker=self.state.name,
                 ).model_dump_json()
             },
         )

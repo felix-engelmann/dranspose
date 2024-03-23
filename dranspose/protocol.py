@@ -201,9 +201,12 @@ class WorkerLoad(BaseModel):
 SystemLoadType = dict[WorkerName, WorkerLoad]
 
 
-class WorkerUpdate(BaseModel):
-    source: Literal["worker"] = "worker"
+class BaseUpdate(BaseModel):
     state: DistributedStateEnum
+
+
+class WorkerUpdate(BaseUpdate):
+    source: Literal["worker"] = "worker"
     completed: Optional[EventNumber]
     worker: WorkerName
     has_result: bool = False
@@ -211,18 +214,18 @@ class WorkerUpdate(BaseModel):
     processing_times: Optional[WorkerTimes] = None
 
 
-class ReducerUpdate(BaseModel):
+class ReducerUpdate(BaseUpdate):
     source: Literal["reducer"] = "reducer"
-    state: DistributedStateEnum
     completed: Optional[EventNumber] = None
     worker: Optional[WorkerName] = None
 
 
-class IngesterUpdate(BaseModel):
+class IngesterUpdate(BaseUpdate):
     source: Literal["ingester"] = "ingester"
-    state: DistributedStateEnum
     ingester: IngesterName
 
+
+DistributedUpdateType = WorkerUpdate | ReducerUpdate | IngesterUpdate
 
 DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate | IngesterUpdate)
 

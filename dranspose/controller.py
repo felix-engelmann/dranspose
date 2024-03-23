@@ -5,6 +5,7 @@ This is the central service to orchestrate all distributed components
 import asyncio
 from asyncio import Task
 from collections import defaultdict
+from types import UnionType
 from typing import Dict, List, Any, AsyncGenerator, Optional, Annotated, Literal
 
 import logging
@@ -77,8 +78,9 @@ class Controller:
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.to_reduce: set[tuple[EventNumber, WorkerName]] = set()
         self.reduced: dict[EventNumber, list[WorkerName]] = defaultdict(list)
+        self.processed_event_no: int = 0
         self.completed_events: list[int] = []
-        self.finished_components: list[DistributedUpdate] = []
+        self.finished_components: list[UnionType] = []
         self.assign_task: Task[None]
         self.config_fetch_time: float = 0
         self.config_cache: EnsembleState
@@ -87,6 +89,7 @@ class Controller:
         self.worker_timing: dict[
             WorkerName, dict[EventNumber, WorkerTimes]
         ] = defaultdict(dict)
+        self.start_time: float
 
     async def run(self) -> None:
         logger.debug("started controller run")
@@ -271,7 +274,9 @@ class Controller:
             except asyncio.exceptions.CancelledError:
                 break
 
-    async def _update_processing_times(self, update):
+    async def _update_processing_times(self, update: WorkerUpdate) -> None:
+        if update.completed is None:
+            return
         if update.processing_times:
             self.worker_timing[update.worker][
                 update.completed
@@ -285,14 +290,25 @@ class Controller:
         if update.has_result:
             toadd = True
             if compev in self.reduced:
+                logger.debug("events %s already received from reducer", self.reduced)
                 if update.worker in self.reduced[compev]:
                     # process worker update very late and already got reduced
+                    logger.debug(
+                        "event %s from worker %s was already reduced",
+                        compev,
+                        update.worker,
+                    )
                     toadd = False
             if toadd:
+                logger.debug(
+                    "waiting for reduction for event %s from worker %s",
+                    compev,
+                    update.worker,
+                )
                 self.to_reduce.add((compev, update.worker))
         # logger.error("time processtime %s", time.perf_counter() - start)
 
-    async def _process_worker_update(self, update):
+    async def _process_worker_update(self, update: WorkerUpdate) -> None:
         logger.debug("got a ready worker %s", update)
         if update.state == DistributedStateEnum.IDLE:
             # start = time.perf_counter()
@@ -338,7 +354,7 @@ class Controller:
             if not update.new:
                 asyncio.create_task(self._update_processing_times(update))
 
-    async def completed_finish(self):
+    async def completed_finish(self) -> bool:
         fin_workers = set()
         reducer = False
         fin_ingesters = set()
@@ -384,18 +400,23 @@ class Controller:
                             # asyncio.create_task(self._process_worker_update(update))
                             # logger.error("update took %s", time.perf_counter() - before)
                         elif isinstance(update, ReducerUpdate):
-                            compev = update.completed
-                            self.reduced[compev].append(update.worker)
-                            logger.debug("added reduced to set %s", self.reduced)
-                            # wa = self.mapping.get_event_workers(compev)
-                            if (compev, update.worker) in self.to_reduce:
-                                self.to_reduce.remove((compev, update.worker))
+                            if (
+                                update.completed is not None
+                                and update.worker is not None
+                            ):
+                                compev = update.completed
+                                self.reduced[compev].append(update.worker)
+                                logger.debug("added reduced to set %s", self.reduced)
+                                # wa = self.mapping.get_event_workers(compev)
+                                if (compev, update.worker) in self.to_reduce:
+                                    self.to_reduce.remove((compev, update.worker))
                         elif isinstance(update, IngesterUpdate):
                             pass
 
-                        if update.state == DistributedStateEnum.FINISHED:
-                            logger.info("distributed %s has finished", update)
-                            self.finished_components.append(update)
+                        if hasattr(update, "state"):
+                            if update.state == DistributedStateEnum.FINISHED:
+                                logger.info("distributed %s has finished", update)
+                                self.finished_components.append(update)
 
                         last = ready[0]
                 logger.debug(
