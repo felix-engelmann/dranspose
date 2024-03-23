@@ -43,7 +43,7 @@ async def test_panda_pcap(
 async def test_pcapingester(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
-    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pcap: Callable[[int], Coroutine[None, None, None]],
 ) -> None:

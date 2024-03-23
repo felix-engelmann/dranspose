@@ -1,5 +1,5 @@
 from datetime import datetime
-from types import UnionType
+from typing import Optional
 
 import zmq
 
@@ -8,16 +8,17 @@ from dranspose.data.positioncap import (
     PositionCapEnd,
     PositionCapValues,
     PositionCapField,
+    PositionCapPacketType,
 )
 from dranspose.event import StreamData
 
 
 class PositioncapParser:
-    def __init__(self):
-        self.arm_time = None
-        self.fields = []
+    def __init__(self) -> None:
+        self.arm_time: Optional[datetime] = None
+        self.fields: list[PositionCapField] = []
 
-    def parse(self, data: StreamData) -> UnionType:
+    def parse(self, data: StreamData) -> PositionCapPacketType:
         """
         Parses a position capture packet
 
@@ -42,20 +43,15 @@ class PositioncapParser:
                     self.arm_time = datetime.fromisoformat(line[len("arm_time: ") :])
                 if line.startswith(" "):
                     parts = line.strip().split(" ")
-                    self.fields.append({"name": parts[0], "type": parts[1]})
+                    self.fields.append(PositionCapField(name=parts[0], type=parts[1]))
+            if self.arm_time is None:
+                raise Exception("unable to parse header")
             return PositionCapStart(arm_time=self.arm_time)
         elif val.startswith("END"):
             return PositionCapEnd()
         else:
             parts = val.strip().split(" ")
-            data = {}
+            ret = PositionCapValues()
             for f, v in zip(self.fields, parts):
-                if f["type"] == "uint32":
-                    data[f["name"]] = PositionCapField(
-                        value=int(v), type=f["type"], name=f["name"]
-                    )
-                if f["type"] == "double":
-                    data[f["name"]] = PositionCapField(
-                        value=float(v), type=f["type"], name=f["name"]
-                    )
-            return PositionCapValues(fields=data)
+                ret.fields[f.name] = f.parse(v)
+            return ret

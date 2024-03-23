@@ -5,7 +5,8 @@ import logging
 import os
 import sys
 import traceback
-from asyncio import Future
+from asyncio import Future, Task
+from typing import Any
 
 from dranspose.protocol import Digest, WorkParameter, ParameterName
 
@@ -37,7 +38,7 @@ def done_callback(futr: Future[None]) -> None:
         )
 
 
-async def cancel_and_wait(task):
+async def cancel_and_wait(task: Task[Any] | Future[Any]) -> None:
     task.cancel()
     try:
         await task

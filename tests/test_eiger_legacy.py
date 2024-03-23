@@ -81,7 +81,7 @@ async def test_eiger_legacy(
             PosixPath("tests/data/eiger-small.pkls"),
             0.001,
             zmq.PUSH,
-            begin=0,
+            begin=0,  # type: ignore[call-arg]
         )
     )
 

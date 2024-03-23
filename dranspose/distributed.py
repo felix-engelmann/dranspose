@@ -65,7 +65,7 @@ class DistributedService(abc.ABC):
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         self.parameters: dict[ParameterName, WorkParameter] = {}
 
-    def get_category(self):
+    def get_category(self) -> str:
         if isinstance(self.state, IngesterState):
             category = "ingester"
         elif isinstance(self.state, WorkerState):
