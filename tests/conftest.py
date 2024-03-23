@@ -309,16 +309,19 @@ async def stream_orca() -> Callable[
 
 
 @pytest_asyncio.fixture
-async def stream_alba() -> Callable[
+async def stream_small() -> Callable[
     [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
 ]:
-    async def _make_alba(ctx: zmq.Context[Any], port: int, nframes: int) -> None:
+    async def _make_alba(
+        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1
+    ) -> None:
         socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
         acq = await socket.start(filename="")
         val = np.zeros((0,), dtype=np.float64)
         for frameno in range(nframes):
             await acq.image(val, val.shape, frameno)
-            await asyncio.sleep(0.1)
+            if frame_time:
+                await asyncio.sleep(frame_time)
         await acq.close()
         await socket.close()
 

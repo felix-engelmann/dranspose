@@ -37,7 +37,7 @@ async def test_dump(
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
     stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
-    stream_alba: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
     tmp_path: Any,
 ) -> None:
     await reducer(None)
@@ -169,8 +169,8 @@ async def test_dump(
 
     asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
     asyncio.create_task(stream_orca(context, 9998, ntrig - 1))
-    asyncio.create_task(stream_alba(context, 9997, ntrig - 1))
-    asyncio.create_task(stream_alba(context, 9996, ntrig // 4))
+    asyncio.create_task(stream_small(context, 9997, ntrig - 1))
+    asyncio.create_task(stream_small(context, 9996, ntrig // 4))
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
