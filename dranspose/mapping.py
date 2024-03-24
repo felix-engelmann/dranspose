@@ -67,10 +67,10 @@ class Mapping:
         assigned_to = []
         maxassign = EventNumber(self.len() + 1)
         if horizon is None:
-            horizon = self.len()
+            horizon = 0
         still_has_work = False
         if completed is not None:
-            for evnint in range(completed + 1, self.complete_events):
+            for evnint in range(completed + 1, self.complete_events - horizon):
                 wa = self.get_event_workers(evnint)
                 if worker.name in wa.get_all_workers():
                     still_has_work = True

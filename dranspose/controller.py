@@ -323,6 +323,7 @@ class Controller:
                 next(w for w in cfg.workers if w.name == update.worker),
                 cfg.workers,
                 completed=update.completed,
+                horizon=5,
             )
             # logger.error("time assign %s", time.perf_counter() - start)
             logger.debug("assigned worker %s to %s", update.worker, virt)
