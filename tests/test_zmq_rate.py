@@ -143,3 +143,64 @@ async def test_zmq_forward_latency() -> None:
 
     await time_beacon(9999, 10000)
     await ctask
+
+
+async def route(inport, outport, n, workers) -> None:
+    c = zmq.asyncio.Context()
+    sin = c.socket(zmq.PULL)
+    sout = c.socket(zmq.ROUTER)
+    sin.connect(f"tcp://localhost:{inport}")
+    sout.bind(f"tcp://*:{outport}")
+    for _ in workers:
+        data = await sout.recv_multipart()
+        logging.info("registered worker %s", data)
+    start = time.perf_counter()
+    for i in range(n):
+        data = await sin.recv_multipart(copy=False)
+        await sout.send_multipart([workers[i % len(workers)]] + data)
+        if i % 1000 == 0:
+            end = time.perf_counter()
+            logging.info(
+                "forward 1000 packets took %s: %lf p/s",
+                end - start,
+                1000 / (end - start),
+            )
+            start = end
+    c.destroy()
+
+
+async def dealer_sink(port, name, n) -> None:
+    c = zmq.asyncio.Context()
+    s = c.socket(zmq.DEALER)
+    s.setsockopt(zmq.IDENTITY, name)
+    s.connect(f"tcp://localhost:{port}")
+    await s.send(b"ping")
+    start = time.perf_counter()
+    total_bytes = 0
+    for i in range(n):
+        # logging.info("recv %d", i)
+        data = await s.recv_multipart(copy=True)
+        total_bytes += sum(map(len, data))
+        if i % 1000 == 0:
+            end = time.perf_counter()
+            logging.info(
+                "%s: sink 100 packets took %s: %lf p/s",
+                name,
+                end - start,
+                1000 / (end - start),
+            )
+            start = end
+        # logging.info("i %d, data %s", i, data)
+    logging.info("total bytes %d", total_bytes)
+    c.destroy()
+
+
+@pytest.mark.asyncio
+async def test_zmq_full_latency() -> None:
+    asyncio.create_task(route(9999, 9998, 10000, [b"w1", b"w2"]))
+    c1task = asyncio.create_task(dealer_sink(9998, b"w1", 5000))
+    c2task = asyncio.create_task(dealer_sink(9998, b"w2", 5000))
+
+    await time_beacon(9999, 10000)
+    await c1task
+    await c2task
