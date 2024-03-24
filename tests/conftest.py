@@ -1,12 +1,14 @@
 import asyncio
 import json
 import logging
+import multiprocessing
 import os
 import pickle
 import random
 import struct
 import time
 from asyncio import StreamReader, StreamWriter
+from multiprocessing import Process
 from typing import (
     Coroutine,
     AsyncIterator,
@@ -58,15 +60,19 @@ async def create_worker() -> AsyncIterator[
             worker = Worker(WorkerSettings(worker_name=name))
         else:
             worker = name
-        worker_task = asyncio.create_task(worker.run())
-        workers.append((worker, worker_task))
+
+        q = multiprocessing.Queue()
+        p = Process(target=worker.sync_run, args=(q,), daemon=True)
+        p.start()
+        # worker_task = asyncio.create_task(worker.run())
+        workers.append((worker, p, q))
         return worker
 
     yield _make_worker
 
-    for worker, task in workers:
-        await worker.close()
-        await cancel_and_wait(task)
+    for worker, task, que in workers:
+        que.put("stop")
+        task.join()
 
 
 @pytest_asyncio.fixture

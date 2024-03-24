@@ -8,7 +8,7 @@ from pydantic import UUID4, AliasChoices, Field, RedisDsn
 from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
-from dranspose.helpers.utils import parameters_hash
+from dranspose.helpers.utils import parameters_hash, cancel_and_wait
 from dranspose.parameters import Parameter, ParameterType
 from dranspose.protocol import (
     RedisKeys,
@@ -187,6 +187,16 @@ class DistributedService(abc.ABC):
                 break
             except asyncio.exceptions.CancelledError:
                 break
+
+    async def multiprocess_run(self, queue):
+        task = asyncio.create_task(self.run())
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, queue.get)
+        await self.close()
+        await cancel_and_wait(task)
+
+    def sync_run(self, queue):
+        asyncio.run(self.multiprocess_run(queue))
 
     async def update_metrics(self) -> None:
         while True:
