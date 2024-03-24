@@ -4,6 +4,7 @@ import logging
 import os
 import pickle
 import random
+import struct
 import time
 from asyncio import StreamReader, StreamWriter
 from typing import (
@@ -336,6 +337,33 @@ async def stream_small() -> Callable[
         await socket.close()
 
     return _make_alba
+
+
+@pytest_asyncio.fixture
+async def time_beacon() -> Callable[
+    [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
+]:
+    async def _make_time(
+        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1
+    ) -> None:
+        sout = ctx.socket(zmq.PUSH)
+        sout.bind(f"tcp://*:{port}")
+        start = time.perf_counter()
+        for i in range(nframes):
+            data = struct.pack(">d", time.perf_counter())
+            await sout.send(data)
+            if frame_time is not None:
+                await asyncio.sleep(frame_time)
+            if i % 1000 == 0:
+                end = time.perf_counter()
+                logging.info(
+                    "send 1000 time packets took %s: %lf p/s",
+                    end - start,
+                    1000 / (end - start),
+                )
+                start = end
+
+    return _make_time
 
 
 @pytest_asyncio.fixture

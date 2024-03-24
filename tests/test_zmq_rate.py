@@ -56,26 +56,6 @@ async def time_sink(port, n) -> None:
     c.destroy()
 
 
-async def time_beacon(port, n) -> None:
-    c = zmq.asyncio.Context()
-    sout = c.socket(zmq.PUSH)
-    sout.bind(f"tcp://*:{port}")
-    start = time.perf_counter()
-    for i in range(n):
-        data = struct.pack(">d", time.perf_counter())
-        await sout.send(data)
-        await asyncio.sleep(0.00001)
-        if i % 1000 == 0:
-            end = time.perf_counter()
-            logging.info(
-                "send 1000 time packets took %s: %lf p/s",
-                end - start,
-                1000 / (end - start),
-            )
-            start = end
-    c.destroy()
-
-
 async def forward(inport, outport, n) -> None:
     c = zmq.asyncio.Context()
     sin = c.socket(zmq.PULL)
@@ -129,20 +109,24 @@ async def test_zmq_rate_forward(
 
 
 @pytest.mark.asyncio
-async def test_zmq_latency() -> None:
+async def test_zmq_latency(time_beacon) -> None:
     ctask = asyncio.create_task(time_sink(9999, 10000))
 
-    await time_beacon(9999, 10000)
+    context = zmq.asyncio.Context()
+    await time_beacon(context, 9999, 10000, 0.00001)
     await ctask
+    context.destroy()
 
 
 @pytest.mark.asyncio
-async def test_zmq_forward_latency() -> None:
+async def test_zmq_forward_latency(time_beacon) -> None:
     asyncio.create_task(forward(9999, 9998, 10000))
     ctask = asyncio.create_task(time_sink(9998, 10000))
 
-    await time_beacon(9999, 10000)
+    context = zmq.asyncio.Context()
+    await time_beacon(context, 9999, 10000, 0.00001)
     await ctask
+    context.destroy()
 
 
 async def route(inport, outport, n, workers) -> None:
@@ -196,11 +180,13 @@ async def dealer_sink(port, name, n) -> None:
 
 
 @pytest.mark.asyncio
-async def test_zmq_full_latency() -> None:
+async def test_zmq_full_latency(time_beacon) -> None:
     asyncio.create_task(route(9999, 9998, 10000, [b"w1", b"w2"]))
     c1task = asyncio.create_task(dealer_sink(9998, b"w1", 5000))
     c2task = asyncio.create_task(dealer_sink(9998, b"w2", 5000))
 
-    await time_beacon(9999, 10000)
+    context = zmq.asyncio.Context()
+    await time_beacon(context, 9999, 10000, 0.000001)
     await c1task
     await c2task
+    context.destroy()
