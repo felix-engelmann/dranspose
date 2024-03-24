@@ -317,7 +317,7 @@ async def stream_small() -> Callable[
     ) -> None:
         socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
         acq = await socket.start(filename="")
-        val = np.zeros((0,), dtype=np.float64)
+        val = np.zeros((10,), dtype=np.float64)
         for frameno in range(nframes):
             await acq.image(val, val.shape, frameno)
             if frame_time:
