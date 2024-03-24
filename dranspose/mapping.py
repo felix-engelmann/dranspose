@@ -58,10 +58,24 @@ class Mapping:
             return 0
 
     def assign_next(
-        self, worker: WorkerState, all_workers: list[WorkerState]
+        self,
+        worker: WorkerState,
+        all_workers: list[WorkerState],
+        completed: Optional[EventNumber] = None,
+        horizon: Optional[EventNumber] = None,
     ) -> list[VirtualWorker]:
         assigned_to = []
         maxassign = EventNumber(self.len() + 1)
+        if horizon is None:
+            horizon = self.len()
+        still_has_work = False
+        if completed is not None:
+            for evnint in range(completed + 1, self.complete_events):
+                wa = self.get_event_workers(evnint)
+                if worker.name in wa.get_all_workers():
+                    still_has_work = True
+        if still_has_work:
+            return assigned_to
         for evnint in range(self.complete_events, self.len()):
             evn = EventNumber(evnint)
             for stream, v in self.mapping.items():  # first fill the alls

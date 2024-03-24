@@ -4,6 +4,7 @@ import logging
 import os
 import pickle
 import random
+import time
 from asyncio import StreamReader, StreamWriter
 from typing import (
     Coroutine,
@@ -318,10 +319,19 @@ async def stream_small() -> Callable[
         socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
         acq = await socket.start(filename="")
         val = np.zeros((10,), dtype=np.float64)
+        start = time.perf_counter()
         for frameno in range(nframes):
             await acq.image(val, val.shape, frameno)
             if frame_time:
                 await asyncio.sleep(frame_time)
+            if frameno % 1000 == 0:
+                end = time.perf_counter()
+                logging.info(
+                    "send 1000 packets took %s: %lf p/s",
+                    end - start,
+                    1000 / (end - start),
+                )
+                start = end
         await acq.close()
         await socket.close()
 

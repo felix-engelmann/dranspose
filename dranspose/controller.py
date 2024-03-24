@@ -322,6 +322,7 @@ class Controller:
             virt = self.mapping.assign_next(
                 next(w for w in cfg.workers if w.name == update.worker),
                 cfg.workers,
+                completed=update.completed,
             )
             # logger.error("time assign %s", time.perf_counter() - start)
             logger.debug("assigned worker %s to %s", update.worker, virt)
