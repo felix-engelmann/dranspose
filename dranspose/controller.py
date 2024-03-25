@@ -312,7 +312,7 @@ class Controller:
 
     async def assign_worker_in_mapping(
         self, worker: WorkerName, completed: EventNumber
-    ):
+    ) -> None:
         cfg = await self.get_configs()
         # logger.error("time cfg %s", time.perf_counter() - start)
         logger.debug(
@@ -405,10 +405,14 @@ class Controller:
                     for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
                         update = DistributedUpdate.validate_json(ready[1]["data"])
                         if isinstance(update, WorkerUpdate):
-                            # before = time.perf_counter()
+                            before = time.perf_counter()
                             await self._process_worker_update(update)
                             # asyncio.create_task(self._process_worker_update(update))
-                            # logger.error("update took %s", time.perf_counter() - before)
+                            logger.error(
+                                "update for ev %s took %s",
+                                update.completed,
+                                time.perf_counter() - before,
+                            )
                         elif isinstance(update, ReducerUpdate):
                             if (
                                 update.completed is not None

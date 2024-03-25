@@ -12,7 +12,7 @@ from starlette.responses import Response
 from dranspose.event import EventData
 from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import WorkerUpdate, DistributedStateEnum, RedisKeys
-from dranspose.worker import Worker, RedisException
+from dranspose.worker import Worker
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +26,10 @@ class DebugWorker(Worker):
         self._logger.info("started work task")
         await self.notify_worker_ready()
 
-        lastev = "0"
         while True:
-            try:
-                newlastev, ingesterset = await self.get_new_assignments(lastev)
-                if newlastev is None or ingesterset is None:
-                    continue
-                lastev = newlastev
-            except RedisException:
-                self._logger.warning("failed to access redis, exiting worker")
-                break
-
-            if len(ingesterset) == 0:
-                continue
+            self.dequeue_task = None
+            self.dequeue_task = asyncio.create_task(self.assignment_queue.get())
+            ingesterset = await self.dequeue_task
             done = await self.poll_internals(ingesterset)
             if set(done) != {zmq.POLLIN}:
                 self._logger.warning("not all sockets are pollIN %s", done)
@@ -50,7 +41,8 @@ class DebugWorker(Worker):
 
             wu = WorkerUpdate(
                 state=DistributedStateEnum.IDLE,
-                completed=event.event_number,
+                completed=[event.event_number],
+                has_result=[False],
                 worker=self.state.name,
             )
             await self.redis.xadd(

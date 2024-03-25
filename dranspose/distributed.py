@@ -1,8 +1,7 @@
 import abc
 import logging
-import multiprocessing
 import time
-from typing import Optional
+from typing import Optional, Any
 
 import redis.asyncio as redis
 from pydantic import UUID4, AliasChoices, Field, RedisDsn
@@ -189,14 +188,14 @@ class DistributedService(abc.ABC):
             except asyncio.exceptions.CancelledError:
                 break
 
-    async def multiprocess_run(self, queue: multiprocessing.Queue) -> None:
+    async def multiprocess_run(self, queue: Any) -> None:
         task = asyncio.create_task(self.run())
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, queue.get)
         await self.close()
         await cancel_and_wait(task)
 
-    def sync_run(self, queue: multiprocessing.Queue) -> None:
+    def sync_run(self, queue: Any) -> None:
         asyncio.run(self.multiprocess_run(queue))
 
     async def update_metrics(self) -> None:

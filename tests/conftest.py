@@ -65,7 +65,7 @@ class AsyncDistributed:
 class ProcessDistributed:
     instance: DistributedService
     process: multiprocessing.Process
-    queue: multiprocessing.Queue
+    queue: Any
 
     async def stop(self) -> None:
         self.queue.put("stop")
@@ -87,7 +87,7 @@ async def create_worker() -> AsyncIterator[
             worker = name
 
         if subprocess:
-            q: multiprocessing.Queue = multiprocessing.Queue()
+            q: Any = multiprocessing.Queue()
             p = Process(target=worker.sync_run, args=(q,), daemon=True)
             p.start()
             workers.append(ProcessDistributed(instance=worker, process=p, queue=q))
@@ -111,7 +111,7 @@ async def create_ingester() -> AsyncIterator[
 
     async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
         if subprocess:
-            q: multiprocessing.Queue = multiprocessing.Queue()
+            q: Any = multiprocessing.Queue()
             p = Process(target=inst.sync_run, args=(q,), daemon=True)
             p.start()
             ingesters.append(ProcessDistributed(instance=inst, process=p, queue=q))

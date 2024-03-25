@@ -6,7 +6,7 @@ import socket
 import string
 import time
 import traceback
-from asyncio import Future
+from asyncio import Future, Task
 from typing import Optional, Any
 
 import zmq.asyncio
@@ -84,7 +84,7 @@ class Worker(DistributedService):
         self.assignment_queue: asyncio.Queue[
             set[zmq._future._AsyncSocket]
         ] = asyncio.Queue()
-        self.dequeue_task = None
+        self.dequeue_task: Optional[Task[set[zmq._future._AsyncSocket]]] = None
 
         self.param_descriptions = []
         self.custom = None
