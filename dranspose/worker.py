@@ -173,7 +173,6 @@ class Worker(DistributedService):
                 if len(ingesterset) > 0:
                     await self.assignment_queue.put(ingesterset)
             lastev = assignments[0]
-            # return lastev, ingesterset
 
     async def poll_internals(
         self, ingesterset: set[zmq._future._AsyncSocket]
@@ -224,6 +223,7 @@ class Worker(DistributedService):
             completed = []
             has_result = []
             accum_times = WorkerTimes(no_events=0)
+            accum_start = time.time()
             while True:
                 perf_start = time.perf_counter()
 
@@ -296,7 +296,7 @@ class Worker(DistributedService):
                     perf_sent_result,
                 )
                 accum_times += times
-                if self.assignment_queue.empty():
+                if self.assignment_queue.empty() or time.time() - accum_start > 1:
                     wu = WorkerUpdate(
                         state=DistributedStateEnum.IDLE,
                         completed=completed,
@@ -312,6 +312,7 @@ class Worker(DistributedService):
                     completed = []
                     has_result = []
                     accum_times = WorkerTimes(no_events=0)
+                    accum_start = time.time()
         except asyncio.exceptions.CancelledError:
             pass
         self._logger.info("work thread finished")

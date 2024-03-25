@@ -407,14 +407,7 @@ class Controller:
                     for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
                         update = DistributedUpdate.validate_json(ready[1]["data"])
                         if isinstance(update, WorkerUpdate):
-                            # before = time.perf_counter()
                             await self._process_worker_update(update)
-                            # asyncio.create_task(self._process_worker_update(update))
-                            # logger.error(
-                            #    "update for ev %s took %s",
-                            #    update.completed,
-                            #    time.perf_counter() - before,
-                            # )
                         elif isinstance(update, ReducerUpdate):
                             if (
                                 update.completed is not None
@@ -423,7 +416,6 @@ class Controller:
                                 compev = update.completed
                                 self.reduced[compev].append(update.worker)
                                 logger.debug("added reduced to set %s", self.reduced)
-                                # wa = self.mapping.get_event_workers(compev)
                                 if (compev, update.worker) in self.to_reduce:
                                     self.to_reduce.remove((compev, update.worker))
                         elif isinstance(update, IngesterUpdate):
