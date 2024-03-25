@@ -25,7 +25,6 @@ from dranspose.protocol import (
     IngesterState,
     WorkerUpdate,
     DistributedStateEnum,
-    WorkAssignment,
     WorkerName,
     IngesterName,
     StreamName,
@@ -33,6 +32,7 @@ from dranspose.protocol import (
     WorkerTimes,
     GENERIC_WORKER,
     WorkerTag,
+    WorkAssignmentList,
 )
 
 
@@ -154,21 +154,24 @@ class Worker(DistributedService):
             assignments = assignments[sub][0][0]
             self._logger.debug("got assignments %s", assignments)
             self._logger.debug("stream map %s", self._stream_map)
-            work_assignment = WorkAssignment.model_validate_json(assignments[1]["data"])
-            ingesterset = set()
-            for stream, workers in work_assignment.assignments.items():
-                if self.state.name in workers:
-                    try:
-                        ingesterset.add(self._stream_map[stream])
-                    except KeyError:
-                        self._logger.error(
-                            "ingester for stream %s not connected, available: %s",
-                            stream,
-                            self._ingesters,
-                        )
-            self._logger.debug("receive from ingesters %s", ingesterset)
-            if len(ingesterset) > 0:
-                await self.assignment_queue.put(ingesterset)
+            work_assignment_list = WorkAssignmentList.validate_json(
+                assignments[1]["data"]
+            )
+            for work_assignment in work_assignment_list:
+                ingesterset = set()
+                for stream, workers in work_assignment.assignments.items():
+                    if self.state.name in workers:
+                        try:
+                            ingesterset.add(self._stream_map[stream])
+                        except KeyError:
+                            self._logger.error(
+                                "ingester for stream %s not connected, available: %s",
+                                stream,
+                                self._ingesters,
+                            )
+                self._logger.debug("receive from ingesters %s", ingesterset)
+                if len(ingesterset) > 0:
+                    await self.assignment_queue.put(ingesterset)
             lastev = assignments[0]
             # return lastev, ingesterset
 

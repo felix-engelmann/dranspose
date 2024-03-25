@@ -140,6 +140,9 @@ class WorkAssignment(BaseModel):
         return set([x for stream in self.assignments.values() for x in stream])
 
 
+WorkAssignmentList = TypeAdapter(list[WorkAssignment])
+
+
 class DistributedStateEnum(Enum):
     READY = "ready"
     IDLE = "idle"

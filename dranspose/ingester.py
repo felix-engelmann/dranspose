@@ -24,6 +24,7 @@ from dranspose.protocol import (
     ConnectedWorker,
     IngesterUpdate,
     DistributedStateEnum,
+    WorkAssignmentList,
 )
 
 
@@ -152,9 +153,10 @@ class Ingester(DistributedService):
             assignment_evs = assignments[sub][0]
             self._logger.debug("got assignments %s", assignment_evs)
             for assignment in assignment_evs:
-                wa = WorkAssignment.model_validate_json(assignment[1]["data"])
-                mywa = wa.get_workers_for_streams(self.state.streams)
-                await self.assignment_queue.put(mywa)
+                was = WorkAssignmentList.validate_json(assignment[1]["data"])
+                for wa in was:
+                    mywa = wa.get_workers_for_streams(self.state.streams)
+                    await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
 
     async def work(self) -> None:

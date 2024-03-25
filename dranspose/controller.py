@@ -53,6 +53,8 @@ from dranspose.protocol import (
     DistributedUpdate,
     ReducerUpdate,
     IngesterUpdate,
+    WorkAssignmentList,
+    WorkAssignment,
 )
 
 logger = logging.getLogger(__name__)
@@ -328,30 +330,30 @@ class Controller:
         )
         # logger.error("time assign %s", time.perf_counter() - start)
         logger.debug("assigned worker %s to %s", worker, virt)
-        async with self.redis.pipeline() as pipe:
-            logger.debug(
-                "send out complete events in range(%d, %d)",
-                self.processed_event_no,
-                self.mapping.complete_events,
-            )
-            for evn in range(self.processed_event_no, self.mapping.complete_events):
-                wrks = self.mapping.get_event_workers(EventNumber(evn))
-                await pipe.xadd(
-                    RedisKeys.assigned(self.mapping.uuid),
-                    {"data": wrks.model_dump_json()},
-                    id=evn + 1,
+        logger.debug(
+            "send out complete events in range(%d, %d)",
+            self.processed_event_no,
+            self.mapping.complete_events,
+        )
+        assignments: list[WorkAssignment] = []
+        for evn in range(self.processed_event_no, self.mapping.complete_events):
+            wrks = self.mapping.get_event_workers(EventNumber(evn))
+            assignments.append(wrks)
+            if wrks.get_all_workers() == set():
+                self.completed[wrks.event_number] = []
+                self.completed_events.append(wrks.event_number)
+            if evn % 1000 == 0:
+                logger.info(
+                    "1000 events in %lf",
+                    time.perf_counter() - self.start_time,
                 )
-                if wrks.get_all_workers() == set():
-                    self.completed[wrks.event_number] = []
-                    self.completed_events.append(wrks.event_number)
-                if evn % 1000 == 0:
-                    logger.info(
-                        "1000 events in %lf",
-                        time.perf_counter() - self.start_time,
-                    )
-                    self.start_time = time.perf_counter()
-            await pipe.execute()
-            # logger.error("time sent out %s", time.perf_counter() - start)
+                self.start_time = time.perf_counter()
+        await self.redis.xadd(
+            RedisKeys.assigned(self.mapping.uuid),
+            {"data": WorkAssignmentList.dump_json(assignments)},
+        )
+
+        # logger.error("time sent out %s", time.perf_counter() - start)
         self.processed_event_no = self.mapping.complete_events
 
     async def _process_worker_update(self, update: WorkerUpdate) -> None:
@@ -405,14 +407,14 @@ class Controller:
                     for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
                         update = DistributedUpdate.validate_json(ready[1]["data"])
                         if isinstance(update, WorkerUpdate):
-                            before = time.perf_counter()
+                            # before = time.perf_counter()
                             await self._process_worker_update(update)
                             # asyncio.create_task(self._process_worker_update(update))
-                            logger.error(
-                                "update for ev %s took %s",
-                                update.completed,
-                                time.perf_counter() - before,
-                            )
+                            # logger.error(
+                            #    "update for ev %s took %s",
+                            #    update.completed,
+                            #    time.perf_counter() - before,
+                            # )
                         elif isinstance(update, ReducerUpdate):
                             if (
                                 update.completed is not None
