@@ -279,82 +279,90 @@ class Controller:
             return
         if update.processing_times:
             self.worker_timing[update.worker][
-                update.completed
+                update.completed[-1]
             ] = update.processing_times
-        compev = update.completed
-        self.completed[compev].append(update.worker)
-        logger.debug("added completed to set %s", self.completed)
-        wa = self.mapping.get_event_workers(compev)
-        if wa.get_all_workers() == set(self.completed[compev]):
-            self.completed_events.append(compev)
-        if update.has_result:
-            toadd = True
-            if compev in self.reduced:
-                logger.debug("events %s already received from reducer", self.reduced)
-                if update.worker in self.reduced[compev]:
-                    # process worker update very late and already got reduced
+        for compev, has_result in zip(update.completed, update.has_result):
+            self.completed[compev].append(update.worker)
+            logger.debug("added completed to set %s", self.completed)
+            wa = self.mapping.get_event_workers(compev)
+            if wa.get_all_workers() == set(self.completed[compev]):
+                self.completed_events.append(compev)
+            if has_result:
+                toadd = True
+                if compev in self.reduced:
                     logger.debug(
-                        "event %s from worker %s was already reduced",
+                        "events %s already received from reducer", self.reduced
+                    )
+                    if update.worker in self.reduced[compev]:
+                        # process worker update very late and already got reduced
+                        logger.debug(
+                            "event %s from worker %s was already reduced",
+                            compev,
+                            update.worker,
+                        )
+                        toadd = False
+                if toadd:
+                    logger.debug(
+                        "waiting for reduction for event %s from worker %s",
                         compev,
                         update.worker,
                     )
-                    toadd = False
-            if toadd:
-                logger.debug(
-                    "waiting for reduction for event %s from worker %s",
-                    compev,
-                    update.worker,
-                )
-                self.to_reduce.add((compev, update.worker))
+                    self.to_reduce.add((compev, update.worker))
         # logger.error("time processtime %s", time.perf_counter() - start)
+
+    async def assign_worker_in_mapping(
+        self, worker: WorkerName, completed: EventNumber
+    ):
+        cfg = await self.get_configs()
+        # logger.error("time cfg %s", time.perf_counter() - start)
+        logger.debug(
+            "assigning worker %s with all %s",
+            worker,
+            [ws.name for ws in cfg.workers],
+        )
+        virt = self.mapping.assign_next(
+            next(w for w in cfg.workers if w.name == worker),
+            cfg.workers,
+            completed=completed,
+            horizon=5,
+        )
+        # logger.error("time assign %s", time.perf_counter() - start)
+        logger.debug("assigned worker %s to %s", worker, virt)
+        async with self.redis.pipeline() as pipe:
+            logger.debug(
+                "send out complete events in range(%d, %d)",
+                self.processed_event_no,
+                self.mapping.complete_events,
+            )
+            for evn in range(self.processed_event_no, self.mapping.complete_events):
+                wrks = self.mapping.get_event_workers(EventNumber(evn))
+                await pipe.xadd(
+                    RedisKeys.assigned(self.mapping.uuid),
+                    {"data": wrks.model_dump_json()},
+                    id=evn + 1,
+                )
+                if wrks.get_all_workers() == set():
+                    self.completed[wrks.event_number] = []
+                    self.completed_events.append(wrks.event_number)
+                if evn % 1000 == 0:
+                    logger.info(
+                        "1000 events in %lf",
+                        time.perf_counter() - self.start_time,
+                    )
+                    self.start_time = time.perf_counter()
+            await pipe.execute()
+            # logger.error("time sent out %s", time.perf_counter() - start)
+        self.processed_event_no = self.mapping.complete_events
 
     async def _process_worker_update(self, update: WorkerUpdate) -> None:
         logger.debug("got a ready worker %s", update)
+        if update.state == DistributedStateEnum.READY:
+            await self.assign_worker_in_mapping(update.worker, EventNumber(0))
         if update.state == DistributedStateEnum.IDLE:
             # start = time.perf_counter()
-            cfg = await self.get_configs()
-            # logger.error("time cfg %s", time.perf_counter() - start)
-            logger.debug(
-                "assigning worker %s with all %s",
-                update.worker,
-                [ws.name for ws in cfg.workers],
-            )
-            virt = self.mapping.assign_next(
-                next(w for w in cfg.workers if w.name == update.worker),
-                cfg.workers,
-                completed=update.completed,
-                horizon=5,
-            )
-            # logger.error("time assign %s", time.perf_counter() - start)
-            logger.debug("assigned worker %s to %s", update.worker, virt)
-            async with self.redis.pipeline() as pipe:
-                logger.debug(
-                    "send out complete events in range(%d, %d)",
-                    self.processed_event_no,
-                    self.mapping.complete_events,
-                )
-                for evn in range(self.processed_event_no, self.mapping.complete_events):
-                    wrks = self.mapping.get_event_workers(EventNumber(evn))
-                    await pipe.xadd(
-                        RedisKeys.assigned(self.mapping.uuid),
-                        {"data": wrks.model_dump_json()},
-                        id=evn + 1,
-                    )
-                    if wrks.get_all_workers() == set():
-                        self.completed[wrks.event_number] = []
-                        self.completed_events.append(wrks.event_number)
-                    if evn % 1000 == 0:
-                        logger.info(
-                            "1000 events in %lf",
-                            time.perf_counter() - self.start_time,
-                        )
-                        self.start_time = time.perf_counter()
-                await pipe.execute()
-                # logger.error("time sent out %s", time.perf_counter() - start)
-            self.processed_event_no = self.mapping.complete_events
+            await self.assign_worker_in_mapping(update.worker, update.completed[-1])
 
-            if not update.new:
-                asyncio.create_task(self._update_processing_times(update))
+            asyncio.create_task(self._update_processing_times(update))
 
     async def completed_finish(self) -> bool:
         fin_workers = set()

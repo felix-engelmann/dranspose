@@ -189,14 +189,14 @@ class DistributedService(abc.ABC):
             except asyncio.exceptions.CancelledError:
                 break
 
-    async def multiprocess_run(self, queue: multiprocessing.Queue[str]) -> None:
+    async def multiprocess_run(self, queue: multiprocessing.Queue) -> None:
         task = asyncio.create_task(self.run())
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, queue.get)
         await self.close()
         await cancel_and_wait(task)
 
-    def sync_run(self, queue: multiprocessing.Queue[str]) -> None:
+    def sync_run(self, queue: multiprocessing.Queue) -> None:
         asyncio.run(self.multiprocess_run(queue))
 
     async def update_metrics(self) -> None:

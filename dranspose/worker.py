@@ -27,7 +27,6 @@ from dranspose.protocol import (
     DistributedStateEnum,
     WorkAssignment,
     WorkerName,
-    EventNumber,
     IngesterName,
     StreamName,
     ReducerState,
@@ -82,6 +81,11 @@ class Worker(DistributedService):
         self._reducer_service_uuid: Optional[UUID4] = None
         self.out_socket: Optional[zmq._future._AsyncSocket] = None
 
+        self.assignment_queue: asyncio.Queue[
+            set[zmq._future._AsyncSocket]
+        ] = asyncio.Queue()
+        self.dequeue_task = None
+
         self.param_descriptions = []
         self.custom = None
         self.custom_context: dict[Any, Any] = {}
@@ -115,8 +119,11 @@ class Worker(DistributedService):
         self.manage_ingester_task.add_done_callback(done_callback)
         self.manage_receiver_task = asyncio.create_task(self.manage_receiver())
         self.manage_receiver_task.add_done_callback(done_callback)
+        self.assignment_queue = asyncio.Queue()
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+        self.assign_task = asyncio.create_task(self.manage_assignments())
+        self.assign_task.add_done_callback(done_callback)
         self.metrics_task = asyncio.create_task(self.update_metrics())
         self.metrics_task.add_done_callback(done_callback)
         await self.register()
@@ -126,9 +133,7 @@ class Worker(DistributedService):
             RedisKeys.ready(self.state.mapping_uuid),
             {
                 "data": WorkerUpdate(
-                    state=DistributedStateEnum.IDLE,
-                    new=True,
-                    completed=EventNumber(0),
+                    state=DistributedStateEnum.READY,
                     worker=self.state.name,
                 ).model_dump_json()
             },
@@ -136,35 +141,36 @@ class Worker(DistributedService):
 
         self._logger.info("registered ready message")
 
-    async def get_new_assignments(
-        self, lastev: str
-    ) -> tuple[Optional[str], Optional[set[zmq._future._AsyncSocket]]]:
+    async def manage_assignments(self) -> None:
         sub = RedisKeys.assigned(self.state.mapping_uuid)
-        try:
-            assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
-        except rexceptions.ConnectionError:
-            raise RedisException()
-        if sub not in assignments:
-            return None, None
-        assignments = assignments[sub][0][0]
-        self._logger.debug("got assignments %s", assignments)
-        self._logger.debug("stream map %s", self._stream_map)
-        work_assignment = WorkAssignment.model_validate_json(assignments[1]["data"])
-        ingesterset = set()
-        for stream, workers in work_assignment.assignments.items():
-            if self.state.name in workers:
-                try:
-                    ingesterset.add(self._stream_map[stream])
-                except KeyError:
-                    self._logger.error(
-                        "ingester for stream %s not connected, available: %s",
-                        stream,
-                        self._ingesters,
-                    )
-        self._logger.debug("receive from ingesters %s", ingesterset)
-
-        lastev = assignments[0]
-        return lastev, ingesterset
+        lastev = 0
+        while True:
+            try:
+                assignments = await self.redis.xread({sub: lastev}, block=1000, count=1)
+            except rexceptions.ConnectionError:
+                break
+            if sub not in assignments:
+                continue
+            assignments = assignments[sub][0][0]
+            self._logger.debug("got assignments %s", assignments)
+            self._logger.debug("stream map %s", self._stream_map)
+            work_assignment = WorkAssignment.model_validate_json(assignments[1]["data"])
+            ingesterset = set()
+            for stream, workers in work_assignment.assignments.items():
+                if self.state.name in workers:
+                    try:
+                        ingesterset.add(self._stream_map[stream])
+                    except KeyError:
+                        self._logger.error(
+                            "ingester for stream %s not connected, available: %s",
+                            stream,
+                            self._ingesters,
+                        )
+            self._logger.debug("receive from ingesters %s", ingesterset)
+            if len(ingesterset) > 0:
+                await self.assignment_queue.put(ingesterset)
+            lastev = assignments[0]
+            # return lastev, ingesterset
 
     async def poll_internals(
         self, ingesterset: set[zmq._future._AsyncSocket]
@@ -210,93 +216,101 @@ class Worker(DistributedService):
                 )
 
         await self.notify_worker_ready()
+        try:
+            proced = 0
+            completed = []
+            has_result = []
+            accum_times = WorkerTimes(no_events=0)
+            while True:
+                perf_start = time.perf_counter()
 
-        lastev: str = "0"
-        proced = 0
-        while True:
-            perf_start = time.perf_counter()
-            try:
-                newlastev, ingesterset = await self.get_new_assignments(lastev)
-                if newlastev is None or ingesterset is None:
+                self.dequeue_task = None
+                self.dequeue_task = asyncio.create_task(self.assignment_queue.get())
+                ingesterset = await self.dequeue_task
+                perf_got_assignments = time.perf_counter()
+                done = await self.poll_internals(ingesterset)
+                if set(done) != {zmq.POLLIN}:
+                    self._logger.warning("not all sockets are pollIN %s", done)
                     continue
-                lastev = newlastev
-            except RedisException:
-                self._logger.warning("failed to access redis, exiting worker")
-                break
-            perf_got_assignments = time.perf_counter()
 
-            if len(ingesterset) == 0:
-                continue
-            done = await self.poll_internals(ingesterset)
-            if set(done) != {zmq.POLLIN}:
-                self._logger.warning("not all sockets are pollIN %s", done)
-                continue
+                perf_got_work = time.perf_counter()
 
-            perf_got_work = time.perf_counter()
+                event = await self.build_event(ingesterset)
 
-            event = await self.build_event(ingesterset)
-
-            perf_assembled_event = time.perf_counter()
-            self._logger.debug("received work %s", event)
-            result = None
-            if self.worker:
-                try:
-                    loop = asyncio.get_event_loop()
-                    result = await loop.run_in_executor(
-                        None, self.worker.process_event, event, self.parameters
-                    )
-                except Exception as e:
-                    self._logger.error(
-                        "custom worker failed: %s\n%s",
-                        e.__repr__(),
-                        traceback.format_exc(),
-                    )
-            perf_custom_code = time.perf_counter()
-            self._logger.debug("got result %s", result)
-            if result is not None:
-                rd = ResultData(
-                    event_number=event.event_number,
-                    worker=self.state.name,
-                    payload=result,
-                    parameters_hash=self.state.parameters_hash,
-                )
-                if self.out_socket:
+                perf_assembled_event = time.perf_counter()
+                self._logger.debug("received work %s", event)
+                result = None
+                if self.worker:
                     try:
-                        header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
-                        body = pickle.dumps(rd.payload)
-                        self._logger.debug(
-                            "send result to reducer with header %s, len-payload %d",
-                            header,
-                            len(body),
+                        loop = asyncio.get_event_loop()
+                        result = await loop.run_in_executor(
+                            None, self.worker.process_event, event, self.parameters
                         )
-                        await self.out_socket.send_multipart([header, body])
                     except Exception as e:
-                        self._logger.error("could not send out result %s", e.__repr__())
-            perf_sent_result = time.perf_counter()
-            proced += 1
-            self.state.processed_events += 1
-            if proced % 500 == 0:
-                self._logger.info("processed %d events", proced)
-            times = WorkerTimes.from_timestamps(
-                perf_start,
-                perf_got_assignments,
-                perf_got_work,
-                perf_assembled_event,
-                perf_custom_code,
-                perf_sent_result,
-            )
-            wu = WorkerUpdate(
-                state=DistributedStateEnum.IDLE,
-                completed=event.event_number,
-                worker=self.state.name,
-                has_result=result is not None,
-                processing_times=times,
-            )
-            self._logger.debug("all work done, notify controller with %s", wu)
-            await self.redis.xadd(
-                RedisKeys.ready(self.state.mapping_uuid),
-                {"data": wu.model_dump_json()},
-            )
+                        self._logger.error(
+                            "custom worker failed: %s\n%s",
+                            e.__repr__(),
+                            traceback.format_exc(),
+                        )
+                perf_custom_code = time.perf_counter()
+                self._logger.debug("got result %s", result)
+                if result is not None:
+                    rd = ResultData(
+                        event_number=event.event_number,
+                        worker=self.state.name,
+                        payload=result,
+                        parameters_hash=self.state.parameters_hash,
+                    )
+                    if self.out_socket:
+                        try:
+                            header = rd.model_dump_json(exclude={"payload"}).encode(
+                                "utf8"
+                            )
+                            body = pickle.dumps(rd.payload)
+                            self._logger.debug(
+                                "send result to reducer with header %s, len-payload %d",
+                                header,
+                                len(body),
+                            )
+                            await self.out_socket.send_multipart([header, body])
+                        except Exception as e:
+                            self._logger.error(
+                                "could not send out result %s", e.__repr__()
+                            )
+                perf_sent_result = time.perf_counter()
+                proced += 1
+                self.state.processed_events += 1
+                if proced % 500 == 0:
+                    self._logger.info("processed %d events", proced)
+                completed.append(event.event_number)
+                has_result.append(result is not None)
+                times = WorkerTimes.from_timestamps(
+                    perf_start,
+                    perf_got_assignments,
+                    perf_got_work,
+                    perf_assembled_event,
+                    perf_custom_code,
+                    perf_sent_result,
+                )
+                accum_times += times
+                if self.assignment_queue.empty():
+                    wu = WorkerUpdate(
+                        state=DistributedStateEnum.IDLE,
+                        completed=completed,
+                        worker=self.state.name,
+                        has_result=has_result,
+                        processing_times=accum_times,
+                    )
+                    self._logger.debug("all work done, notify controller with %s", wu)
+                    await self.redis.xadd(
+                        RedisKeys.ready(self.state.mapping_uuid),
+                        {"data": wu.model_dump_json()},
+                    )
+                    completed = []
+                    has_result = []
+                    accum_times = WorkerTimes(no_events=0)
+        except asyncio.exceptions.CancelledError:
+            pass
         self._logger.info("work thread finished")
 
     async def finish_work(self) -> None:
@@ -319,8 +333,6 @@ class Worker(DistributedService):
             {
                 "data": WorkerUpdate(
                     state=DistributedStateEnum.FINISHED,
-                    new=False,
-                    completed=EventNumber(0),
                     worker=self.state.name,
                 ).model_dump_json()
             },
@@ -334,6 +346,7 @@ class Worker(DistributedService):
             self._logger.debug("cancelled poll task")
         await cancel_and_wait(self.work_task)
         self._logger.info("clean up in sockets")
+        await cancel_and_wait(self.assign_task)
         for iname, ing in self._ingesters.items():
             while True:
                 res = await ing.socket.poll(timeout=0.001)
@@ -343,9 +356,12 @@ class Worker(DistributedService):
                 else:
                     break
 
+        self.assignment_queue = asyncio.Queue()
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+        self.assign_task = asyncio.create_task(self.manage_assignments())
+        self.assign_task.add_done_callback(done_callback)
 
     async def manage_receiver(self) -> None:
         while True:
@@ -431,6 +447,9 @@ class Worker(DistributedService):
         await cancel_and_wait(self.manage_ingester_task)
         await cancel_and_wait(self.manage_receiver_task)
         await cancel_and_wait(self.metrics_task)
+        await cancel_and_wait(self.assign_task)
+        if self.dequeue_task is not None:
+            await cancel_and_wait(self.dequeue_task)
         await self.redis.delete(RedisKeys.config("worker", self.state.name))
         await super().close()
         self.ctx.destroy()

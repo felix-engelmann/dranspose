@@ -317,6 +317,7 @@ class Ingester(DistributedService):
         await cancel_and_wait(self.accept_task)
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.metrics_task)
+        await cancel_and_wait(self.assign_task)
         await self.redis.delete(RedisKeys.config("ingester", self.state.name))
         await super().close()
         self.ctx.destroy(linger=0)

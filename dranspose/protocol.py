@@ -141,16 +141,18 @@ class WorkAssignment(BaseModel):
 
 
 class DistributedStateEnum(Enum):
+    READY = "ready"
     IDLE = "idle"
     FINISHED = "finished"
 
 
 class WorkerTimes(BaseModel):
-    get_assignments: float
-    get_messages: float
-    assemble_event: float
-    custom_code: float
-    send_result: float
+    get_assignments: float = 0.0
+    get_messages: float = 0.0
+    assemble_event: float = 0.0
+    custom_code: float = 0.0
+    send_result: float = 0.0
+    no_events: int = 1
 
     @classmethod
     def from_timestamps(
@@ -168,6 +170,16 @@ class WorkerTimes(BaseModel):
             assemble_event=event - messages,
             custom_code=custom - event,
             send_result=send - custom,
+        )
+
+    def __add__(self, other: "WorkerTimes") -> "WorkerTimes":
+        return WorkerTimes(
+            get_assignments=self.get_assignments + other.get_assignments,
+            get_messages=self.get_messages + other.get_messages,
+            assemble_event=self.assemble_event + other.assemble_event,
+            custom_code=self.custom_code + other.custom_code,
+            send_result=self.send_result + other.send_result,
+            no_events=self.no_events + other.no_events,
         )
 
     @cached_property
@@ -207,10 +219,9 @@ class BaseUpdate(BaseModel):
 
 class WorkerUpdate(BaseUpdate):
     source: Literal["worker"] = "worker"
-    completed: Optional[EventNumber]
+    completed: list[EventNumber] = []
     worker: WorkerName
-    has_result: bool = False
-    new: bool = False
+    has_result: list[bool] = []
     processing_times: Optional[WorkerTimes] = None
 
 
