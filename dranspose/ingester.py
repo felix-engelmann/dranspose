@@ -72,6 +72,7 @@ class Ingester(DistributedService):
 
         self.dump_file: Optional[IO[bytes]] = None
 
+    def open_socket(self):
         self.ctx = zmq.asyncio.Context()
         self.out_socket = self.ctx.socket(zmq.ROUTER)
         self.out_socket.setsockopt(zmq.ROUTER_MANDATORY, 1)
@@ -84,6 +85,8 @@ class Ingester(DistributedService):
         """
         Main function orchestrating the dependent tasks. This needs to be called from an async context once an instance is created.
         """
+        self.open_socket()
+
         self.accept_task = asyncio.create_task(self.accept_workers())
         self.accept_task.add_done_callback(done_callback)
         self.work_task = asyncio.create_task(self.work())
@@ -93,6 +96,7 @@ class Ingester(DistributedService):
         self.assignment_queue: asyncio.Queue[WorkAssignment] = asyncio.Queue()
         self.metrics_task = asyncio.create_task(self.update_metrics())
         self.metrics_task.add_done_callback(done_callback)
+        self._logger.info("all subtasks running")
         await self.register()
 
     async def restart_work(self, new_uuid: UUID4) -> None:
@@ -177,8 +181,17 @@ class Ingester(DistributedService):
                 self.dump_file,
             )
         try:
+            took = []
+            empties = []
             while True:
+                empty = False
+                if self.assignment_queue.empty():
+                    empty = True
+                start = time.perf_counter()
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
+                if empty:
+                    empties.append(work_assignment.event_number)
+
                 workermessages = {}
                 zmqyields: list[Awaitable[StreamData]] = []
                 streams: list[StreamName] = []
@@ -225,6 +238,18 @@ class Ingester(DistributedService):
                         + message.get_all_frames()
                     )
                     self._logger.debug("sent message to worker %s", worker)
+                end = time.perf_counter()
+                took.append(end - start)
+                if len(took) > 1000:
+                    self._logger.info(
+                        "forwarding took avg %lf, min %f max %f",
+                        sum(took) / len(took),
+                        min(took),
+                        max(took),
+                    )
+                    self._logger.info("waiting for queue %d of 1000", len(empties))
+                    took = []
+                    empties = []
                 self.state.processed_events += 1
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")

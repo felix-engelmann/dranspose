@@ -39,16 +39,24 @@ async def test_simple(
     ],
 ) -> None:
     await reducer(None)
-    await create_worker(WorkerName("w1"))
-    await create_worker(WorkerName("w2"))
-    await create_worker(WorkerName("w3"))
+    await create_worker(WorkerName("w1"), subprocess=True)
+    await create_worker(WorkerName("w2"), subprocess=True)
+    await create_worker(WorkerName("w3"), subprocess=True)
+    await create_worker(WorkerName("w4"), subprocess=True)
+    await create_worker(WorkerName("w5"), subprocess=True)
+    await create_worker(WorkerName("w6"), subprocess=True)
+    await create_worker(WorkerName("w7"), subprocess=True)
+    await create_worker(WorkerName("w8"), subprocess=True)
+    await create_worker(WorkerName("w9"), subprocess=True)
+    await create_worker(WorkerName("w10"), subprocess=True)
     await create_ingester(
         ZmqPullSingleIngester(
             settings=ZmqPullSingleSettings(
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
             ),
-        )
+        ),
+        subprocess=True,
     )
 
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
@@ -61,19 +69,20 @@ async def test_simple(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        ntrig = 10000
+        ntrig = 20000
+        mapping = {
+            "eiger": [
+                [
+                    VirtualWorker(constraint=VirtualConstraint(i // 10)).model_dump(
+                        mode="json"
+                    )
+                ]
+                for i in range(1, ntrig)
+            ],
+        }
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i // 10)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
+            json=mapping,
         )
         assert resp.status == 200
         uuid = await resp.json()
@@ -87,7 +96,7 @@ async def test_simple(
 
     context = zmq.asyncio.Context()
 
-    asyncio.create_task(stream_small(context, 9999, ntrig - 1, None))
+    asyncio.create_task(stream_small(context, 9999, ntrig - 1, 0.000001))
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")

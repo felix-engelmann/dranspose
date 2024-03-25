@@ -7,7 +7,8 @@ import pickle
 import random
 import struct
 import time
-from asyncio import StreamReader, StreamWriter
+from asyncio import StreamReader, StreamWriter, Task
+from dataclasses import dataclass
 from multiprocessing import Process
 from typing import (
     Coroutine,
@@ -27,6 +28,7 @@ from pydantic import HttpUrl
 from pydantic_core import Url
 
 from dranspose.controller import app
+from dranspose.distributed import DistributedService
 from dranspose.helpers.utils import cancel_and_wait
 from dranspose.ingester import Ingester
 from dranspose.protocol import WorkerName
@@ -49,30 +51,54 @@ async def controller() -> AsyncIterator[None]:
     await asyncio.sleep(0.1)
 
 
+@dataclass
+class AsyncDistributed:
+    instance: DistributedService
+    task: Task
+
+    async def stop(self):
+        await self.instance.close()
+        await cancel_and_wait(self.task)
+
+
+@dataclass
+class ProcessDistributed:
+    instance: DistributedService
+    process: multiprocessing.Process
+    queue: multiprocessing.Queue
+
+    async def stop(self):
+        self.queue.put("stop")
+        self.process.join()
+
+
 @pytest_asyncio.fixture
 async def create_worker() -> AsyncIterator[
     Callable[[WorkerName], Coroutine[None, None, Worker]]
 ]:
     workers = []
 
-    async def _make_worker(name: WorkerName | Worker) -> Worker:
+    async def _make_worker(name: WorkerName | Worker, subprocess=False) -> Worker:
         if not isinstance(name, Worker):
             worker = Worker(WorkerSettings(worker_name=name))
         else:
             worker = name
 
-        q = multiprocessing.Queue()
-        p = Process(target=worker.sync_run, args=(q,), daemon=True)
-        p.start()
-        # worker_task = asyncio.create_task(worker.run())
-        workers.append((worker, p, q))
+        if subprocess:
+            q = multiprocessing.Queue()
+            p = Process(target=worker.sync_run, args=(q,), daemon=True)
+            p.start()
+            workers.append(ProcessDistributed(instance=worker, process=p, queue=q))
+        else:
+            worker_task = asyncio.create_task(worker.run())
+            workers.append(AsyncDistributed(instance=worker, task=worker_task))
+
         return worker
 
     yield _make_worker
 
-    for worker, task, que in workers:
-        que.put("stop")
-        task.join()
+    for wo in workers:
+        await wo.stop()
 
 
 @pytest_asyncio.fixture
@@ -81,16 +107,21 @@ async def create_ingester() -> AsyncIterator[
 ]:
     ingesters = []
 
-    async def _make_ingester(inst: Ingester) -> Ingester:
-        ingester_task = asyncio.create_task(inst.run())
-        ingesters.append((inst, ingester_task))
+    async def _make_ingester(inst: Ingester, subprocess=False) -> Ingester:
+        if subprocess:
+            q = multiprocessing.Queue()
+            p = Process(target=inst.sync_run, args=(q,), daemon=True)
+            p.start()
+            ingesters.append(ProcessDistributed(instance=inst, process=p, queue=q))
+        else:
+            ingester_task = asyncio.create_task(inst.run())
+            ingesters.append(AsyncDistributed(instance=inst, task=ingester_task))
         return inst
 
     yield _make_ingester
 
-    for inst, task in ingesters:
-        await inst.close()
-        await cancel_and_wait(task)
+    for ing in ingesters:
+        await ing.stop()
 
 
 @pytest_asyncio.fixture()
