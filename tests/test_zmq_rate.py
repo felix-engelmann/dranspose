@@ -8,10 +8,13 @@ import pytest
 import zmq.asyncio
 
 
-async def sink(port: int, n: int) -> None:
+async def sink(port: int | str, n: int) -> None:
     c = zmq.asyncio.Context()
     s = c.socket(zmq.PULL)
-    s.connect(f"tcp://localhost:{port}")
+    if type(port) is str:
+        s.connect(port)
+    else:
+        s.connect(f"tcp://localhost:{port}")
     start = time.perf_counter()
     total_bytes = 0
     for i in range(n):
@@ -87,6 +90,21 @@ async def test_zmq_rate_tcp(
 
     context = zmq.asyncio.Context()
     await stream_small(context, 9999, 1000, 0.000001)
+    await ctask
+
+    context.destroy()
+
+
+@pytest.mark.asyncio
+async def test_zmq_rate_ipc(
+    stream_small: Callable[
+        [zmq.Context[Any], str, int, Optional[float]], Coroutine[Any, Any, None]
+    ]
+) -> None:
+    ctask = asyncio.create_task(sink("ipc:///tmp/zmq-test-0", 1002))
+
+    context = zmq.asyncio.Context()
+    await stream_small(context, "ipc:///tmp/zmq-test-0", 1000, 0.000001)
     await ctask
 
     context.destroy()

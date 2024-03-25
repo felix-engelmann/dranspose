@@ -351,12 +351,15 @@ async def stream_orca() -> Callable[
 
 @pytest_asyncio.fixture
 async def stream_small() -> Callable[
-    [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
+    [zmq.Context[Any], int | str, int], Coroutine[Any, Any, None]
 ]:
     async def _make_alba(
-        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1
+        ctx: zmq.Context[Any], port: int | str, nframes: int, frame_time: float = 0.1
     ) -> None:
-        socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
+        if type(port) is str:
+            socket = AcquisitionSocket(ctx, Url(port))
+        else:
+            socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
         acq = await socket.start(filename="")
         val = np.zeros((10,), dtype=np.float64)
         start = time.perf_counter()
