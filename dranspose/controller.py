@@ -249,9 +249,8 @@ class Controller:
             try:
                 consistent = True
                 cfg = await self.get_configs()
-                for ing in cfg.ingesters:
-                    if ing.parameters_hash != self.parameters_hash:
-                        consistent = False
+                if cfg.reducer and cfg.reducer.parameters_hash != self.parameters_hash:
+                    consistent = False
                 for wo in cfg.workers:
                     if wo.parameters_hash != self.parameters_hash:
                         consistent = False
@@ -539,12 +538,25 @@ async def set_mapping(
     global ctrl
     config = await ctrl.get_configs()
     if set(mapping.keys()) - set(config.get_streams()) != set():
-        return (
-            f"streams {set(mapping.keys()) - set(config.get_streams())} not available"
+        logger.warning(
+            "bad request streams %s not available",
+            set(mapping.keys()) - set(config.get_streams()),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"streams {set(mapping.keys()) - set(config.get_streams())} not available",
         )
     m = Mapping(mapping, add_start_end=all_wrap)
     if len(config.workers) < m.min_workers():
-        return f"only {len(config.workers)} workers available, but {m.min_workers()} required"
+        logger.warning(
+            "only %d workers available, but %d required",
+            len(config.workers),
+            m.min_workers(),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"only {len(config.workers)} workers available, but {m.min_workers()} required",
+        )
     await ctrl.set_mapping(m)
     return m.uuid
 
