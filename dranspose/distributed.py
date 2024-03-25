@@ -1,5 +1,6 @@
 import abc
 import logging
+import multiprocessing
 import time
 from typing import Optional
 
@@ -188,14 +189,14 @@ class DistributedService(abc.ABC):
             except asyncio.exceptions.CancelledError:
                 break
 
-    async def multiprocess_run(self, queue):
+    async def multiprocess_run(self, queue: multiprocessing.Queue[str]) -> None:
         task = asyncio.create_task(self.run())
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, queue.get)
         await self.close()
         await cancel_and_wait(task)
 
-    def sync_run(self, queue):
+    def sync_run(self, queue: multiprocessing.Queue[str]) -> None:
         asyncio.run(self.multiprocess_run(queue))
 
     async def update_metrics(self) -> None:
@@ -208,6 +209,9 @@ class DistributedService(abc.ABC):
                 rate = (self.state.processed_events - old) / (end - start)
                 self.state.event_rate = rate
                 self._logger.info("receiving %lf frames per second", rate)
+
+    async def run(self) -> None:
+        pass
 
     async def restart_work(self, uuid: UUID4) -> None:
         pass

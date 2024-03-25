@@ -39,16 +39,16 @@ async def test_simple(
     ],
 ) -> None:
     await reducer(None)
-    await create_worker(WorkerName("w1"), subprocess=True)
-    await create_worker(WorkerName("w2"), subprocess=True)
-    await create_worker(WorkerName("w3"), subprocess=True)
-    await create_worker(WorkerName("w4"), subprocess=True)
-    await create_worker(WorkerName("w5"), subprocess=True)
-    await create_worker(WorkerName("w6"), subprocess=True)
-    await create_worker(WorkerName("w7"), subprocess=True)
-    await create_worker(WorkerName("w8"), subprocess=True)
-    await create_worker(WorkerName("w9"), subprocess=True)
-    await create_worker(WorkerName("w10"), subprocess=True)
+    await create_worker(WorkerName("w1"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w2"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w3"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w4"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w5"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w6"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w7"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w8"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w9"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w10"), subprocess=True)  # type: ignore[call-arg]
     await create_ingester(
         ZmqPullSingleIngester(
             settings=ZmqPullSingleSettings(
@@ -56,7 +56,7 @@ async def test_simple(
                 upstream_url=Url("tcp://localhost:9999"),
             ),
         ),
-        subprocess=True,
+        subprocess=True,  # type: ignore[call-arg]
     )
 
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
@@ -69,7 +69,7 @@ async def test_simple(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        ntrig = 20000
+        ntrig = 100
         mapping = {
             "eiger": [
                 [

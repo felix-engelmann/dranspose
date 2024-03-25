@@ -8,7 +8,7 @@ import pytest
 import zmq.asyncio
 
 
-async def sink(port, n) -> None:
+async def sink(port: int, n: int) -> None:
     c = zmq.asyncio.Context()
     s = c.socket(zmq.PULL)
     s.connect(f"tcp://localhost:{port}")
@@ -29,7 +29,7 @@ async def sink(port, n) -> None:
     c.destroy()
 
 
-async def time_sink(port, n) -> None:
+async def time_sink(port: int, n: int) -> None:
     c = zmq.asyncio.Context()
     s = c.socket(zmq.PULL)
     s.connect(f"tcp://localhost:{port}")
@@ -56,7 +56,7 @@ async def time_sink(port, n) -> None:
     c.destroy()
 
 
-async def forward(inport, outport, n) -> None:
+async def forward(inport: int, outport: int, n: int) -> None:
     c = zmq.asyncio.Context()
     sin = c.socket(zmq.PULL)
     sout = c.socket(zmq.PUSH)
@@ -109,7 +109,11 @@ async def test_zmq_rate_forward(
 
 
 @pytest.mark.asyncio
-async def test_zmq_latency(time_beacon) -> None:
+async def test_zmq_latency(
+    time_beacon: Callable[
+        [zmq.Context[Any], int, int, Optional[float]], Coroutine[Any, Any, None]
+    ]
+) -> None:
     ctask = asyncio.create_task(time_sink(9999, 10000))
 
     context = zmq.asyncio.Context()
@@ -119,7 +123,11 @@ async def test_zmq_latency(time_beacon) -> None:
 
 
 @pytest.mark.asyncio
-async def test_zmq_forward_latency(time_beacon) -> None:
+async def test_zmq_forward_latency(
+    time_beacon: Callable[
+        [zmq.Context[Any], int, int, Optional[float]], Coroutine[Any, Any, None]
+    ]
+) -> None:
     asyncio.create_task(forward(9999, 9998, 10000))
     ctask = asyncio.create_task(time_sink(9998, 10000))
 
@@ -129,19 +137,20 @@ async def test_zmq_forward_latency(time_beacon) -> None:
     context.destroy()
 
 
-async def route(inport, outport, n, workers) -> None:
+async def route(inport: int, outport: int, n: int, workers: list[bytes]) -> None:
     c = zmq.asyncio.Context()
     sin = c.socket(zmq.PULL)
     sout = c.socket(zmq.ROUTER)
     sin.connect(f"tcp://localhost:{inport}")
     sout.bind(f"tcp://*:{outport}")
     for _ in workers:
-        data = await sout.recv_multipart()
-        logging.info("registered worker %s", data)
+        regdata = await sout.recv_multipart()
+        logging.info("registered worker %s", regdata)
     start = time.perf_counter()
     for i in range(n):
         data = await sin.recv_multipart(copy=False)
-        await sout.send_multipart([workers[i % len(workers)]] + data)
+        dest = zmq.Frame(workers[i % len(workers)])
+        await sout.send_multipart([dest] + data)
         if i % 1000 == 0:
             end = time.perf_counter()
             logging.info(
@@ -153,7 +162,7 @@ async def route(inport, outport, n, workers) -> None:
     c.destroy()
 
 
-async def dealer_sink(port, name, n) -> None:
+async def dealer_sink(port: int, name: bytes, n: int) -> None:
     c = zmq.asyncio.Context()
     s = c.socket(zmq.DEALER)
     s.setsockopt(zmq.IDENTITY, name)
@@ -180,7 +189,11 @@ async def dealer_sink(port, name, n) -> None:
 
 
 @pytest.mark.asyncio
-async def test_zmq_full_latency(time_beacon) -> None:
+async def test_zmq_full_latency(
+    time_beacon: Callable[
+        [zmq.Context[Any], int, int, Optional[float]], Coroutine[Any, Any, None]
+    ]
+) -> None:
     asyncio.create_task(route(9999, 9998, 10000, [b"w1", b"w2"]))
     c1task = asyncio.create_task(dealer_sink(9998, b"w1", 5000))
     c2task = asyncio.create_task(dealer_sink(9998, b"w2", 5000))

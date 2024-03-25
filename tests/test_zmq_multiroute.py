@@ -1,14 +1,19 @@
 import asyncio
 import logging
 import time
+from typing import Callable, Any, Optional, Coroutine
 
 import pytest
 import zmq.asyncio
 
 
 @pytest.mark.asyncio
-async def test_zmq_multiroute(time_beacon) -> None:
-    async def dealer_msink(ports, name, n) -> None:
+async def test_zmq_multiroute(
+    time_beacon: Callable[
+        [zmq.Context[Any], int, int, Optional[float]], Coroutine[Any, Any, None]
+    ]
+) -> None:
+    async def dealer_msink(ports: list[int], name: bytes, n: int) -> None:
         c = zmq.asyncio.Context()
         s = c.socket(zmq.DEALER)
         s.setsockopt(zmq.IDENTITY, name)
@@ -35,15 +40,15 @@ async def test_zmq_multiroute(time_beacon) -> None:
         logging.info("total bytes %d", total_bytes)
         c.destroy()
 
-    async def route(inport, outport, n, workers) -> None:
+    async def route(inport: int, outport: int, n: int, workers: list[bytes]) -> None:
         c = zmq.asyncio.Context()
         sin = c.socket(zmq.PULL)
         sout = c.socket(zmq.ROUTER)
         sin.connect(f"tcp://localhost:{inport}")
         sout.bind(f"tcp://*:{outport}")
         for _ in workers:
-            data = await sout.recv_multipart()
-            logging.info("%d: registered worker %s", inport, data)
+            regdata = await sout.recv_multipart()
+            logging.info("%d: registered worker %s", inport, regdata)
         start = time.perf_counter()
         for i in range(n):
             data = await sin.recv_multipart(copy=False)

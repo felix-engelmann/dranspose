@@ -72,7 +72,7 @@ class Ingester(DistributedService):
 
         self.dump_file: Optional[IO[bytes]] = None
 
-    def open_socket(self):
+    def open_socket(self) -> None:
         self.ctx = zmq.asyncio.Context()
         self.out_socket = self.ctx.socket(zmq.ROUTER)
         self.out_socket.setsockopt(zmq.ROUTER_MANDATORY, 1)

@@ -62,16 +62,14 @@ class Mapping:
         worker: WorkerState,
         all_workers: list[WorkerState],
         completed: Optional[EventNumber] = None,
-        horizon: Optional[EventNumber] = None,
+        horizon: int = 0,
     ) -> list[VirtualWorker]:
-        assigned_to = []
+        assigned_to: list[VirtualWorker] = []
         maxassign = EventNumber(self.len() + 1)
-        if horizon is None:
-            horizon = 0
         still_has_work = False
         if completed is not None:
             for evnint in range(completed + 1, self.complete_events - horizon):
-                wa = self.get_event_workers(evnint)
+                wa = self.get_event_workers(EventNumber(evnint))
                 if worker.name in wa.get_all_workers():
                     still_has_work = True
         if still_has_work:

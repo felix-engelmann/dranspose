@@ -54,9 +54,9 @@ async def controller() -> AsyncIterator[None]:
 @dataclass
 class AsyncDistributed:
     instance: DistributedService
-    task: Task
+    task: Task[Any]
 
-    async def stop(self):
+    async def stop(self) -> None:
         await self.instance.close()
         await cancel_and_wait(self.task)
 
@@ -65,9 +65,9 @@ class AsyncDistributed:
 class ProcessDistributed:
     instance: DistributedService
     process: multiprocessing.Process
-    queue: multiprocessing.Queue
+    queue: multiprocessing.Queue[str]
 
-    async def stop(self):
+    async def stop(self) -> None:
         self.queue.put("stop")
         self.process.join()
 
@@ -76,16 +76,18 @@ class ProcessDistributed:
 async def create_worker() -> AsyncIterator[
     Callable[[WorkerName], Coroutine[None, None, Worker]]
 ]:
-    workers = []
+    workers: list[AsyncDistributed | ProcessDistributed] = []
 
-    async def _make_worker(name: WorkerName | Worker, subprocess=False) -> Worker:
+    async def _make_worker(
+        name: WorkerName | Worker, subprocess: bool = False
+    ) -> Worker:
         if not isinstance(name, Worker):
             worker = Worker(WorkerSettings(worker_name=name))
         else:
             worker = name
 
         if subprocess:
-            q = multiprocessing.Queue()
+            q: multiprocessing.Queue[str] = multiprocessing.Queue()
             p = Process(target=worker.sync_run, args=(q,), daemon=True)
             p.start()
             workers.append(ProcessDistributed(instance=worker, process=p, queue=q))
@@ -105,11 +107,11 @@ async def create_worker() -> AsyncIterator[
 async def create_ingester() -> AsyncIterator[
     Callable[[Ingester], Coroutine[None, None, Ingester]]
 ]:
-    ingesters = []
+    ingesters: list[AsyncDistributed | ProcessDistributed] = []
 
-    async def _make_ingester(inst: Ingester, subprocess=False) -> Ingester:
+    async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
         if subprocess:
-            q = multiprocessing.Queue()
+            q: multiprocessing.Queue[str] = multiprocessing.Queue()
             p = Process(target=inst.sync_run, args=(q,), daemon=True)
             p.start()
             ingesters.append(ProcessDistributed(instance=inst, process=p, queue=q))
