@@ -1,13 +1,27 @@
-use async_zmq::{Result, StreamExt};
+use async_std::stream::StreamExt;
+use async_zmq::{AsRawSocket, Message, Result, Router, SinkExt};
 use redis::aio::MultiplexedConnection;
-use redis::streams::{StreamReadOptions, StreamReadReply, StreamRangeReply};
+use redis::streams::{StreamReadOptions, StreamReadReply, StreamRangeReply, StreamId};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use redis::{from_redis_value, AsyncCommands};
+use redis::{from_redis_value, AsyncCommands, RedisResult};
 use redis::Commands;
 use std::collections::HashMap;
 use uuid::Uuid;
 use std::time::Duration;
+use futures::channel::mpsc;
+use std::vec::IntoIter;
+use std::sync::Arc;
+
+use futures::{
+    future::FutureExt, // for `.fuse()`
+    pin_mut,
+    future,
+    select,
+};
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::ops::{Deref};
+
 
 use async_std::task;
 
@@ -49,7 +63,7 @@ struct IngesterState {
     name: String,
     url: String,
     #[serde(flatten)]
-    connected_workers: HashMap<String, ConnectedWorker>,
+    connected_workers: HashMap<Uuid, ConnectedWorker>,
     streams: Vec<String>,
 }
 
@@ -59,6 +73,95 @@ struct ControllerUpdate {
     finished: bool,
 }
 
+async fn work() -> Result<()> {
+    let mut zmq = async_zmq::pull("tcp://127.0.0.1:9999")?.connect()?;
+
+    while let Some(msg) = zmq.next().await {
+        // Received message is a type of Result<MessageBuf>
+        let msg = msg?;
+
+        println!("{}", msg[0].as_str().unwrap());
+        let packet = parse_stream1(msg[0].as_str().unwrap()).unwrap();
+        if packet.htype == "series_end" {
+            break;
+        }
+    }
+    Ok(())
+}
+
+async fn inner_manager() ->Result<()> {
+    let mut router: Router<IntoIter<Message>, Message> = async_zmq::router("tcp://*:10000")?.bind()?;
+
+    loop {
+        let item = select! {
+            x = router.next().fuse() => x,
+            //x = s2.next() => x,
+            complete => break,
+        };
+        if let Some(next_num) = item {
+            println!("res {:?}", next_num);
+        }
+    }
+
+    println!("futures are over");
+
+    Ok(())
+}
+
+#[derive(Debug)]
+enum Event {
+    WorkAssignment {
+        event_number: String,
+        workers: Vec<String>,
+    },
+    Control {
+        restart: bool
+    },
+}
+
+
+async fn forwarder(mut events: mpsc::Receiver<Event>, mut workers: mpsc::Sender<ConnectedWorker>) ->Result<()> {
+    let mut router: Router<IntoIter<Message>, Message> = async_zmq::router("tcp://*:10000")?.bind()?;
+
+    let mut pull = async_zmq::pull("tcp://127.0.0.1:9999")?.connect()?;
+
+    loop {
+        select! {
+            msg = pull.next().fuse() => {
+                if let Some(data) = msg {
+                    let data = data?;
+                    println!("got from pull {:?}", data[0].as_str().unwrap());
+                }
+            },
+            msg = router.next().fuse() => {
+                if let Some(msg) = msg {
+                    let data = msg?;
+                    let start = SystemTime::now();
+                    let since_the_epoch = start
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards");
+
+                    let cw = ConnectedWorker{
+                        name: data[0].as_str().unwrap().to_string(),
+                        service_uuid: Uuid::from_bytes({
+                            let mut array = [0; 16];
+                            array[..16].copy_from_slice(data[1].deref());
+                            array
+                        }
+                        ),
+                        last_seen: since_the_epoch.as_millis() as f64/1000f64
+                    };
+                    print!("got connected worker {:?}", cw);
+                    workers.send(cw).await.expect("could not send message");
+                }
+
+            },
+            complete => break,
+        };
+    }
+
+    Ok(())
+}
 
 async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
     let mut state = IngesterState{ service_uuid: Uuid::new_v4(),
@@ -67,13 +170,25 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
         streams: vec!["eiger".to_string()],
         ..IngesterState::default()};
 
+    //let mut router = async_zmq::router("tcp://*:10000").expect("no router socket");
+    //let socket = router
+    //let sock: Router<IntoIter<Message>, Message> = router.bind().expect("unable to bind");
+    //sock.as_raw_socket().set_router_mandatory(true);
     //let latest: StreamRangeReply = con.xrevrange_count("dranspose:controller:updates", "+", "-", 1).await.unwrap();
+    //let arcsock = Arc::new(sock);
 
+    //sock.recv_multipart()
+
+    let (ev_sender, ev_receiver) = mpsc::channel(1000);
+    let (wo_sender, wo_receiver) = mpsc::channel(1000);
+
+    let forwarder_task = task::spawn(forwarder(ev_receiver, wo_sender));
     //println!("latest value is {:?}", latest);
+
 
     let mut lastid: String = "0".to_string();
 
-    while true {
+    loop {
 
         let config = serde_json::to_string(&state).unwrap();
         println!("{}", &config);
@@ -81,17 +196,26 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
 
 
         let opts = StreamReadOptions::default().block(6000);
+        let lastidcopy = lastid.clone();
+        select! {
+            update_msgs = con.xread_options::<&str, std::string::String, StreamReadReply>(&["dranspose:controller:updates"], &[lastidcopy], &opts ).fuse() => {
+                if let Ok(update_msgs) = update_msgs {
+                    for key in update_msgs.keys.iter().filter(|&x| x.key == "dranspose:controller:updates") {
+                        lastid = key.ids.last().unwrap().id.clone();
+                        let data = &key.ids.last().unwrap().map;
 
-        let update_msgs: StreamReadReply = con.xread_options(&["dranspose:controller:updates"], &[lastid.clone()], &opts ).await.unwrap();
+                        let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
+                        let update: ControllerUpdate = serde_json::from_str(&update_str).expect("msg");
+                        println!("got update {:?}", update);
+                        if Some(update.mapping_uuid) != state.mapping_uuid {
+                            println!("resetting config to {}", update.mapping_uuid);
+                            //await self.restart_work(newuuid)
+                        }
+                        state.mapping_uuid = Some(update.mapping_uuid);
+                    }
+                }
 
-        for key in update_msgs.keys.iter().filter(|&x| x.key == "dranspose:controller:updates") {
-            lastid = key.ids.last().unwrap().id.clone();
-            let data = &key.ids.last().unwrap().map;
-
-            let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
-            let update: ControllerUpdate = serde_json::from_str(&update_str).expect("msg");
-            println!("got update {:?}", update);
-            state.mapping_uuid = Some(update.mapping_uuid);
+            }
         }
 
 
@@ -115,18 +239,9 @@ async fn main() -> Result<()> {
     });
     println!("Started task!");
 
-    let mut zmq = async_zmq::pull("tcp://127.0.0.1:9999")?.connect()?;
 
-    while let Some(msg) = zmq.next().await {
-        // Received message is a type of Result<MessageBuf>
-        let msg = msg?;
+    register_task.await;
 
-        println!("{}", msg[0].as_str().unwrap());
-        let packet = parse_stream1(msg[0].as_str().unwrap()).unwrap();
-        if packet.htype == "series_end" {
-            break;
-        }
-    }
 
     Ok(())
 
