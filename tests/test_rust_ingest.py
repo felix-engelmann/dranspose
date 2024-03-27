@@ -14,9 +14,12 @@ from dranspose.protocol import (
 )
 from dranspose.worker import Worker
 
+rust = pytest.mark.skipif("not config.getoption('rust')")
 
+
+@rust
 @pytest.mark.asyncio
-async def test_zmq_push(
+async def test_rust_basic(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     stream_small: Callable[
@@ -54,5 +57,7 @@ async def test_zmq_push(
 
     context = zmq.asyncio.Context()
     await stream_small(context, 9999, 15, 0.000001)
+
+    await asyncio.sleep(10)
 
     context.destroy()

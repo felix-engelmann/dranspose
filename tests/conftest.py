@@ -38,6 +38,16 @@ from dranspose.debug_worker import app as debugworker_app
 from tests.stream1 import AcquisitionSocket
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--rust",
+        action="store_true",
+        dest="rust",
+        default=False,
+        help="enable rust decorated tests",
+    )
+
+
 @pytest_asyncio.fixture()
 async def controller() -> AsyncIterator[None]:
     config = uvicorn.Config(app, port=5000, log_level="debug")
