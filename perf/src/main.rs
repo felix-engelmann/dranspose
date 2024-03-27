@@ -62,7 +62,7 @@ struct IngesterState {
     event_rate: f32,
     name: String,
     url: String,
-    #[serde(flatten)]
+    //#[serde(flatten)]
     connected_workers: HashMap<Uuid, ConnectedWorker>,
     streams: Vec<String>,
 }
@@ -180,7 +180,7 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
     //sock.recv_multipart()
 
     let (ev_sender, ev_receiver) = mpsc::channel(1000);
-    let (wo_sender, wo_receiver) = mpsc::channel(1000);
+    let (wo_sender, mut wo_receiver) = mpsc::channel(1000);
 
     let forwarder_task = task::spawn(forwarder(ev_receiver, wo_sender));
     //println!("latest value is {:?}", latest);
@@ -194,16 +194,14 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
         println!("{}", &config);
         let _ : () = con.set_ex("dranspose:ingester:rust-single-ingester:config", &config, 10).await.unwrap();
 
-
         let opts = StreamReadOptions::default().block(6000);
-        let lastidcopy = lastid.clone();
+        let idcopy = vec![lastid.clone()];
         select! {
-            update_msgs = con.xread_options::<&str, std::string::String, StreamReadReply>(&["dranspose:controller:updates"], &[lastidcopy], &opts ).fuse() => {
+            update_msgs = con.xread_options::<&str, String, StreamReadReply>(&["dranspose:controller:updates"], &idcopy, &opts ).fuse() => {
                 if let Ok(update_msgs) = update_msgs {
                     for key in update_msgs.keys.iter().filter(|&x| x.key == "dranspose:controller:updates") {
                         lastid = key.ids.last().unwrap().id.clone();
                         let data = &key.ids.last().unwrap().map;
-
                         let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
                         let update: ControllerUpdate = serde_json::from_str(&update_str).expect("msg");
                         println!("got update {:?}", update);
@@ -214,9 +212,14 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
                         state.mapping_uuid = Some(update.mapping_uuid);
                     }
                 }
-
+            },
+            cw = wo_receiver.next().fuse() => {
+                if let Some(cw) = cw {
+                    println!("update connected worker {:?}", cw);
+                    state.connected_workers.insert(cw.service_uuid, cw);
+                }
             }
-        }
+        };
 
 
         //println!("new responses: {:?}", update_msgs);
