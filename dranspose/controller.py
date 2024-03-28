@@ -347,10 +347,11 @@ class Controller:
                     time.perf_counter() - self.start_time,
                 )
                 self.start_time = time.perf_counter()
-        await self.redis.xadd(
-            RedisKeys.assigned(self.mapping.uuid),
-            {"data": WorkAssignmentList.dump_json(assignments)},
-        )
+        if len(assignments) > 0:
+            await self.redis.xadd(
+                RedisKeys.assigned(self.mapping.uuid),
+                {"data": WorkAssignmentList.dump_json(assignments)},
+            )
 
         # logger.error("time sent out %s", time.perf_counter() - start)
         self.processed_event_no = self.mapping.complete_events
