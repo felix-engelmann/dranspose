@@ -29,7 +29,7 @@ async def test_rust_basic(
     await reducer(None)
     await create_worker(WorkerName("w1"), subprocess=True)  # type: ignore[call-arg]
 
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(5)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
@@ -58,6 +58,13 @@ async def test_rust_basic(
     context = zmq.asyncio.Context()
     await stream_small(context, 9999, 15, 0.000001)
 
-    await asyncio.sleep(10)
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/progress")
+        content = await st.json()
+        while not content["finished"]:
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/progress")
+            content = await st.json()
+            logging.debug("progress is %s", content)
 
     context.destroy()
