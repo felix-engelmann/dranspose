@@ -139,7 +139,7 @@ def reducer(args: argparse.Namespace) -> None:
         if args.reducerclass:
             os.environ["REDUCER_CLASS"] = args.reducerclass
         config = uvicorn.Config(
-            reducer_app, port=5000, host=args.host, log_level="info"
+            reducer_app, port=5002, host=args.host, log_level="info"
         )
         server = uvicorn.Server(config)
         server.run()

@@ -265,8 +265,8 @@ async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedCon
         //println!("{}", &config);
         let _ : () = con.set_ex("dranspose:ingester:rust-single-ingester:config", &config, 10).await.unwrap();
 
-        let opts = StreamReadOptions::default().block(600);
-        let optslong = StreamReadOptions::default().block(100);
+        let opts = StreamReadOptions::default().block(6000);
+        let optslong = StreamReadOptions::default().block(10);
         let idcopy = vec![lastid.clone()];
         let evcopy = vec![lastev.clone()];
 
@@ -277,7 +277,7 @@ async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedCon
         let assignedkeylist = vec![assignedkey.as_str()];
 
         select! {
-            update_msgs = con.xread_options::<&str, String, StreamReadReply>(&["dranspose:controller:updates"], &idcopy, &opts ).fuse() => {
+            update_msgs = con.xread::<&str, String, StreamReadReply>(&["dranspose:controller:updates"], &idcopy ).fuse() => {
                 if let Ok(update_msgs) = update_msgs {
                     for key in update_msgs.keys.iter().filter(|&x| x.key == "dranspose:controller:updates") {
                         lastid = key.ids.last().unwrap().id.clone();
@@ -339,17 +339,19 @@ async fn main() -> Result<()> {
 
 
     let client = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let con = client.get_multiplexed_async_connection().await.unwrap();
+    let mut con = client.get_multiplexed_async_connection().await.unwrap();
     let client_assign = redis::Client::open("redis://127.0.0.1/").unwrap();
     let con_assign = client_assign.get_multiplexed_async_connection().await.unwrap();
 
     let register_task = task::spawn(async {
         register(con, con_assign).await
     });
+
     println!("Started task!");
 
 
     register_task.await;
+
 
 
     Ok(())
