@@ -126,6 +126,8 @@ async fn forwarder(mut connectedworker_s: mpsc::Sender<ForwarderEvent>, mut assi
     let mut asbuf: VecDeque<WorkAssignment> = VecDeque::new();
     let mut pkbuf: VecDeque<TimedMultipart> = VecDeque::new();
 
+    let mut no_events = 0;
+    let mut starttime = Instant::now();
     loop {
         //println!("forwarder looped");
 
@@ -170,6 +172,12 @@ async fn forwarder(mut connectedworker_s: mpsc::Sender<ForwarderEvent>, mut assi
                     router.send(MultipartIter::from(payload)
                     ).await.expect("unable to send");
                 }
+            }
+            no_events+=1;
+            if no_events%1000==999 {
+                let micros = starttime.elapsed().as_micros();
+                println!("{} to {} packets in {} microsecs = {} p/s", no_events-1000, no_events, micros, 1000000000/micros);
+                starttime = Instant::now();
             }
             //println!("finished sending out assignment to workers {:?}", assignment);
         }
@@ -354,7 +362,7 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
             },
             cw = fwd_reg_connectedworker_r.next().fuse() => {
                 if let Some(cw) = cw {
-                    println!("update connected worker {:?}", cw);
+                    //println!("update connected worker {:?}", cw);
                     match cw {
                         ForwarderEvent::ConnectedWorker{connected_worker} => {
                             state.connected_workers.insert(connected_worker.service_uuid, connected_worker);

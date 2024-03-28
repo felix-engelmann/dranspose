@@ -51,7 +51,7 @@ async def test_rust_basic(
 
         logging.info("startup done")
 
-        ntrig = 10000
+        ntrig = 50000
         mapping = {
             "eiger": [
                 [
