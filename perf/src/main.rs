@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use redis::{from_redis_value, AsyncCommands, RedisResult};
 use redis::Commands;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use uuid::Uuid;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use futures::channel::mpsc;
 use std::vec::IntoIter;
 use std::sync::Arc;
@@ -75,14 +75,6 @@ struct ControllerUpdate {
     finished: bool,
 }
 
-#[derive(Debug)]
-enum Event {
-    Start {
-        mapping_uuid: Uuid,
-    },
-    ControllerUpdate
-}
-
 
 async fn work() -> Result<()> {
     let mut zmq = async_zmq::pull("tcp://127.0.0.1:9999")?.connect()?;
@@ -119,57 +111,95 @@ async fn inner_manager() ->Result<()> {
     Ok(())
 }
 
+struct TimedMultipart {
+    multipart: Vec<Message>,
+    received: Instant,
+}
 
 
-async fn forwarder(mut updates_r: mpsc::Receiver<Event>, mut connectedworker_s: mpsc::Sender<ConnectedWorker>, mut assignment_r: mpsc::Receiver<QueueWorkAssignment>) ->Result<()> {
+
+async fn forwarder(mut connectedworker_s: mpsc::Sender<ForwarderEvent>, mut assignment_r: mpsc::Receiver<QueueWorkAssignment>) ->Result<()> {
     let mut router: Router<IntoIter<Message>, Message> = async_zmq::router("tcp://*:10000")?.bind()?;
 
     let mut pull = async_zmq::pull("tcp://127.0.0.1:9999")?.connect()?;
 
+    let mut asbuf: VecDeque<WorkAssignment> = VecDeque::new();
+    let mut pkbuf: VecDeque<TimedMultipart> = VecDeque::new();
+
     loop {
+        //println!("forwarder looped");
+
+
+        while asbuf.len() > 0 && pkbuf.len() > 0 {
+
+            let assignment = asbuf.pop_back().unwrap();
+            let timed = pkbuf.pop_back().unwrap();
+            let stins = timed.multipart;
+
+            //println!("send message to assignment {:?}", assignment);
+            /*{'w3': InternalWorkerMessage(event_number=9,
+                streams={'orca': StreamData(typ='STINS',
+                    frames=[<zmq.sugar.frame.Frame object at 0x7f1d2ccd8410>, <zmq.sugar.frame.Frame object at 0x7f1d2ccdbf50>], length=2)})}
+            */
+            let header = json!({"event_number":
+                            assignment.event_number,"streams":{"eiger":{"typ":"STINS","length":stins.len()}}});
+
+            //println!("header is {}", header.to_string());
+            let mymsg = stins;
+            let workerlist = assignment.assignments.get("eiger").unwrap();
+            if workerlist.len() == 1 {
+                let w = workerlist.first().unwrap();
+                //println!("send event data to worker {:?}", w);
+                let mut payload = vec![Message::from(w),
+                                       Message::from(&header.to_string()) ];
+                payload.extend(mymsg);
+
+                router.send(MultipartIter::from(payload)
+                ).await.expect("unable to send");
+                //println!("sending took {} microsec", timed.received.elapsed().as_micros());
+            }
+            else{
+                //needs copyingg
+                for w in workerlist {
+                    //println!("copy message to worker {:?}", w);
+                    let msgcopy: Vec<Message> = mymsg.iter().map(|m| Message::from(m.to_vec().clone())).collect();
+                    let mut payload = vec![Message::from(w),
+                                           Message::from(&header.to_string())];
+                    payload.extend(msgcopy);
+
+                    router.send(MultipartIter::from(payload)
+                    ).await.expect("unable to send");
+                }
+            }
+            //println!("finished sending out assignment to workers {:?}", assignment);
+        }
+        /*if pkbuf.len() > 0 {
+            println!("waiting for assignments");
+        }*/
+        //println!("start forwarder select");
         select! {
-            control = updates_r.next().fuse() => {
-                println!("forwarder got control message {:?}", control);
+            control = assignment_r.next().fuse() => {
+                //println!("forwarder got control message {:?}", control);
                 match control {
-                    Some(Event::Start{mapping_uuid}) => {
+                    Some(QueueWorkAssignment::Start{mapping_uuid}) => {
                         println!("got start {:?}", mapping_uuid);
-
-                    }
-                    _ => {}
+                        asbuf = VecDeque::new();
+                        pkbuf = VecDeque::new();
+                        connectedworker_s.send(ForwarderEvent::Ready{mapping_uuid}).await.expect("must be able to ready");
+                        println!("ready sent from fwd");
+                    },
+                    Some(QueueWorkAssignment::WorkAssignment {assignment}) => {
+                        asbuf.push_front(assignment);
+                    },
+                    None => { println!("control message was none");}
                 };
-
             },
             msg = pull.next().fuse() => {
                 if let Some(data) = msg {
                     let stins: Vec<Message> = data?;
-                    println!("got from pull {:?}", stins[0].as_str().unwrap());
-                    let assignment = assignment_r.next().await.unwrap();
-                    println!("send message to assignment {:?}", assignment);
-                    /*{'w3': InternalWorkerMessage(event_number=9,
-                        streams={'orca': StreamData(typ='STINS',
-                            frames=[<zmq.sugar.frame.Frame object at 0x7f1d2ccd8410>, <zmq.sugar.frame.Frame object at 0x7f1d2ccdbf50>], length=2)})}
-                    */
-                    if let QueueWorkAssignment::WorkAssignment{assignment} = assignment {
-                        let header = json!({"event_number":
-                            assignment.event_number,"streams":{"eiger":{"typ":"STINS","length":stins.len()}}});
-
-                        println!("header is {}", header.to_string());
-                        let mymsg = stins;
-                        if let w = assignment.assignments.get("eiger").unwrap().first().unwrap() {
-                            println!("send event data to worker {:?}", w);
-                            let mut payload = vec![Message::from("w1"),
-                               Message::from(&header.to_string()) ];
-                            payload.extend(mymsg);
-
-                            router.send(MultipartIter::from(payload)
-                            ).await.expect("unable to send");
-                        }
-                        else{
-                            //needs copying
-                        }
-                        //for w in assignment.assignments.get("eiger").unwrap().iter() {
-
-                    }
+                    //println!("got from pull {:?}", stins[0].as_str().unwrap());
+                    let now = Instant::now();
+                    pkbuf.push_front(TimedMultipart{multipart: stins, received:now});
                 }
             },
             msg = router.next().fuse() => {
@@ -190,8 +220,8 @@ async fn forwarder(mut updates_r: mpsc::Receiver<Event>, mut connectedworker_s: 
                         ),
                         last_seen: since_the_epoch.as_millis() as f64/1000f64
                     };
-                    print!("got connected worker {:?}", cw);
-                    connectedworker_s.send(cw).await.expect("could not send message");
+                    //print!("got connected worker {:?}", cw);
+                    connectedworker_s.send(ForwarderEvent::ConnectedWorker {connected_worker:cw}).await.expect("could not send message");
                 }
 
             },
@@ -220,9 +250,19 @@ enum QueueWorkAssignment {
     }
 }
 
+#[derive(Debug)]
+enum ForwarderEvent {
+    ConnectedWorker {
+        connected_worker: ConnectedWorker,
+    },
+    Ready{
+        mapping_uuid: Uuid
+    }
+}
 
 
-async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedConnection) -> redis::RedisResult<()> {
+
+async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
     let mut state = IngesterState{ service_uuid: Uuid::new_v4(),
         name: "rust-single-ingester".to_string(),
         url: "tcp://localhost:10000".to_string(),
@@ -236,15 +276,11 @@ async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedCon
     //sock.recv_multipart()
 
 
-    let (mut reg_fwd_updates_s, reg_fwd_updates_r) = mpsc::channel(1000);
-    //let (reg_ass_updates_s, reg_ass_updates_r) = mpsc::channel(1000);
     let (fwd_reg_connectedworker_s, mut fwd_reg_connectedworker_r) = mpsc::channel(1000);
     let (mut reg_fwd_assignment_s, reg_fwd_assignment_r) = mpsc::channel(1000);
 
 
-    let forwarder_task = task::spawn(forwarder(reg_fwd_updates_r, fwd_reg_connectedworker_s, reg_fwd_assignment_r));
-    //let assign_task = task::spawn(get_assignments(con, reg_ass_updates_r, ass_fwd_assignment_s));
-    //println!("latest value is {:?}", latest);
+    let forwarder_task = task::spawn(forwarder(fwd_reg_connectedworker_s, reg_fwd_assignment_r));
 
 
     let mut lastid: String = "0".to_string();
@@ -257,7 +293,7 @@ async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedCon
         lastid = firstelem.id.clone();
     }
 
-
+    let mut pending_uuid: Option<Uuid> = None;
 
     loop {
 
@@ -266,31 +302,28 @@ async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedCon
         let _ : () = con.set_ex("dranspose:ingester:rust-single-ingester:config", &config, 10).await.unwrap();
 
         let opts = StreamReadOptions::default().block(6000);
-        let optslong = StreamReadOptions::default().block(10);
-        let idcopy = vec![lastid.clone()];
-        let evcopy = vec![lastev.clone()];
+        let ids = vec![lastid.clone(), lastev.clone()];
 
         let assignedkey = format!("dranspose:assigned:{}", state.mapping_uuid.unwrap_or(Uuid::default()).to_string());
 
-        //println!("assigned key is {:?}", assignedkey);
-
-        let assignedkeylist = vec![assignedkey.as_str()];
-
+        let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
+        //println!("register select");
         select! {
-            update_msgs = con.xread::<&str, String, StreamReadReply>(&["dranspose:controller:updates"], &idcopy ).fuse() => {
+            update_msgs = con.xread_options::<&str, String, StreamReadReply>(&keylist, &ids, &opts).fuse() => {
+                //println!("raw redis message {:?}", update_msgs);
                 if let Ok(update_msgs) = update_msgs {
-                    for key in update_msgs.keys.iter().filter(|&x| x.key == "dranspose:controller:updates") {
+                    if let Some(key) = update_msgs.keys.iter().find(|&x| x.key == "dranspose:controller:updates") {
                         lastid = key.ids.last().unwrap().id.clone();
                         let data = &key.ids.last().unwrap().map;
                         let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
                         let update: ControllerUpdate = serde_json::from_str(&update_str).expect("msg");
                         println!("got update {:?}", update);
                         if Some(update.mapping_uuid) != state.mapping_uuid {
-                            state.mapping_uuid = Some(update.mapping_uuid);
+                            //state.mapping_uuid = Some(update.mapping_uuid);
                             println!("resetting config to {}", update.mapping_uuid);
-                            reg_fwd_assignment_s.send(QueueWorkAssignment::Start {mapping_uuid: update.mapping_uuid});
-                            reg_fwd_updates_s.send(Event::Start {mapping_uuid: update.mapping_uuid}).await.expect("cannot send");
-                            //await self.restart_work(newuuid)
+                            reg_fwd_assignment_s.send(QueueWorkAssignment::Start {mapping_uuid: update.mapping_uuid}).await.expect("work");
+                            println!("wait for forwarder ready");
+                            pending_uuid = Some( update.mapping_uuid);
                         }
                         if update.finished == true {
                             let finished = json!({"state":"finished", "source": "ingester", "ingester":"rust-single-ingester"});
@@ -300,29 +333,43 @@ async fn register(mut con: MultiplexedConnection, mut con_assign: MultiplexedCon
                             //    "data":finished.to_string()).await.unwrap();
                         }
                     }
+                    if let Some(key) = update_msgs.keys.iter().find(|&x| x.key == assignedkey) {
+                        //println!("got raw assignments {:?}", key);
+                        for upd in key.ids.iter() {
+                            let data = &upd.map;
+                            let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
+                            let assignments: Vec<WorkAssignment> = serde_json::from_str(&update_str).expect("marshall not work");
+                            //println!("got assignments {:?}", assignments);
+                            for assignment in assignments.iter() {
+                                //println!("send assign");
+                                reg_fwd_assignment_s.send(QueueWorkAssignment::WorkAssignment{assignment: assignment.clone()}).await.expect("cannot send");
+                                //println!("sent assign")
+                            }
+                            lastev = upd.id.clone();
+                        }
+
+
+                    }
                 }
             },
             cw = fwd_reg_connectedworker_r.next().fuse() => {
                 if let Some(cw) = cw {
                     println!("update connected worker {:?}", cw);
-                    state.connected_workers.insert(cw.service_uuid, cw);
+                    match cw {
+                        ForwarderEvent::ConnectedWorker{connected_worker} => {
+                            state.connected_workers.insert(connected_worker.service_uuid, connected_worker);
+                        },
+                        ForwarderEvent::Ready {mapping_uuid}  => {println!("forwarder is ready, change state");
+                            if let Some(new_uuid) = pending_uuid {
+                                state.mapping_uuid = Some(new_uuid);
+                                pending_uuid = None;
+                            }
+
+                        }
+                    };
+
                 }
             },
-            assignment_msgs = con_assign.xread_options::<&str, String, StreamReadReply>(&assignedkeylist, &evcopy, &optslong ).fuse() => {
-                println!("got assignmentmsg {:?}",assignment_msgs );
-                if let Ok(assignment_msgs) = assignment_msgs {
-                    for key in assignment_msgs.keys.iter().filter(|&x| x.key == assignedkey) {
-                        lastev = key.ids.last().unwrap().id.clone();
-                        let data = &key.ids.last().unwrap().map;
-                        let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
-                        let assignments: Vec<WorkAssignment> = serde_json::from_str(&update_str).expect("marshall not work");
-                        println!("got assignment {:?}", assignments);
-                        for assignment in assignments.iter() {
-                            reg_fwd_assignment_s.send(QueueWorkAssignment::WorkAssignment{assignment: assignment.clone()}).await.expect("cannot send");
-                        }
-                    }
-                }
-            }
         };
 
 
@@ -340,11 +387,9 @@ async fn main() -> Result<()> {
 
     let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_multiplexed_async_connection().await.unwrap();
-    let client_assign = redis::Client::open("redis://127.0.0.1/").unwrap();
-    let con_assign = client_assign.get_multiplexed_async_connection().await.unwrap();
 
     let register_task = task::spawn(async {
-        register(con, con_assign).await
+        register(con).await
     });
 
     println!("Started task!");

@@ -28,8 +28,17 @@ async def test_rust_basic(
 ) -> None:
     await reducer(None)
     await create_worker(WorkerName("w1"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w2"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w3"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w4"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w5"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w6"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w7"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w8"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w9"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w10"), subprocess=True)  # type: ignore[call-arg]
 
-    await asyncio.sleep(5)
+    await asyncio.sleep(2)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
@@ -42,10 +51,14 @@ async def test_rust_basic(
 
         logging.info("startup done")
 
-        ntrig = 15
+        ntrig = 10000
         mapping = {
             "eiger": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
+                [
+                    VirtualWorker(constraint=VirtualConstraint(i // 10)).model_dump(
+                        mode="json"
+                    )
+                ]
                 for i in range(1, ntrig)
             ],
         }
@@ -56,7 +69,7 @@ async def test_rust_basic(
         assert resp.status == 200
 
     context = zmq.asyncio.Context()
-    await stream_small(context, 9999, 15, 0.000001)
+    await stream_small(context, 9999, ntrig - 1, 0.000001)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
