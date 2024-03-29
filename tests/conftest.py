@@ -31,6 +31,7 @@ from dranspose.controller import app
 from dranspose.distributed import DistributedService
 from dranspose.helpers.utils import cancel_and_wait
 from dranspose.ingester import Ingester
+from dranspose.ingesters import ZmqPullSingleIngester
 from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
@@ -82,6 +83,19 @@ class ProcessDistributed:
         self.process.join()
 
 
+@dataclass
+class ExternalDistributed:
+    instance: DistributedService
+    process: asyncio.subprocess.Process
+    log_task: Task
+
+    async def stop(self) -> None:
+        logging.warning("stopping log task")
+        self.log_task.cancel()
+        logging.warning("stopping process")
+        self.process.terminate()
+
+
 @pytest_asyncio.fixture
 async def create_worker() -> AsyncIterator[
     Callable[[WorkerName], Coroutine[None, None, Worker]]
@@ -114,13 +128,46 @@ async def create_worker() -> AsyncIterator[
 
 
 @pytest_asyncio.fixture
-async def create_ingester() -> AsyncIterator[
-    Callable[[Ingester], Coroutine[None, None, Ingester]]
-]:
-    ingesters: list[AsyncDistributed | ProcessDistributed] = []
+async def create_ingester(
+    request,
+) -> AsyncIterator[Callable[[Ingester], Coroutine[None, None, Ingester]]]:
+    ingesters: list[AsyncDistributed | ProcessDistributed | ExternalDistributed] = []
 
-    async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
-        if subprocess:
+    async def forward_output(proc, settings):
+        while True:
+            try:
+                data = await proc.stdout.readline()
+                line = data.decode("ascii").rstrip()
+                if len(line) > 0:
+                    logging.warning("rust_%s: %s", settings.ingester_streams[0], line)
+                else:
+                    logging.error("rust output line 0")
+                    break
+            except Exception as e:
+                logging.error("outputing broke %s", e.__repr__())
+                break
+
+    async def _make_ingester(inst: Ingester, run_sub: bool = False) -> Ingester:
+        if request.config.getoption("rust"):
+            logging.warning("replace ingester with rust")
+            if isinstance(inst, ZmqPullSingleIngester):
+                logging.warning("ues settings %s", inst._streaming_single_settings)
+                proc = await asyncio.create_subprocess_exec(
+                    "./perf/target/debug/perf",
+                    inst._streaming_single_settings.ingester_streams[0],
+                    str(inst._streaming_single_settings.upstream_url),
+                    str(inst._streaming_single_settings.ingester_url),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                output = asyncio.create_task(
+                    forward_output(proc, inst._streaming_single_settings)
+                )
+                ingesters.append(
+                    ExternalDistributed(instance=inst, process=proc, log_task=output)
+                )
+                return inst
+        if run_sub:
             q: Any = multiprocessing.Queue()
             p = Process(target=inst.sync_run, args=(q,), daemon=True)
             p.start()
