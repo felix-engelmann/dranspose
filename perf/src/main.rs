@@ -12,6 +12,10 @@ use std::time::{Duration, Instant};
 use futures::channel::mpsc;
 use std::vec::IntoIter;
 use std::sync::Arc;
+use clap::Parser;
+
+use url::Url;
+
 
 use futures::{
     future::FutureExt, // for `.fuse()`
@@ -22,6 +26,7 @@ use futures::{
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::ops::{Deref};
 use std::os::linux::raw::ino_t;
+use std::string::ToString;
 
 
 use async_std::task;
@@ -118,10 +123,14 @@ struct TimedMultipart {
 
 
 
-async fn forwarder(mut connectedworker_s: mpsc::Sender<ForwarderEvent>, mut assignment_r: mpsc::Receiver<QueueWorkAssignment>) ->Result<()> {
-    let mut router: Router<IntoIter<Message>, Message> = async_zmq::router("tcp://*:10000")?.bind()?;
+async fn forwarder(args: Cli, mut connectedworker_s: mpsc::Sender<ForwarderEvent>, mut assignment_r: mpsc::Receiver<QueueWorkAssignment>) ->Result<()> {
+    let url = Url::parse(&args.ingester_url).expect("unparsable url");
 
-    let mut pull = async_zmq::pull("tcp://127.0.0.1:9999")?.connect()?;
+    let listenurl = format!("tcp://*:{}", url.port().unwrap());
+
+    let mut router: Router<IntoIter<Message>, Message> = async_zmq::router(&listenurl)?.bind()?;
+
+    let mut pull = async_zmq::pull(&args.upstream_url)?.connect()?;
 
     let mut asbuf: VecDeque<WorkAssignment> = VecDeque::new();
     let mut pkbuf: VecDeque<TimedMultipart> = VecDeque::new();
@@ -144,11 +153,11 @@ async fn forwarder(mut connectedworker_s: mpsc::Sender<ForwarderEvent>, mut assi
                     frames=[<zmq.sugar.frame.Frame object at 0x7f1d2ccd8410>, <zmq.sugar.frame.Frame object at 0x7f1d2ccdbf50>], length=2)})}
             */
             let header = json!({"event_number":
-                            assignment.event_number,"streams":{"eiger":{"typ":"STINS","length":stins.len()}}});
+                            assignment.event_number,"streams":{args.stream.clone():{"typ":"STINS","length":stins.len()}}});
 
             //println!("header is {}", header.to_string());
             let mymsg = stins;
-            let workerlist = assignment.assignments.get("eiger").unwrap();
+            let workerlist = assignment.assignments.get(&args.stream).unwrap();
             if workerlist.len() == 1 {
                 let w = workerlist.first().unwrap();
                 //println!("send event data to worker {:?}", w);
@@ -270,11 +279,12 @@ enum ForwarderEvent {
 
 
 
-async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
+async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResult<()> {
+    let name = format!("rust-{}-ingester", args.stream);
     let mut state = IngesterState{ service_uuid: Uuid::new_v4(),
-        name: "rust-single-ingester".to_string(),
-        url: "tcp://localhost:10000".to_string(),
-        streams: vec!["eiger".to_string()],
+        name: name.clone(),
+        url: args.ingester_url.clone(),
+        streams: vec![args.stream.clone()],
         ..IngesterState::default()};
 
     //let mut router = async_zmq::router("tcp://*:10000").expect("no router socket");
@@ -288,7 +298,7 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
     let (mut reg_fwd_assignment_s, reg_fwd_assignment_r) = mpsc::channel(1000);
 
 
-    let forwarder_task = task::spawn(forwarder(fwd_reg_connectedworker_s, reg_fwd_assignment_r));
+    let forwarder_task = task::spawn(forwarder(args, fwd_reg_connectedworker_s, reg_fwd_assignment_r));
 
 
     let mut lastid: String = "0".to_string();
@@ -307,7 +317,8 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
 
         let config = serde_json::to_string(&state).unwrap();
         //println!("{}", &config);
-        let _ : () = con.set_ex("dranspose:ingester:rust-single-ingester:config", &config, 10).await.unwrap();
+        let configkey = format!("dranspose:ingester:{}:config", name);
+        let _ : () = con.set_ex(configkey, &config, 10).await.unwrap();
 
         let opts = StreamReadOptions::default().block(6000);
         let ids = vec![lastid.clone(), lastev.clone()];
@@ -334,7 +345,7 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
                             pending_uuid = Some( update.mapping_uuid);
                         }
                         if update.finished == true {
-                            let finished = json!({"state":"finished", "source": "ingester", "ingester":"rust-single-ingester"});
+                            let finished = json!({"state":"finished", "source": "ingester", "ingester":name});
                             let _ : () = con.xadd(format!("dranspose:ready:{}", update.mapping_uuid.to_string()),
                             "*", &vec![("data",finished.to_string() )]).await?;
                             //let _ : () = con.xadd(,
@@ -387,17 +398,30 @@ async fn register(mut con: MultiplexedConnection) -> redis::RedisResult<()> {
     Ok(())
 }
 
+#[derive(Parser)]
+struct Cli {
+    #[clap(default_value_t = String::from("eiger"))]
+    stream: String,
+    #[clap(default_value_t = String::from("tcp://localhost:9999"))]
+    upstream_url: String,
+    #[clap(default_value_t = String::from("tcp://localhost:10000"))]
+    ingester_url: String,
+}
+
 
 
 #[async_std::main]
 async fn main() -> Result<()> {
 
+    let args = Cli::parse();
+
+    println!("stream: {:?}, ingester_url: {:?}, upstream_url: {:?}", args.stream, args.ingester_url, args.upstream_url);
 
     let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_multiplexed_async_connection().await.unwrap();
 
     let register_task = task::spawn(async {
-        register(con).await
+        register(con, args).await
     });
 
     println!("Started task!");
