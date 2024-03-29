@@ -147,7 +147,7 @@ async def create_ingester(
                 logging.error("outputing broke %s", e.__repr__())
                 break
 
-    async def _make_ingester(inst: Ingester, run_sub: bool = False) -> Ingester:
+    async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
         if request.config.getoption("rust"):
             logging.warning("replace ingester with rust")
             if isinstance(inst, ZmqPullSingleIngester):
@@ -167,7 +167,7 @@ async def create_ingester(
                     ExternalDistributed(instance=inst, process=proc, log_task=output)
                 )
                 return inst
-        if run_sub:
+        if subprocess:
             q: Any = multiprocessing.Queue()
             p = Process(target=inst.sync_run, args=(q,), daemon=True)
             p.start()
