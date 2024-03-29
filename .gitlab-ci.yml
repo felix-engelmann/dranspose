@@ -9,7 +9,7 @@ include:
 variables:
   DOCKER_REGISTRY: "harbor.maxiv.lu.se/daq"
   REDIS_URL: "redis://redis:6379/0"
-  PYTEST_EXTRA_ARGS: "--log-cli-level=DEBUG"
+  PYTEST_EXTRA_ARGS: "--log-cli-level=INFO"
 
 test-python39:
   allow_failure: true
