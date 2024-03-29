@@ -45,9 +45,9 @@ async def test_stream_not_available(controller: None) -> None:
                 ],
             },
         )
-        assert resp.status == 200
+        assert resp.status == 400
         response = await resp.json()
-        assert "streams {'eiger'} not available" == response
+        assert {"detail": "streams {'eiger'} not available"} == response
 
 
 @pytest.mark.asyncio
@@ -84,6 +84,6 @@ async def test_not_enough_workers(
                 ],
             },
         )
-        assert resp.status == 200
+        assert resp.status == 400
         response = await resp.json()
-        assert "only 0 workers available, but 1 required" == response
+        assert {"detail": "only 0 workers available, but 1 required"} == response
