@@ -14,7 +14,11 @@ use std::vec::IntoIter;
 use std::sync::Arc;
 use clap::Parser;
 
+use log::{debug, info, error};
 use url::Url;
+use signal_hook::consts::signal::*;
+use signal_hook_async_std::Signals;
+
 
 
 use futures::{
@@ -30,6 +34,7 @@ use std::string::ToString;
 
 
 use async_std::task;
+use env_logger::Env;
 use serde_json::json;
 
 #[derive(Serialize, Deserialize)]
@@ -138,7 +143,7 @@ async fn forwarder(args: Cli, mut connectedworker_s: mpsc::Sender<ForwarderEvent
     let mut no_events = 0;
     let mut starttime = Instant::now();
     loop {
-        //println!("forwarder looped");
+        debug!("forwarder looped");
 
 
         while asbuf.len() > 0 && pkbuf.len() > 0 {
@@ -147,7 +152,7 @@ async fn forwarder(args: Cli, mut connectedworker_s: mpsc::Sender<ForwarderEvent
             let timed = pkbuf.pop_back().unwrap();
             let stins = timed.multipart;
 
-            //println!("send message to assignment {:?}", assignment);
+            debug!("send message to assignment {:?}", assignment);
             /*{'w3': InternalWorkerMessage(event_number=9,
                 streams={'orca': StreamData(typ='STINS',
                     frames=[<zmq.sugar.frame.Frame object at 0x7f1d2ccd8410>, <zmq.sugar.frame.Frame object at 0x7f1d2ccdbf50>], length=2)})}
@@ -208,7 +213,9 @@ async fn forwarder(args: Cli, mut connectedworker_s: mpsc::Sender<ForwarderEvent
                     Some(QueueWorkAssignment::WorkAssignment {assignment}) => {
                         asbuf.push_front(assignment);
                     },
-                    None => { println!("control message was none");}
+                    None => {
+                        println!("control message was none");
+                        break;}
                 };
             },
             msg = pull.next().fuse() => {
@@ -237,7 +244,7 @@ async fn forwarder(args: Cli, mut connectedworker_s: mpsc::Sender<ForwarderEvent
                         ),
                         last_seen: since_the_epoch.as_millis() as f64/1000f64
                     };
-                    //print!("got connected worker {:?}", cw);
+                    debug!("got connected worker {:?}", cw);
                     connectedworker_s.send(ForwarderEvent::ConnectedWorker {connected_worker:cw}).await.expect("could not send message");
                 }
 
@@ -279,7 +286,7 @@ enum ForwarderEvent {
 
 
 
-async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResult<()> {
+async fn register(mut con: MultiplexedConnection, args: Cli, mut signals: Signals) -> redis::RedisResult<()> {
     let name = format!("rust-{}-ingester", args.stream);
     let mut state = IngesterState{ service_uuid: Uuid::new_v4(),
         name: name.clone(),
@@ -316,9 +323,9 @@ async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResu
     loop {
 
         let config = serde_json::to_string(&state).unwrap();
-        //println!("{}", &config);
+        debug!("{}", &config);
         let configkey = format!("dranspose:ingester:{}:config", name);
-        let _ : () = con.set_ex(configkey, &config, 10).await.unwrap();
+        let _ : () = con.set_ex(&configkey, &config, 10).await.unwrap();
 
         let opts = StreamReadOptions::default().block(6000);
         let ids = vec![lastid.clone(), lastev.clone()];
@@ -326,10 +333,10 @@ async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResu
         let assignedkey = format!("dranspose:assigned:{}", state.mapping_uuid.unwrap_or(Uuid::default()).to_string());
 
         let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
-        //println!("register select");
+        debug!("register select");
         select! {
             update_msgs = con.xread_options::<&str, String, StreamReadReply>(&keylist, &ids, &opts).fuse() => {
-                //println!("raw redis message {:?}", update_msgs);
+                debug!("raw redis message {:?}", update_msgs);
                 if let Ok(update_msgs) = update_msgs {
                     if let Some(key) = update_msgs.keys.iter().find(|&x| x.key == "dranspose:controller:updates") {
                         lastid = key.ids.last().unwrap().id.clone();
@@ -353,16 +360,16 @@ async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResu
                         }
                     }
                     if let Some(key) = update_msgs.keys.iter().find(|&x| x.key == assignedkey) {
-                        //println!("got raw assignments {:?}", key);
+                        debug!("got raw assignments {:?}", key);
                         for upd in key.ids.iter() {
                             let data = &upd.map;
                             let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
                             let assignments: Vec<WorkAssignment> = serde_json::from_str(&update_str).expect("marshall not work");
-                            //println!("got assignments {:?}", assignments);
+                            debug!("got assignments {:?}", assignments);
                             for assignment in assignments.iter() {
-                                //println!("send assign");
+                                debug!("send assign");
                                 reg_fwd_assignment_s.send(QueueWorkAssignment::WorkAssignment{assignment: assignment.clone()}).await.expect("cannot send");
-                                //println!("sent assign")
+                                debug!("sent assign")
                             }
                             lastev = upd.id.clone();
                         }
@@ -373,7 +380,7 @@ async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResu
             },
             cw = fwd_reg_connectedworker_r.next().fuse() => {
                 if let Some(cw) = cw {
-                    //println!("update connected worker {:?}", cw);
+                    debug!("update connected worker {:?}", cw);
                     match cw {
                         ForwarderEvent::ConnectedWorker{connected_worker} => {
                             state.connected_workers.insert(connected_worker.service_uuid, connected_worker);
@@ -389,10 +396,23 @@ async fn register(mut con: MultiplexedConnection, args: Cli) -> redis::RedisResu
 
                 }
             },
+            sig = signals.next().fuse() => {
+                if let Some(signal) = sig {
+                    match signal {
+                        SIGTERM | SIGINT | SIGQUIT => {
+                            // Shutdown the system;
+                            println!("signal received");
+                            let _: () = con.del(&configkey).await.expect("cannot delete config");
+                            println!("deleted config, terminate");
+                            break;
+                        },
+                        _ => unreachable!(),
+                    }
+                }
+            },
         };
 
 
-        //println!("new responses: {:?}", update_msgs);
     }
 
     Ok(())
@@ -410,26 +430,27 @@ struct Cli {
 
 
 
+
 #[async_std::main]
 async fn main() -> Result<()> {
 
     let args = Cli::parse();
 
-    println!("stream: {:?}, ingester_url: {:?}, upstream_url: {:?}", args.stream, args.ingester_url, args.upstream_url);
+    env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
+
+
+    let signals = Signals::new(&[SIGHUP, SIGTERM, SIGINT, SIGQUIT]).expect("unable to register signals");
+    let handle = signals.handle();
+
+
+    info!("stream: {:?}, ingester_url: {:?}, upstream_url: {:?}", args.stream, args.ingester_url, args.upstream_url);
 
     let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let mut con = client.get_multiplexed_async_connection().await.unwrap();
 
-    let register_task = task::spawn(async {
-        register(con, args).await
-    });
+    register(con, args, signals).await.expect("main task");
 
-    println!("Started task!");
-
-
-    register_task.await;
-
-
+    handle.close();
 
     Ok(())
 
