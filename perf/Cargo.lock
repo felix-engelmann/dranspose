@@ -1025,6 +1025,7 @@ dependencies = [
  "clap",
  "env_logger",
  "futures",
+ "futures-util",
  "log",
  "redis",
  "serde",

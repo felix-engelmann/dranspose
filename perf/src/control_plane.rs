@@ -1,9 +1,9 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use async_std::task;
 use async_zmq::SinkExt;
 use futures::channel::mpsc;
 use futures::{select, StreamExt,future::FutureExt};
-use log::{debug, info};
+use log::{debug, info, trace, warn};
 use redis::aio::MultiplexedConnection;
 use redis::{AsyncCommands, from_redis_value};
 use redis::streams::{StreamRangeReply, StreamReadOptions, StreamReadReply};
@@ -23,7 +23,8 @@ pub(crate) enum ForwarderEvent {
     },
     Ready{
         mapping_uuid: Uuid
-    }
+    },
+    Started{},
 }
 
 
@@ -52,10 +53,23 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
     let (fwd_reg_connectedworker_s, mut fwd_reg_connectedworker_r) = mpsc::channel(1000);
     let (mut reg_fwd_assignment_s, reg_fwd_assignment_r) = mpsc::channel(1000);
 
-    let forwarder_task = task::spawn(forwarder(args, fwd_reg_connectedworker_s, reg_fwd_assignment_r));
+    let forwarder_task = task::spawn(forwarder(args.clone(), fwd_reg_connectedworker_s, reg_fwd_assignment_r));
+    info!("started forwarder task, waiting for started message");
+    loop {
+        let start_msg = fwd_reg_connectedworker_r.next().await;
+        info!("forwarder notified {:?}", start_msg);
+        match start_msg {
+            Some(ForwarderEvent::Started{}) => {
+                info!("forwarder started");
+                break;
+            },
+            _ => {
+                info!("letting forwarder task start a second longer");
+                task::sleep(Duration::from_micros(1000_000)).await;
+            }
+        };
+    }
 
-    info!("letting forwarder task start");
-    task::sleep(Duration::from_micros(1000_000)).await;
     info!("resume registerer");
 
     let mut lastid: String = "0".to_string();
@@ -69,24 +83,29 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
     }
 
     let mut pending_uuid: Option<Uuid> = None;
+    let mut last_config_upload = Instant::now();
+    let mut fast_publish = false;
+    let opts = StreamReadOptions::default().block(100);
+    let configkey = format!("dranspose:ingester:{}:config", name);
 
     loop {
 
-        let config = serde_json::to_string(&state).unwrap();
-        debug!("{}", &config);
-        let configkey = format!("dranspose:ingester:{}:config", name);
-        let _ : () = con.set_ex(&configkey, &config, 10).await.unwrap();
-
-        let opts = StreamReadOptions::default().block(6000);
+        if last_config_upload.elapsed().as_secs() > 6 || fast_publish {
+            let config = serde_json::to_string(&state).unwrap();
+            debug!("{}", &config);
+            let _: () = con.set_ex(&configkey, &config, 10).await.unwrap();
+            last_config_upload = Instant::now();
+            fast_publish = false;
+        }
         let ids = vec![lastid.clone(), lastev.clone()];
 
         let assignedkey = format!("dranspose:assigned:{}", state.mapping_uuid.unwrap_or(Uuid::default()).to_string());
 
         let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
-        debug!("register select");
+        trace!("register select");
         select! {
             update_msgs = con.xread_options::<&str, String, StreamReadReply>(&keylist, &ids, &opts).fuse() => {
-                debug!("raw redis message {:?}", update_msgs);
+                trace!("raw redis message {:?}", update_msgs);
                 if let Ok(update_msgs) = update_msgs {
                     if let Some(key) = update_msgs.keys.iter().find(|&x| x.key == "dranspose:controller:updates") {
                         lastid = key.ids.last().unwrap().id.clone();
@@ -94,6 +113,13 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
                         let update_str: String = from_redis_value(data.get("data").unwrap()).expect("msg");
                         let update: ControllerUpdate = serde_json::from_str(&update_str).expect("msg");
                         info!("got update {:?}", update);
+                        if update.target_parameters_hash != None {
+                            if update.target_parameters_hash != state.parameters_hash {
+                                info!("discarding parameters in rust but updating hash {:?}", update.target_parameters_hash);
+                                state.parameters_hash = update.target_parameters_hash.clone();
+                                fast_publish = true;
+                            }
+                        }
                         if Some(update.mapping_uuid) != state.mapping_uuid {
                             //state.mapping_uuid = Some(update.mapping_uuid);
                             info!("resetting config to {}", update.mapping_uuid);
@@ -117,9 +143,15 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
                             let assignments: Vec<WorkAssignment> = serde_json::from_str(&update_str).expect("marshall not work");
                             debug!("got assignments {:?}", assignments);
                             for assignment in assignments.iter() {
-                                debug!("send assign");
-                                reg_fwd_assignment_s.send(QueueWorkAssignment::WorkAssignment{assignment: assignment.clone()}).await.expect("cannot send");
-                                debug!("sent assign")
+
+                                if assignment.assignments.get(&args.stream) != None {
+                                    debug!("send assign");
+                                    reg_fwd_assignment_s.send(QueueWorkAssignment::WorkAssignment{assignment: assignment.clone()}).await.expect("cannot send");
+                                    debug!("sent assign");
+                                    }
+                                else{
+                                    debug!("assignment does not include our stream")
+                                }
                             }
                             lastev = upd.id.clone();
                         }
@@ -134,6 +166,7 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
                     match cw {
                         ForwarderEvent::ConnectedWorker{connected_worker} => {
                             state.connected_workers.insert(connected_worker.service_uuid, connected_worker);
+                            fast_publish = true;
                         },
                         ForwarderEvent::Ready {mapping_uuid}  => {
                             info!("forwarder is ready, change state");
@@ -141,9 +174,13 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
                                 assert_eq!(new_uuid, mapping_uuid) ;
                                 state.mapping_uuid = Some(new_uuid);
                                 pending_uuid = None;
+                                fast_publish = true;
                             }
 
                         }
+                        ForwarderEvent::Started {} => {
+                            warn!("got another started event");
+                        },
                     };
                 }
                 else {
@@ -156,10 +193,11 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
                     match signal {
                         SIGTERM | SIGINT | SIGQUIT => {
                             // Shutdown the system;
-                            info!("signal received");
+                            info!("signal received, delete config");
                             let _: () = con.del(&configkey).await.expect("cannot delete config");
-                            info!("deleted config, terminate");
+                            info!("deleted redis key, notify forwarder");
                             reg_fwd_assignment_s.send(QueueWorkAssignment::Terminate {}).await.expect("cannot terminate");
+                            info!("terminate");
                             break;
                         },
                         _ => unreachable!(),

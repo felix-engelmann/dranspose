@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 use std::time::Instant;
 use std::vec::IntoIter;
-use async_zmq::{Message, MultipartIter, Router, SinkExt, StreamExt};
+use async_zmq::{Context, Message, MultipartIter, Router, StreamExt};
+use futures_util::sink::SinkExt;
 use futures::channel::mpsc;
 use futures::select;
 use log::{debug, info};
@@ -19,19 +20,29 @@ use futures::{
 use std::ops::{Deref};
 
 pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<ForwarderEvent>, mut assignment_r: mpsc::Receiver<QueueWorkAssignment>) -> async_zmq::Result<()> {
+    info!("started forwarder");
     let url = Url::parse(&args.ingester_url).expect("unparsable url");
 
     let listenurl = format!("tcp://*:{}", url.port().unwrap());
 
-    let mut router: Router<IntoIter<Message>, Message> = async_zmq::router(&listenurl)?.bind()?;
+    let context = Context::new();
 
-    let mut pull = async_zmq::pull(&args.upstream_url)?.connect()?;
+    let mut routersock: Router<IntoIter<Message>, Message> = async_zmq::router(&listenurl)?.with_context(&context).bind()?;
+    routersock.as_raw_socket().set_router_mandatory(true).expect("cannot set mandatory");
+    info!("connected router socket to {}", &listenurl);
+
+    let mut pullsock = async_zmq::pull(&args.upstream_url)?.with_context(&context).connect()?;
+    pullsock.as_raw_socket().set_linger(0).expect("no linger");
+    info!("connected pull socket to {}", &args.upstream_url);
 
     let mut asbuf: VecDeque<WorkAssignment> = VecDeque::new();
     let mut pkbuf: VecDeque<TimedMultipart> = VecDeque::new();
 
     let mut no_events = 0;
     let mut starttime = Instant::now();
+
+    forwarder_events_s.send(ForwarderEvent::Started {}).await.expect("cannot send started message");
+
     loop {
         debug!("forwarder looped");
 
@@ -52,7 +63,9 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
 
             debug!("header is {}", header.to_string());
             let mymsg = stins;
+            debug!("workerlist is created from assignment {:?}", assignment);
             let workerlist = assignment.assignments.get(&args.stream).unwrap();
+
             if workerlist.len() == 1 {
                 let w = workerlist.first().unwrap();
                 debug!("send event data to worker {:?}", w);
@@ -60,7 +73,7 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
                                        Message::from(&header.to_string()) ];
                 payload.extend(mymsg);
 
-                router.send(MultipartIter::from(payload)
+                routersock.send(MultipartIter::from(payload)
                 ).await.expect("unable to send");
                 debug!("sending took {} microsec", timed.received.elapsed().as_micros());
             }
@@ -73,7 +86,7 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
                                            Message::from(&header.to_string())];
                     payload.extend(msgcopy);
 
-                    router.send(MultipartIter::from(payload)
+                    routersock.send(MultipartIter::from(payload)
                     ).await.expect("unable to send");
                 }
             }
@@ -114,7 +127,7 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
                     }
                 };
             },
-            msg = pull.next().fuse() => {
+            msg = pullsock.next().fuse() => {
                 if let Some(data) = msg {
                     let stins: Vec<Message> = data?;
                     debug!("got from pull {:?}", stins[0].as_str().unwrap());
@@ -122,7 +135,7 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
                     pkbuf.push_front(TimedMultipart{multipart: stins, received:now});
                 }
             },
-            msg = router.next().fuse() => {
+            msg = routersock.next().fuse() => {
                 if let Some(msg) = msg {
                     let data = msg?;
                     let start = SystemTime::now();
@@ -148,7 +161,8 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
             complete => break,
         };
     }
-
+    info!("closing sockets");
+    routersock.close().await.expect("cannot close router");
     info!("forwarder terminated");
 
     Ok(())

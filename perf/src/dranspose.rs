@@ -13,7 +13,7 @@ pub struct ConnectedWorker {
 pub struct IngesterState {
     pub(crate) service_uuid: Uuid,
     pub mapping_uuid: Option<Uuid>,
-    pub parameters_hash: Option<u8>,
+    pub parameters_hash: Option<String>,
     pub processed_events: u64,
     pub event_rate: f32,
     pub(crate) name: String,
@@ -26,6 +26,7 @@ pub struct IngesterState {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ControllerUpdate {
     pub mapping_uuid: Uuid,
+    pub target_parameters_hash: Option<String>,
     pub finished: bool,
 }
 

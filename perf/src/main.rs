@@ -18,7 +18,6 @@ use crate::control_plane::register;
 
 use env_logger::Env;
 
-
 #[derive(Serialize, Deserialize)]
 struct Stream1Packet {
     htype: String,
@@ -34,7 +33,7 @@ struct TimedMultipart {
 
 
 
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 struct Cli {
     #[clap(default_value_t = String::from("eiger"))]
     stream: String,
@@ -64,6 +63,11 @@ async fn main() -> Result<()> {
     let client = redis::Client::open("redis://127.0.0.1/").unwrap();
     let con = client.get_multiplexed_async_connection().await.unwrap();
 
+    /*info!("setting key");
+    let _: () = con.set_ex("testkey", "balub value", 10).await.expect("set key");
+    info!("key set");
+    let _:() = con.del("testkey").await.expect("delkey");
+    info!("key deleted");*/
     register(con, args, signals).await.expect("main task");
 
     handle.close();
