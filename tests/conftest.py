@@ -90,10 +90,11 @@ class ExternalDistributed:
     log_task: Task
 
     async def stop(self) -> None:
-        logging.warning("stopping log task")
-        self.log_task.cancel()
         logging.warning("stopping process")
         self.process.terminate()
+        await self.process.wait()
+        logging.warning("stopping log task")
+        self.log_task.cancel()
 
 
 @pytest_asyncio.fixture
@@ -133,15 +134,22 @@ async def create_ingester(
 ) -> AsyncIterator[Callable[[Ingester], Coroutine[None, None, Ingester]]]:
     ingesters: list[AsyncDistributed | ProcessDistributed | ExternalDistributed] = []
 
-    async def forward_output(proc, settings):
+    async def forward_pipe(out, settings):
         while True:
             try:
-                data = await proc.stdout.readline()
+                data = await out.readline()
                 line = data.decode("ascii").rstrip()
                 if len(line) > 0:
-                    logging.warning("rust_%s: %s", settings.ingester_streams[0], line)
+                    fn = logging.error
+                    parts = line.split("]")
+                    if len(parts) > 1:
+                        if "INFO" in parts[0]:
+                            fn = logging.info
+                        elif "DEBUG" in parts[0]:
+                            fn = logging.debug
+                        # line = "]".join(parts[1:])
+                    fn("rust_%s: %s", settings.ingester_streams[0], line)
                 else:
-                    logging.error("rust output line 0")
                     break
             except Exception as e:
                 logging.error("outputing broke %s", e.__repr__())
@@ -161,7 +169,10 @@ async def create_ingester(
                     stderr=asyncio.subprocess.PIPE,
                 )
                 output = asyncio.create_task(
-                    forward_output(proc, inst._streaming_single_settings)
+                    forward_pipe(proc.stdout, inst._streaming_single_settings)
+                )
+                output = asyncio.create_task(
+                    forward_pipe(proc.stderr, inst._streaming_single_settings)
                 )
                 ingesters.append(
                     ExternalDistributed(instance=inst, process=proc, log_task=output)

@@ -51,7 +51,9 @@ async def test_simple(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
+        while {"eiger"} - set(state.get_streams()) != set() or {"w1"} - set(
+            state.get_workers()
+        ) != set():
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
