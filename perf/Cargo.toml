@@ -1,5 +1,5 @@
 [package]
-name = "fast-ingester"
+name = "fast_ingester"
 version = "0.1.0"
 edition = "2021"
 
