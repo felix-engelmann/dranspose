@@ -29,6 +29,7 @@ import redis.asyncio as redis
 from dranspose.worker import Worker
 
 
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
 @pytest.mark.asyncio
 async def test_dump(
     controller: None,
