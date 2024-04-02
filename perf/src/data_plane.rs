@@ -1,25 +1,29 @@
-use std::collections::VecDeque;
-use std::time::Instant;
-use std::vec::IntoIter;
+use crate::control_plane::{ForwarderEvent, QueueWorkAssignment};
+use crate::dranspose::{ConnectedWorker, WorkAssignment};
+use crate::{Cli, TimedMultipart};
 use async_zmq::{Context, Message, MultipartIter, Router, StreamExt};
-use futures_util::sink::SinkExt;
 use futures::channel::mpsc;
 use futures::select;
+use futures_util::sink::SinkExt;
 use log::{debug, info};
 use serde_json::json;
-use uuid::Uuid;
-use url::Url;
-use crate::{Cli, TimedMultipart};
-use crate::dranspose::{WorkAssignment, ConnectedWorker};
+use std::collections::VecDeque;
+use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::control_plane::{ForwarderEvent, QueueWorkAssignment};
+use std::vec::IntoIter;
+use url::Url;
+use uuid::Uuid;
 
 use futures::{
     future::FutureExt, // for `.fuse()`
 };
-use std::ops::{Deref};
+use std::ops::Deref;
 
-pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<ForwarderEvent>, mut assignment_r: mpsc::Receiver<QueueWorkAssignment>) -> async_zmq::Result<()> {
+pub(crate) async fn forwarder(
+    args: Cli,
+    mut forwarder_events_s: mpsc::Sender<ForwarderEvent>,
+    mut assignment_r: mpsc::Receiver<QueueWorkAssignment>,
+) -> async_zmq::Result<()> {
     info!("started forwarder");
     let url = Url::parse(&args.ingester_url).expect("unparsable url");
 
@@ -27,11 +31,18 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
 
     let context = Context::new();
 
-    let mut routersock: Router<IntoIter<Message>, Message> = async_zmq::router(&listenurl)?.with_context(&context).bind()?;
-    routersock.as_raw_socket().set_router_mandatory(true).expect("cannot set mandatory");
+    let mut routersock: Router<IntoIter<Message>, Message> = async_zmq::router(&listenurl)?
+        .with_context(&context)
+        .bind()?;
+    routersock
+        .as_raw_socket()
+        .set_router_mandatory(true)
+        .expect("cannot set mandatory");
     info!("connected router socket to {}", &listenurl);
 
-    let mut pullsock = async_zmq::pull(&args.upstream_url)?.with_context(&context).connect()?;
+    let mut pullsock = async_zmq::pull(&args.upstream_url)?
+        .with_context(&context)
+        .connect()?;
     pullsock.as_raw_socket().set_linger(0).expect("no linger");
     info!("connected pull socket to {}", &args.upstream_url);
 
@@ -41,14 +52,15 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
     let mut no_events = 0;
     let mut starttime = Instant::now();
 
-    forwarder_events_s.send(ForwarderEvent::Started {}).await.expect("cannot send started message");
+    forwarder_events_s
+        .send(ForwarderEvent::Started {})
+        .await
+        .expect("cannot send started message");
 
     loop {
         debug!("forwarder looped");
 
-
         while asbuf.len() > 0 && pkbuf.len() > 0 {
-
             let assignment = asbuf.pop_back().unwrap();
             let timed = pkbuf.pop_back().unwrap();
             let stins = timed.multipart;
@@ -69,34 +81,50 @@ pub(crate) async fn forwarder(args: Cli, mut forwarder_events_s: mpsc::Sender<Fo
             if workerlist.len() == 1 {
                 let w = workerlist.first().unwrap();
                 debug!("send event data to worker {:?}", w);
-                let mut payload = vec![Message::from(w),
-                                       Message::from(&header.to_string()) ];
+                let mut payload = vec![Message::from(w), Message::from(&header.to_string())];
                 payload.extend(mymsg);
 
-                routersock.send(MultipartIter::from(payload)
-                ).await.expect("unable to send");
-                debug!("sending took {} microsec", timed.received.elapsed().as_micros());
-            }
-            else{
+                routersock
+                    .send(MultipartIter::from(payload))
+                    .await
+                    .expect("unable to send");
+                debug!(
+                    "sending took {} microsec",
+                    timed.received.elapsed().as_micros()
+                );
+            } else {
                 //needs copyingg
                 for w in workerlist {
                     debug!("copy message to worker {:?}", w);
-                    let msgcopy: Vec<Message> = mymsg.iter().map(|m| Message::from(m.to_vec().clone())).collect();
-                    let mut payload = vec![Message::from(w),
-                                           Message::from(&header.to_string())];
+                    let msgcopy: Vec<Message> = mymsg
+                        .iter()
+                        .map(|m| Message::from(m.to_vec().clone()))
+                        .collect();
+                    let mut payload = vec![Message::from(w), Message::from(&header.to_string())];
                     payload.extend(msgcopy);
 
-                    routersock.send(MultipartIter::from(payload)
-                    ).await.expect("unable to send");
+                    routersock
+                        .send(MultipartIter::from(payload))
+                        .await
+                        .expect("unable to send");
                 }
             }
-            no_events+=1;
-            if no_events%1000==999 {
+            no_events += 1;
+            if no_events % 1000 == 999 {
                 let micros = starttime.elapsed().as_micros();
-                info!("{} to {} packets in {} microsecs = {} p/s", no_events-1000, no_events, micros, 1000000000/micros);
+                info!(
+                    "{} to {} packets in {} microsecs = {} p/s",
+                    no_events - 1000,
+                    no_events,
+                    micros,
+                    1000000000 / micros
+                );
                 starttime = Instant::now();
             }
-            debug!("finished sending out assignment to workers {:?}", assignment);
+            debug!(
+                "finished sending out assignment to workers {:?}",
+                assignment
+            );
         }
         /*if pkbuf.len() > 0 {
             println!("waiting for assignments");

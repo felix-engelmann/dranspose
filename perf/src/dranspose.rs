@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -30,10 +30,8 @@ pub struct ControllerUpdate {
     pub finished: bool,
 }
 
-
-
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct WorkAssignment{
+pub struct WorkAssignment {
     pub event_number: u64,
-    pub assignments: HashMap<String, Vec<String>>
+    pub assignments: HashMap<String, Vec<String>>,
 }

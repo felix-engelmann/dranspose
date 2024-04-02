@@ -1,68 +1,65 @@
-use std::time::{Duration, Instant};
+use crate::data_plane::forwarder;
+use crate::dranspose::{ConnectedWorker, ControllerUpdate, IngesterState, WorkAssignment};
+use crate::Cli;
 use async_std::task;
 use async_zmq::SinkExt;
 use futures::channel::mpsc;
-use futures::{select, StreamExt,future::FutureExt};
+use futures::{future::FutureExt, select, StreamExt};
 use log::{debug, info, trace, warn};
 use redis::aio::MultiplexedConnection;
-use redis::{AsyncCommands, from_redis_value};
 use redis::streams::{StreamRangeReply, StreamReadOptions, StreamReadReply};
-use signal_hook_async_std::Signals;
-use uuid::Uuid;
-use crate::{Cli};
-use crate::data_plane::forwarder;
-use crate::dranspose::{ConnectedWorker, ControllerUpdate, IngesterState, WorkAssignment};
+use redis::{from_redis_value, AsyncCommands};
 use serde_json::json;
 use signal_hook::consts::signal::*;
-
+use signal_hook_async_std::Signals;
+use std::time::{Duration, Instant};
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub(crate) enum ForwarderEvent {
-    ConnectedWorker {
-        connected_worker: ConnectedWorker,
-    },
-    Ready{
-        mapping_uuid: Uuid
-    },
-    Started{},
+    ConnectedWorker { connected_worker: ConnectedWorker },
+    Ready { mapping_uuid: Uuid },
+    Started {},
 }
-
 
 #[derive(Debug)]
 pub(crate) enum QueueWorkAssignment {
-    Start {
-        mapping_uuid: Uuid,
-    },
-    WorkAssignment{
-        assignment: WorkAssignment
-    },
+    Start { mapping_uuid: Uuid },
+    WorkAssignment { assignment: WorkAssignment },
     Terminate {},
 }
 
-
-
-pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut signals: Signals) -> redis::RedisResult<()> {
+pub(crate) async fn register(
+    mut con: MultiplexedConnection,
+    args: Cli,
+    mut signals: Signals,
+) -> redis::RedisResult<()> {
     let name = format!("rust-{}-ingester", args.stream);
-    let mut state = IngesterState{ service_uuid: Uuid::new_v4(),
+    let mut state = IngesterState {
+        service_uuid: Uuid::new_v4(),
         name: name.clone(),
         url: args.ingester_url.clone(),
         streams: vec![args.stream.clone()],
-        ..IngesterState::default()};
-
+        ..IngesterState::default()
+    };
 
     let (fwd_reg_connectedworker_s, mut fwd_reg_connectedworker_r) = mpsc::channel(1000);
     let (mut reg_fwd_assignment_s, reg_fwd_assignment_r) = mpsc::channel(1000);
 
-    let forwarder_task = task::spawn(forwarder(args.clone(), fwd_reg_connectedworker_s, reg_fwd_assignment_r));
+    let forwarder_task = task::spawn(forwarder(
+        args.clone(),
+        fwd_reg_connectedworker_s,
+        reg_fwd_assignment_r,
+    ));
     info!("started forwarder task, waiting for started message");
     loop {
         let start_msg = fwd_reg_connectedworker_r.next().await;
         info!("forwarder notified {:?}", start_msg);
         match start_msg {
-            Some(ForwarderEvent::Started{}) => {
+            Some(ForwarderEvent::Started {}) => {
                 info!("forwarder started");
                 break;
-            },
+            }
             _ => {
                 info!("letting forwarder task start a second longer");
                 task::sleep(Duration::from_micros(1000_000)).await;
@@ -76,7 +73,10 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
     let mut lastev: String = "0".to_string();
 
     // check if we joined late and discard a lot
-    let latest: StreamRangeReply = con.xrevrange_count("dranspose:controller:updates", "+", "-", 1).await.unwrap();
+    let latest: StreamRangeReply = con
+        .xrevrange_count("dranspose:controller:updates", "+", "-", 1)
+        .await
+        .unwrap();
     info!("latest update, starting from: {:?}", latest);
     if let Some(firstelem) = latest.ids.first() {
         lastid = firstelem.id.clone();
@@ -89,7 +89,6 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
     let configkey = format!("dranspose:ingester:{}:config", name);
 
     loop {
-
         if last_config_upload.elapsed().as_secs() > 6 || fast_publish {
             let config = serde_json::to_string(&state).unwrap();
             debug!("{}", &config);
@@ -99,7 +98,10 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
         }
         let ids = vec![lastid.clone(), lastev.clone()];
 
-        let assignedkey = format!("dranspose:assigned:{}", state.mapping_uuid.unwrap_or(Uuid::default()).to_string());
+        let assignedkey = format!(
+            "dranspose:assigned:{}",
+            state.mapping_uuid.unwrap_or(Uuid::default()).to_string()
+        );
 
         let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
         trace!("register select");
@@ -207,11 +209,11 @@ pub(crate) async fn register(mut con: MultiplexedConnection, args: Cli, mut sign
         };
 
         //
-
-
     }
 
-    forwarder_task.await.expect("forwarder task did not terminate");
+    forwarder_task
+        .await
+        .expect("forwarder task did not terminate");
 
     info!("register terminated");
 
