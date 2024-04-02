@@ -254,6 +254,9 @@ class Controller:
                 for wo in cfg.workers:
                     if wo.parameters_hash != self.parameters_hash:
                         consistent = False
+                for ing in cfg.ingesters:
+                    if ing.parameters_hash != self.parameters_hash:
+                        consistent = False
 
                 if not consistent:
                     logger.info(
@@ -265,6 +268,7 @@ class Controller:
                         parameters_version={
                             n: p.uuid for n, p in self.parameters.items()
                         },
+                        target_parameters_hash=self.parameters_hash,
                     )
                     logger.debug("send consistency update %s", cupd)
                     await self.redis.xadd(

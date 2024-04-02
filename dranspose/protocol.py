@@ -115,6 +115,7 @@ class ProtocolException(Exception):
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
     parameters_version: dict[ParameterName, UUID4]
+    target_parameters_hash: Optional[Digest] = None
     finished: bool = False
 
 
@@ -288,3 +289,6 @@ class EnsembleState(BaseModel):
         ]
 
         return list(ingester_streams.intersection(*worker_streams))
+
+    def get_workers(self) -> list[WorkerName]:
+        return [w.name for w in self.workers]
