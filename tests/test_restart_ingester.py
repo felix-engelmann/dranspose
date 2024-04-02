@@ -27,6 +27,9 @@ import redis.asyncio as redis
 from dranspose.worker import Worker
 
 
+@pytest.mark.skipif(
+    "config.getoption('rust')", reason="rust does not allow deep access"
+)
 @pytest.mark.asyncio
 async def test_restart_ingester(
     controller: None,

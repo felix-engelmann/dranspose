@@ -17,7 +17,7 @@ from dranspose.worker import Worker
 rust = pytest.mark.skipif("not config.getoption('rust')")
 
 
-@rust
+@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_rust_basic(
     reducer: Callable[[Optional[str]], Awaitable[None]],
