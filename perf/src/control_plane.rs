@@ -12,7 +12,7 @@ use redis::{from_redis_value, AsyncCommands};
 use serde_json::json;
 use signal_hook::consts::signal::*;
 use signal_hook_async_std::Signals;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -167,7 +167,14 @@ pub(crate) async fn register(
                 if let Some(cw) = cw {
                     match cw {
                         ForwarderEvent::ConnectedWorker{connected_worker} => {
+                            let start = SystemTime::now();
+                            let since_the_epoch = start
+                                .duration_since(UNIX_EPOCH)
+                                .expect("Time went backwards");
+                            let now = since_the_epoch.as_millis() as f64/1000f64;
+
                             state.connected_workers.insert(connected_worker.service_uuid, connected_worker);
+                            state.connected_workers.retain(|_, v| now-v.last_seen < 3.0);
                             fast_publish = true;
                         },
                         ForwarderEvent::Ready {mapping_uuid}  => {
