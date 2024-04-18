@@ -28,12 +28,14 @@ struct TimedMultipart {
 
 #[derive(Parser, Clone)]
 struct Cli {
-    #[clap(default_value_t = String::from("eiger"))]
+    #[clap(short, long, default_value_t = String::from("eiger"))]
     stream: String,
-    #[clap(default_value_t = String::from("tcp://localhost:9999"))]
+    #[clap(short, long, default_value_t = String::from("tcp://localhost:9999"))]
     upstream_url: String,
-    #[clap(default_value_t = String::from("tcp://localhost:10000"))]
+    #[clap(short, long, default_value_t = String::from("tcp://localhost:10000"))]
     ingester_url: String,
+    #[clap(short, long, default_value_t = String::from("redis://127.0.0.1/"))]
+    redis_url: String,
 }
 
 #[async_std::main]
@@ -51,7 +53,7 @@ async fn main() -> Result<()> {
         args.stream, args.ingester_url, args.upstream_url
     );
 
-    let client = redis::Client::open("redis://127.0.0.1/").unwrap();
+    let client = redis::Client::open(args.redis_url.clone()).unwrap();
     let con = client.get_multiplexed_async_connection().await.unwrap();
 
     /*info!("setting key");

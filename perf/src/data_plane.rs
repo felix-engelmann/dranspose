@@ -25,7 +25,7 @@ pub(crate) async fn forwarder(
     mut assignment_r: mpsc::Receiver<QueueWorkAssignment>,
 ) -> async_zmq::Result<()> {
     info!("started forwarder");
-    let url = Url::parse(&args.ingester_url).expect("unparsable url");
+    let url = Url::parse(&args.ingester_url).expect("unparsable ingester url");
 
     let listenurl = format!("tcp://*:{}", url.port().unwrap());
 
