@@ -4,7 +4,6 @@ mod dranspose;
 
 use async_zmq::{Message, Result};
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 use log::info;
@@ -15,11 +14,6 @@ use crate::control_plane::register;
 
 use env_logger::Env;
 
-#[derive(Serialize, Deserialize)]
-struct Stream1Packet {
-    htype: String,
-    msg_number: u64,
-}
 
 struct TimedMultipart {
     multipart: Vec<Message>,

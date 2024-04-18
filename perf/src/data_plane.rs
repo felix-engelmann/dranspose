@@ -18,6 +18,20 @@ use futures::{
     future::FutureExt, // for `.fuse()`
 };
 use std::ops::Deref;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, PartialEq, Eq)]
+enum ScanState {
+    Discard,
+    Armed,
+    Running,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Stream1Packet {
+    htype: String,
+    msg_number: u64,
+}
 
 pub(crate) async fn forwarder(
     args: Cli,
@@ -51,6 +65,8 @@ pub(crate) async fn forwarder(
 
     let mut no_events = 0;
     let mut starttime = Instant::now();
+
+    let mut instate = ScanState::Discard;
 
     forwarder_events_s
         .send(ForwarderEvent::Started {})
@@ -138,16 +154,18 @@ pub(crate) async fn forwarder(
                         info!("got start {:?}", mapping_uuid);
                         asbuf = VecDeque::new();
                         pkbuf = VecDeque::new();
+                        instate = ScanState::Armed;
                         forwarder_events_s.send(ForwarderEvent::Ready{mapping_uuid}).await.expect("must be able to ready");
                         info!("ready sent from fwd");
                     },
                     Some(QueueWorkAssignment::WorkAssignment {assignment}) => {
-                        debug!{"received wa {:?}", assignment};
+                        debug!("got assignment");
+                        debug!("received wa {:?}", assignment);
                         asbuf.push_front(assignment);
                     },
                     Some(QueueWorkAssignment::Terminate{}) => {
-                        info!{"to terminate"}
-                        break
+                        info!("to terminate");
+                        break;
                     },
                     None => {
                         info!("control message was none");
@@ -158,9 +176,23 @@ pub(crate) async fn forwarder(
             msg = pullsock.next().fuse() => {
                 if let Some(data) = msg {
                     let stins: Vec<Message> = data?;
-                    debug!("got from pull {:?}", stins[0].as_str().unwrap());
-                    let now = Instant::now();
-                    pkbuf.push_front(TimedMultipart{multipart: stins, received:now});
+                    debug!("got from pull {:?}", stins[0]);
+                    let first_part = stins[0].as_str();
+                    if let Some(header_string) = first_part {
+                        let update: serde_json::Result<Stream1Packet> = serde_json::from_str(&header_string);
+                        if let Ok(header) = update {
+                            if header.htype == "header" && instate == ScanState::Armed {
+                                instate = ScanState::Running;
+                            }
+                            if instate == ScanState::Running {
+                                let now = Instant::now();
+                                pkbuf.push_front(TimedMultipart{multipart: stins, received:now});
+                            }
+                            if header.htype == "series_end" {
+                                instate = ScanState::Discard;
+                            }
+                        }
+                    }
                 }
             },
             msg = routersock.next().fuse() => {
