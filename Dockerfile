@@ -5,15 +5,15 @@ RUN USER=root cargo new --bin fast_ingester
 WORKDIR /fast_ingester
 
 # copy over your manifests
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./Cargo.toml ./Cargo.toml
+COPY ./perf/Cargo.lock ./Cargo.lock
+COPY ./perf/Cargo.toml ./Cargo.toml
 
 # this build step will cache your dependencies
 RUN cargo build --release
 RUN rm src/*.rs
 
 # copy your source tree
-COPY ./src ./src
+COPY ./perf/src ./src
 
 # build for release
 RUN rm ./target/release/deps/fast_ingester*
