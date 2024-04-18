@@ -161,9 +161,12 @@ async def create_ingester(
             if isinstance(inst, ZmqPullSingleIngester):
                 logging.warning("ues settings %s", inst._streaming_single_settings)
                 proc = await asyncio.create_subprocess_exec(
-                    "./perf/target/debug/perf",
+                    "./perf/target/debug/fast_ingester",
+                    "--stream",
                     inst._streaming_single_settings.ingester_streams[0],
+                    "--upstream-url",
                     str(inst._streaming_single_settings.upstream_url),
+                    "--ingester-url",
                     str(inst._streaming_single_settings.ingester_url),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -454,14 +457,17 @@ async def time_beacon() -> Callable[
     [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
 ]:
     async def _make_time(
-        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1
+        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1, flags=0
     ) -> None:
         sout = ctx.socket(zmq.PUSH)
         sout.bind(f"tcp://*:{port}")
         start = time.perf_counter()
         for i in range(nframes):
             data = struct.pack(">d", time.perf_counter())
-            await sout.send(data)
+            try:
+                await sout.send(data, flags=flags)
+            except zmq.Again:
+                pass
             if frame_time is not None:
                 await asyncio.sleep(frame_time)
             if i % 1000 == 0:
@@ -472,6 +478,7 @@ async def time_beacon() -> Callable[
                     1000 / (end - start),
                 )
                 start = end
+        sout.close(linger=0)
 
     return _make_time
 
