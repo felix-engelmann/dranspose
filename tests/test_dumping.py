@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import pickle
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
@@ -91,16 +92,16 @@ async def test_dump(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
-        print("content", state.ingesters)
+        logging.debug("content %s", state)
         while {"eiger", "orca", "alba", "slow"} - set(state.get_streams()) != set():
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        print("startup done")
+        logging.info("startup done")
 
         p_prefix = tmp_path / "dump_"
-        print(p_prefix, str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/dump_prefix",
