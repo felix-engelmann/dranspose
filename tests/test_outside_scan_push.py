@@ -67,7 +67,7 @@ async def test_outside(
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
-        await time_beacon(context, 9999, 5, flags=zmq.NOBLOCK)
+        await time_beacon(context, 9999, 5, flags=zmq.NOBLOCK)  # type: ignore[call-arg]
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",

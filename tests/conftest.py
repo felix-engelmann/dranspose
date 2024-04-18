@@ -23,6 +23,7 @@ import numpy as np
 import pytest_asyncio
 import uvicorn
 import zmq
+from _pytest.fixtures import FixtureRequest
 from fastapi import FastAPI
 from pydantic import HttpUrl
 from pydantic_core import Url
@@ -30,16 +31,18 @@ from pydantic_core import Url
 from dranspose.controller import app
 from dranspose.distributed import DistributedService
 from dranspose.helpers.utils import cancel_and_wait
-from dranspose.ingester import Ingester
-from dranspose.ingesters import ZmqPullSingleIngester
+from dranspose.ingester import Ingester, IngesterSettings
+from dranspose.ingesters.zmqpull_single import ZmqPullSingleIngester
 from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
 from tests.stream1 import AcquisitionSocket
 
+from pytest import Parser
 
-def pytest_addoption(parser):
+
+def pytest_addoption(parser: Parser) -> None:
     parser.addoption(
         "--rust",
         action="store_true",
@@ -87,7 +90,7 @@ class ProcessDistributed:
 class ExternalDistributed:
     instance: DistributedService
     process: asyncio.subprocess.Process
-    log_task: Task
+    log_task: Task[Any]
 
     async def stop(self) -> None:
         logging.warning("stopping process")
@@ -130,11 +133,15 @@ async def create_worker() -> AsyncIterator[
 
 @pytest_asyncio.fixture
 async def create_ingester(
-    request,
+    request: FixtureRequest,
 ) -> AsyncIterator[Callable[[Ingester], Coroutine[None, None, Ingester]]]:
     ingesters: list[AsyncDistributed | ProcessDistributed | ExternalDistributed] = []
 
-    async def forward_pipe(out, settings):
+    async def forward_pipe(
+        out: StreamReader | None, settings: IngesterSettings
+    ) -> None:
+        if out is None:
+            return
         while True:
             try:
                 data = await out.readline()
@@ -457,7 +464,11 @@ async def time_beacon() -> Callable[
     [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
 ]:
     async def _make_time(
-        ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1, flags=0
+        ctx: zmq.Context[Any],
+        port: int,
+        nframes: int,
+        frame_time: float = 0.1,
+        flags: int = 0,
     ) -> None:
         sout = ctx.socket(zmq.PUSH)
         sout.bind(f"tcp://*:{port}")
