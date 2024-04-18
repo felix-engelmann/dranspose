@@ -148,6 +148,8 @@ class Mapping:
             assign = v[no]
             if assign is None:
                 continue
+            if len(assign) == 0:
+                ret[s] = set()
             for i, vw in enumerate(assign):
                 if vw.constraint is None:  # get from all
                     ret[s].update(self.all_assignments[(no, s, i)])

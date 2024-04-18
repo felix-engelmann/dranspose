@@ -82,7 +82,48 @@ def test_discard() -> None:
 
     assign = m.get_event_workers(EventNumber(8))
     print("assign is", assign)
+    assert assign.assignments == {"test": []}
+
+
+def test_partial_discard() -> None:
+    ntrig = 10
+    m = Mapping(
+        {
+            StreamName("test"): [
+                [VirtualWorker(constraint=VirtualConstraint(i))]
+                if i < 2 or i > 7
+                else []
+                if i < 5
+                else None
+                for i in range(ntrig)
+            ]
+        },
+        add_start_end=False,
+    )
+
+    m.print()
+    all_workers = [
+        WorkerState(name=WorkerName("w1")),
+        WorkerState(name=WorkerName("w2")),
+    ]
+    r = m.assign_next(all_workers[0], all_workers)
+    print(r)
+    r = m.assign_next(all_workers[1], all_workers)
+    print(r)
+    r = m.assign_next(all_workers[0], all_workers)
+    print(r)
+
+    m.print()
+    print("completed", m.complete_events)
+
+    # m.assign_next(all_workers[0], all_workers)
+
+    assign = m.get_event_workers(EventNumber(4))
+    assert assign.assignments == {"test": []}
+    assign = m.get_event_workers(EventNumber(6))
     assert assign.assignments == {}
+    assign = m.get_event_workers(EventNumber(8))
+    assert assign.assignments == {"test": ["w1"]}
 
 
 def test_discard_only_one() -> None:
