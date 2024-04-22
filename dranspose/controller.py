@@ -409,6 +409,7 @@ class Controller:
                 )
                 if RedisKeys.ready(self.mapping.uuid) in workers:
                     for ready in workers[RedisKeys.ready(self.mapping.uuid)][0]:
+                        logger.debug("got ready raw data: %s", ready)
                         update = DistributedUpdate.validate_json(ready[1]["data"])
                         if isinstance(update, WorkerUpdate):
                             await self._process_worker_update(update)
