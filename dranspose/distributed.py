@@ -2,6 +2,7 @@ import abc
 import logging
 import time
 from typing import Optional, Any
+from importlib.metadata import version
 
 import redis.asyncio as redis
 from pydantic import UUID4, AliasChoices, Field, RedisDsn
@@ -63,6 +64,8 @@ class DistributedService(abc.ABC):
             f"{self._distributed_settings.redis_dsn}?protocol=3"
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
+        self.state.dranspose_version = version("dranspose")
+        self._logger.info("running version %s", self.state.dranspose_version)
         self.parameters: dict[ParameterName, WorkParameter] = {}
 
     def get_category(self) -> str:

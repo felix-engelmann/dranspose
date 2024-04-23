@@ -248,6 +248,7 @@ DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate | IngesterUpdate)
 class DistributedState(BaseModel):
     service_uuid: UUID4 = Field(default_factory=uuid.uuid4)
     mapping_uuid: Optional[UUID4] = None
+    dranspose_version: Optional[str] = None
     parameters_hash: Optional[Digest] = None
     processed_events: int = 0
     event_rate: float = 0.0
