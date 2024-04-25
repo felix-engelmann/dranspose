@@ -1,3 +1,4 @@
+import datetime
 import time
 import uuid
 from enum import Enum
@@ -245,10 +246,18 @@ DistributedUpdateType = WorkerUpdate | ReducerUpdate | IngesterUpdate
 DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate | IngesterUpdate)
 
 
+class BuildGitMeta(BaseModel):
+    commit_hash: Digest
+    branch_name: str
+    timestamp: datetime.datetime
+    repository_url: Url
+
+
 class DistributedState(BaseModel):
     service_uuid: UUID4 = Field(default_factory=uuid.uuid4)
     mapping_uuid: Optional[UUID4] = None
     dranspose_version: Optional[str] = None
+    mapreduce_version: Optional[BuildGitMeta] = None
     parameters_hash: Optional[Digest] = None
     processed_events: int = 0
     event_rate: float = 0.0

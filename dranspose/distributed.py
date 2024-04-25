@@ -1,5 +1,6 @@
 import abc
 import logging
+import os
 import time
 from typing import Optional, Any
 from importlib.metadata import version
@@ -19,6 +20,7 @@ from dranspose.protocol import (
     ReducerState,
     ParameterName,
     WorkParameter,
+    BuildGitMeta,
 )
 import redis.exceptions as rexceptions
 import asyncio
@@ -36,6 +38,8 @@ class DistributedSettings(BaseSettings):
         Url("redis://localhost:6379/0"),
         validation_alias=AliasChoices("service_redis_dsn", "redis_url"),
     )
+
+    build_meta_file: Optional[os.PathLike[Any] | str] = "/etc/build_git_meta.json"
 
 
 class DistributedService(abc.ABC):
@@ -64,6 +68,13 @@ class DistributedService(abc.ABC):
             f"{self._distributed_settings.redis_dsn}?protocol=3"
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
+        try:
+            with open(self._distributed_settings.build_meta_file) as fd:
+                build_data = BuildGitMeta.model_validate_json(fd.read())
+                self._logger.info("build meta is %s", build_data)
+                self.state.mapreduce_version = build_data
+        except Exception as e:
+            logging.info("cannot load build meta information: %s", e.__repr__())
         self.state.dranspose_version = version("dranspose")
         self._logger.info("running version %s", self.state.dranspose_version)
         self.parameters: dict[ParameterName, WorkParameter] = {}

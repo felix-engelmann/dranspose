@@ -41,6 +41,8 @@ from tests.stream1 import AcquisitionSocket
 
 from pytest import Parser
 
+os.environ["BUILD_META_FILE"] = "tests/data/build_git_meta.json"
+
 
 def pytest_addoption(parser: Parser) -> None:
     parser.addoption(
