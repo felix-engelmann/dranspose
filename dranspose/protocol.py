@@ -291,6 +291,7 @@ class EnsembleState(BaseModel):
     ingesters: list[IngesterState]
     workers: list[WorkerState]
     reducer: Optional[ReducerState]
+    controller_version: Optional[str] = None
 
     def get_streams(self) -> list[StreamName]:
         ingester_streams = set([s for i in self.ingesters for s in i.streams])

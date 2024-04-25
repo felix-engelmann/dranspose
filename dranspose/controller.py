@@ -20,6 +20,7 @@ from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_w
 from dranspose.mapping import Mapping
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
+from importlib.metadata import version
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
@@ -120,8 +121,12 @@ class Controller:
         reducer = None
         if reducer_json:
             reducer = ReducerState.model_validate_json(reducer_json)
+        dranspose_version = version("dranspose")
         self.config_cache = EnsembleState(
-            ingesters=ingesters, workers=workers, reducer=reducer
+            ingesters=ingesters,
+            workers=workers,
+            reducer=reducer,
+            controller_version=dranspose_version,
         )
         self.config_fetch_time = time.time()
         return self.config_cache
