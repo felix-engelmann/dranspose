@@ -9,21 +9,26 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 
+class SocketSpec(BaseModel):
+    type: int = zmq.PUSH
+    port: int = 9999
+
+
 class WorkloadGenerator:
     def __init__(self, **kwargs: Any) -> None:
         self.context = zmq.Context()
-        self.socket = None
+        self.socket: zmq.Socket[Any] | None = None
 
-    def open_socket(self, spec):
+    def open_socket(self, spec: SocketSpec) -> None:
         self.close_socket()
         self.socket = self.context.socket(spec.type)
         self.socket.bind(f"tcp://*:{spec.port}")
 
-    def close_socket(self):
+    def close_socket(self) -> None:
         if self.socket is not None:
             self.socket.close()
 
-    async def close(self):
+    async def close(self) -> None:
         self.context.destroy(linger=0)
 
 
@@ -48,13 +53,8 @@ async def get_status() -> bool:
     return True
 
 
-class SocketSpec(BaseModel):
-    type: int = zmq.PUSH
-    port: int = 9999
-
-
 @app.post("/api/v1/open_socket")
-async def sock(sockspec: SocketSpec):
+async def sock(sockspec: SocketSpec) -> SocketSpec:
     global gen
     print(sockspec)
     gen.open_socket(sockspec)
@@ -62,7 +62,7 @@ async def sock(sockspec: SocketSpec):
 
 
 @app.post("/api/v1/close_socket")
-async def close_sock():
+async def close_sock() -> bool:
     global gen
     gen.close_socket()
     return True

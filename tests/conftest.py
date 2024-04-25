@@ -342,12 +342,10 @@ async def debug_worker(
 @pytest_asyncio.fixture()
 async def workload_generator(
     tmp_path: Any,
-) -> AsyncIterator[
-    Callable[[Optional[str], Optional[list[str]]], Coroutine[None, None, None]]
-]:
+) -> AsyncIterator[Callable[[int], Coroutine[None, None, None]]]:
     server_tasks = []
 
-    async def start_generator(port: Optional[int] = 5003) -> None:
+    async def start_generator(port: int = 5003) -> None:
         config = uvicorn.Config(generator_app, port=port, log_level="debug")
         server = uvicorn.Server(config)
         server_tasks.append((server, asyncio.create_task(server.serve())))

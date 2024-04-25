@@ -69,10 +69,11 @@ class DistributedService(abc.ABC):
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         try:
-            with open(self._distributed_settings.build_meta_file) as fd:
-                build_data = BuildGitMeta.model_validate_json(fd.read())
-                self._logger.info("build meta is %s", build_data)
-                self.state.mapreduce_version = build_data
+            if self._distributed_settings.build_meta_file is not None:
+                with open(self._distributed_settings.build_meta_file) as fd:
+                    build_data = BuildGitMeta.model_validate_json(fd.read())
+                    self._logger.info("build meta is %s", build_data)
+                    self.state.mapreduce_version = build_data
         except Exception as e:
             logging.info("cannot load build meta information: %s", e.__repr__())
         self.state.dranspose_version = version("dranspose")

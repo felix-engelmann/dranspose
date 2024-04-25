@@ -12,7 +12,7 @@ import zmq
 async def test_debugger(
     workload_generator: Callable[[Optional[int]], Awaitable[None]],
 ) -> None:
-    await workload_generator()
+    await workload_generator(5003)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5003/api/v1/status")
