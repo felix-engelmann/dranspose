@@ -145,6 +145,10 @@ async def test_reduction(
         result = pickle.loads(content)
         print("content", result)
         assert len(result["map"].keys()) == ntrig
+        assert (
+            result["version"]["commit_hash"]
+            == "1a474d1455f0d6c6113a22179b8fff1e98325916"
+        )
 
     context.destroy()
 

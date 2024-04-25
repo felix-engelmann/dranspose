@@ -85,7 +85,9 @@ class Reducer(DistributedService):
         self.reducer = None
         if self.custom:
             self.reducer = self.custom(
-                parameters=self.parameters, context=self.custom_context
+                parameters=self.parameters,
+                context=self.custom_context,
+                state=self.state,
             )
         while True:
             parts = await self.in_socket.recv_multipart()
