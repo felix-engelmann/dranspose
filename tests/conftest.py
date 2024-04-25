@@ -37,6 +37,7 @@ from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
+from dranspose.workload_generator import app as generator_app
 from tests.stream1 import AcquisitionSocket
 
 from pytest import Parser
@@ -51,6 +52,13 @@ def pytest_addoption(parser: Parser) -> None:
         dest="rust",
         default=False,
         help="enable rust decorated tests",
+    )
+    parser.addoption(
+        "--k8s",
+        action="store_true",
+        dest="k8s",
+        default=False,
+        help="enable k8s remote tests",
     )
 
 
@@ -323,6 +331,30 @@ async def debug_worker(
                 del os.environ["WORKER_NAME"]
 
     yield start_debug_worker
+
+    for server, task in server_tasks:
+        server.should_exit = True
+        await task
+
+    await asyncio.sleep(0.1)
+
+
+@pytest_asyncio.fixture()
+async def workload_generator(
+    tmp_path: Any,
+) -> AsyncIterator[
+    Callable[[Optional[str], Optional[list[str]]], Coroutine[None, None, None]]
+]:
+    server_tasks = []
+
+    async def start_generator(port: Optional[int] = 5003) -> None:
+        config = uvicorn.Config(generator_app, port=port, log_level="debug")
+        server = uvicorn.Server(config)
+        server_tasks.append((server, asyncio.create_task(server.serve())))
+        while server.started is False:
+            await asyncio.sleep(0.1)
+
+    yield start_generator
 
     for server, task in server_tasks:
         server.should_exit = True
