@@ -17,7 +17,7 @@ async def consume(
     s.connect(f"tcp://127.0.0.1:{port}")
     if typ == zmq.SUB:
         s.setsockopt(zmq.SUBSCRIBE, b"")
-        num -= 1
+        num -= 2
     logging.info("connected socket to port %s", port)
     for _ in range(num):
         data = await s.recv_multipart(copy=False)
@@ -29,7 +29,7 @@ async def consume(
 @pytest.mark.parametrize("srv,cli", [(zmq.PUSH, zmq.PULL), (zmq.PUB, zmq.SUB)])
 @pytest.mark.asyncio
 async def test_debugger(
-    workload_generator: Callable[[Optional[int]], Awaitable[None]], srv, cli
+    workload_generator: Callable[[Optional[int]], Awaitable[None]], srv: int, cli: int
 ) -> None:
     await workload_generator(5003)
 
@@ -39,7 +39,7 @@ async def test_debugger(
         state = await st.json()
         logging.info("gen state %s", state)
 
-        task = asyncio.create_task(consume(ctx, 5, typ=cli))
+        task = asyncio.create_task(consume(ctx, 7, typ=cli))
         logging.info("created consumer task")
 
         st = await session.post(

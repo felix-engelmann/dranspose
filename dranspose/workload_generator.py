@@ -1,13 +1,17 @@
 import asyncio
 import logging
+import random
 from asyncio import Task
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator, Any, Tuple
 
 import numpy as np
 import zmq.asyncio
 from fastapi import FastAPI
 from pydantic import BaseModel
+from pydantic_core import Url
+
+from tests.stream1 import AcquisitionSocket
 
 logger = logging.getLogger(__name__)
 
@@ -20,33 +24,39 @@ class SocketSpec(BaseModel):
 class WorkloadGenerator:
     def __init__(self, **kwargs: Any) -> None:
         self.context = zmq.asyncio.Context()
-        self.socket: zmq.Socket[Any] | None = None
+        self.socket: AcquisitionSocket | None = None
         self.task: Task[Any] | None = None
 
-    def status(self):
+    def status(self) -> bool:
         if self.task is None:
             return True
         return self.task.done()
 
-    def open_socket(self, spec: SocketSpec) -> None:
-        self.close_socket()
-        self.socket = self.context.socket(spec.type)
-        self.socket.bind(f"tcp://*:{spec.port}")
+    async def open_socket(self, spec: SocketSpec) -> None:
+        await self.close_socket()
+        self.socket = AcquisitionSocket(
+            self.context, Url(f"tcp://*:{spec.port}"), typ=spec.type
+        )
 
-    async def packets(self, num, time):
-        for i in range(num):
-            logger.debug("send packet %d", i)
-            data = np.zeros((10, 10))
-            await self.socket.send(data)
+    async def packets(self, num: int, time: float, shape: Tuple[int, int]) -> None:
+        if self.socket is None:
+            raise Exception("must open socket before sending packets")
+        acq = await self.socket.start(filename="")
+        width = shape[0]
+        height = shape[1]
+        img = np.zeros((width, height), dtype=np.uint16)
+        for _ in range(20):
+            img[random.randint(0, width - 1)][
+                random.randint(0, height - 1)
+            ] = random.randint(0, 10)
+        for frameno in range(num):
+            await acq.image(img, img.shape, frameno)
             await asyncio.sleep(time)
+        await acq.close()
 
-    def empty_packets(self, num, time):
-        logger.debug("create task")
-        self.task = asyncio.create_task(self.packets(num, time))
-
-    def close_socket(self) -> None:
+    async def close_socket(self) -> None:
         if self.socket is not None:
-            self.socket.close()
+            await self.socket.close()
 
     async def close(self) -> None:
         self.context.destroy(linger=0)
@@ -78,20 +88,22 @@ async def get_status() -> bool:
 async def sock(sockspec: SocketSpec) -> SocketSpec:
     global gen
     print(sockspec)
-    gen.open_socket(sockspec)
+    await gen.open_socket(sockspec)
     return sockspec
 
 
 @app.post("/api/v1/frames")
-async def frames(number: int = 5, time: float = 0.2) -> bool:
+async def frames(
+    number: int = 5, time: float = 0.2, shape: Tuple[int, int] = (10, 10)
+) -> bool:
     global gen
     logger.debug("start of packets")
-    gen.empty_packets(number, time)
+    gen.task = asyncio.create_task(gen.packets(number, time, shape))
     return True
 
 
 @app.post("/api/v1/close_socket")
 async def close_sock() -> bool:
     global gen
-    gen.close_socket()
+    await gen.close_socket()
     return True

@@ -59,8 +59,10 @@ class Acquisition:
 
 
 class AcquisitionSocket:
-    def __init__(self, ctx: zmq.Context[Any], bind: ZmqUrl) -> None:
-        self.data_socket = ctx.socket(zmq.PUSH)
+    def __init__(
+        self, ctx: zmq.Context[Any], bind: ZmqUrl, typ: int = zmq.PUSH
+    ) -> None:
+        self.data_socket = ctx.socket(typ)
         self.data_socket.bind(str(bind))
         self.msg_number = itertools.count(0)
 
