@@ -17,11 +17,10 @@ async def consume(
     s.connect(f"tcp://127.0.0.1:{port}")
     if typ == zmq.SUB:
         s.setsockopt(zmq.SUBSCRIBE, b"")
-        num -= 2
     logging.info("connected socket to port %s", port)
     for _ in range(num):
         data = await s.recv_multipart(copy=False)
-        logging.info("received data %s", data)
+        logging.debug("received data %s", data)
 
     return num
 
@@ -33,13 +32,15 @@ async def test_debugger(
 ) -> None:
     await workload_generator(5003)
 
+    nframes = 500
+
     ctx = zmq.asyncio.Context()
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5003/api/v1/status")
+        st = await session.get("http://localhost:5003/api/v1/finished")
         state = await st.json()
         logging.info("gen state %s", state)
 
-        task = asyncio.create_task(consume(ctx, 7, typ=cli))
+        task = asyncio.create_task(consume(ctx, nframes + 2, typ=cli))
         logging.info("created consumer task")
 
         st = await session.post(
@@ -49,22 +50,29 @@ async def test_debugger(
         state = await st.json()
         logging.info("open %s", state)
 
+        await asyncio.sleep(0.4)
+
         st = await session.post(
             "http://localhost:5003/api/v1/frames",
+            json={"number": nframes, "time": 0.01, "shape": [100, 100]},
         )
         state = await st.json()
         logging.info("sending frames %s", state)
 
-        st = await session.get("http://localhost:5003/api/v1/status")
+        st = await session.get("http://localhost:5003/api/v1/finished")
         state = await st.json()
         while not state:
             await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5003/api/v1/status")
+            st = await session.get("http://localhost:5003/api/v1/finished")
             state = await st.json()
 
         st = await session.post("http://localhost:5003/api/v1/close_socket")
         state = await st.json()
         logging.info("close %s", state)
+
+        st = await session.get("http://localhost:5003/api/v1/statistics")
+        stat = await st.json()
+        logging.info("stats %s", stat)
 
     await task
     ctx.destroy(linger=0)
