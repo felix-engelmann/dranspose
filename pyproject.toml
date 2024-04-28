@@ -38,6 +38,8 @@ tests = [
     "pytest",
     "pytest-asyncio",
     "aiohttp",
+    "psutil",
+    "types-psutil",
 ]
 docs = [
     "mkdocs",
