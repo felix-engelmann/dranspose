@@ -106,18 +106,10 @@ async def test_simple(
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
             st = await session.get("http://localhost:5000/api/v1/config")
-            conf = await st.json()
+            conf = EnsembleState.model_validate(await st.json())
             msg = []
-            for k in conf:
-                if isinstance(conf[k], list):
-                    for dist in conf[k]:
-                        msg.append(
-                            f"{k}:{dist['name']}:{dist['processed_events']} -- {dist['event_rate']}"
-                        )
-                else:
-                    msg.append(
-                        f"{k}:{conf[k]['processed_events']} -- {conf[k]['event_rate']}"
-                    )
+            for k in conf.workers + conf.ingesters + [conf.reducer]:
+                msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
             logging.info("config is \n%s", "\n".join(msg))
 
     context.destroy()
