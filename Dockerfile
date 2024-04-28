@@ -28,6 +28,6 @@ COPY . /tmp
 
 COPY --from=build /fast_ingester/target/release/fast_ingester /bin/
 
-RUN python -m pip --no-cache-dir install .
+RUN python -m pip --no-cache-dir install ".[bench]"
 
 CMD ["dranspose"]
