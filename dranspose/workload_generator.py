@@ -7,8 +7,10 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any, Tuple
 
 import numpy as np
+import psutil
 import zmq.asyncio
 from fastapi import FastAPI
+from psutil._common import snicaddr, snetio, snicstats
 from pydantic import BaseModel
 from pydantic_core import Url
 
@@ -30,10 +32,15 @@ class WorkloadSpec(BaseModel):
 
 
 class Statistics(BaseModel):
-    snapshots: dict[float, int] = {}
+    snapshots: dict[float, tuple[int, dict[str, snetio]]] = {}
     fps: float = 0
     sent: int = 0
     measured: float = 0
+
+
+class NetworkConfig(BaseModel):
+    addresses: dict[str, list[snicaddr]]
+    stats: dict[str, snicstats]
 
 
 class WorkloadGenerator:
@@ -49,15 +56,18 @@ class WorkloadGenerator:
         return self.task.done()
 
     async def calc_stat(self):
+        start = time.time()
+        before_sent = self.stat.sent
         while True:
-            start = time.time()
-            before_sent = self.stat.sent
             await asyncio.sleep(0.5)
             after = time.time()
             num = self.stat.sent
+            ctr = psutil.net_io_counters(pernic=True)
             self.stat.measured = after
             self.stat.fps = (num - before_sent) / (after - start)
-            self.stat.snapshots[after] = num
+            self.stat.snapshots[after] = (num, ctr)
+            start = after
+            before_sent = num
 
     async def open_socket(self, spec: SocketSpec) -> None:
         await self.close_socket()
@@ -116,6 +126,11 @@ app = FastAPI(lifespan=lifespan)
 async def get_fin() -> bool:
     global gen
     return gen.finished()
+
+
+@app.get("/api/v1/config")
+async def get_conf() -> NetworkConfig:
+    return NetworkConfig(addresses=psutil.net_if_addrs(), stats=psutil.net_if_stats())
 
 
 @app.get("/api/v1/statistics")

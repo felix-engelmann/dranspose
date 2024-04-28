@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 from typing import Awaitable, Callable, Optional, Any
 
@@ -7,6 +8,9 @@ import aiohttp
 import pytest
 import zmq.asyncio
 import zmq
+from psutil._common import snicaddr, snetio
+
+from dranspose.workload_generator import Statistics, NetworkConfig
 
 
 async def consume(
@@ -32,10 +36,17 @@ async def test_debugger(
 ) -> None:
     await workload_generator(5003)
 
-    nframes = 500
+    nframes = 5
 
     ctx = zmq.asyncio.Context()
     async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5003/api/v1/config")
+        state = NetworkConfig.model_validate_json(await st.read())
+        for ifname, ifaddrs in state.addresses.items():
+            logging.info("interface %s : %s", ifname, state.stats[ifname])
+            for ifaddr in ifaddrs:
+                logging.info("    %s", snicaddr(*ifaddr))
+
         st = await session.get("http://localhost:5003/api/v1/finished")
         state = await st.json()
         logging.info("gen state %s", state)
@@ -54,7 +65,7 @@ async def test_debugger(
 
         st = await session.post(
             "http://localhost:5003/api/v1/frames",
-            json={"number": nframes, "time": 0.01, "shape": [100, 100]},
+            json={"number": nframes, "time": 0.1, "shape": [100, 100]},
         )
         state = await st.json()
         logging.info("sending frames %s", state)
@@ -62,17 +73,37 @@ async def test_debugger(
         st = await session.get("http://localhost:5003/api/v1/finished")
         state = await st.json()
         while not state:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
             st = await session.get("http://localhost:5003/api/v1/finished")
             state = await st.json()
+
+            st = await session.get("http://localhost:5003/api/v1/statistics")
+            stat = await st.json()
+            logging.info("fps %s", stat["fps"])
 
         st = await session.post("http://localhost:5003/api/v1/close_socket")
         state = await st.json()
         logging.info("close %s", state)
 
         st = await session.get("http://localhost:5003/api/v1/statistics")
-        stat = await st.json()
-        logging.info("stats %s", stat)
-
+        stat = Statistics.model_validate_json(await st.read())
+        last = {}
+        last_sent = 0
+        for t, (sent, stats) in stat.snapshots.items():
+            logging.info(
+                "timestamp %s: sent %d, Δ%d",
+                datetime.datetime.fromtimestamp(t),
+                sent,
+                sent - last_sent,
+            )
+            last_sent = sent
+            for ifname, nst in stats.items():
+                if ifname not in last:
+                    last[ifname] = nst
+                    logging.info("    %s: %s", ifname, nst)
+                else:
+                    delta = snetio(*map(lambda x: x[1] - x[0], zip(last[ifname], nst)))
+                    logging.info("   Δ%s: %s", ifname, delta)
+                    last[ifname] = nst
     await task
     ctx.destroy(linger=0)
