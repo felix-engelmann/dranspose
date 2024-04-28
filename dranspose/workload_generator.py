@@ -55,7 +55,7 @@ class WorkloadGenerator:
             return True
         return self.task.done()
 
-    async def calc_stat(self):
+    async def calc_stat(self) -> None:
         start = time.time()
         before_sent = self.stat.sent
         while True:
@@ -148,7 +148,7 @@ async def sock(sockspec: SocketSpec) -> SocketSpec:
 
 
 @app.post("/api/v1/frames")
-async def frames(spec: WorkloadSpec | None) -> bool:
+async def frames(spec: WorkloadSpec) -> bool:
     global gen
     logger.debug("start of packets: %s", spec)
     gen.task = asyncio.create_task(gen.packets(spec))
