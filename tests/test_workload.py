@@ -89,7 +89,7 @@ async def test_debugger(
         stat = Statistics.model_validate_json(await st.read())
         last = {}
         last_sent = 0
-        for t, (sent, stats) in stat.snapshots.items():
+        for t, sent, stats in stat.snapshots:
             logging.info(
                 "timestamp %s: sent %d, Δ%d",
                 datetime.datetime.fromtimestamp(t),

@@ -3,6 +3,7 @@ import logging
 import random
 import time
 from asyncio import Task
+from collections import deque
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any, Tuple
 
@@ -11,7 +12,7 @@ import psutil
 import zmq.asyncio
 from fastapi import FastAPI
 from psutil._common import snicaddr, snetio, snicstats
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_serializer
 from pydantic_core import Url
 
 from dranspose.helpers.utils import cancel_and_wait
@@ -32,10 +33,16 @@ class WorkloadSpec(BaseModel):
 
 
 class Statistics(BaseModel):
-    snapshots: dict[float, tuple[int, dict[str, snetio]]] = {}
+    snapshots: list[tuple[float, int, dict[str, snetio]]] = Field(
+        default_factory=lambda: deque(maxlen=100)
+    )
     fps: float = 0
     sent: int = 0
     measured: float = 0
+
+    @field_serializer("snapshots", mode="wrap")
+    def serialize_sn(self, snapshots, _info):
+        return list(snapshots)
 
 
 class NetworkConfig(BaseModel):
@@ -65,7 +72,7 @@ class WorkloadGenerator:
             ctr = psutil.net_io_counters(pernic=True)
             self.stat.measured = after
             self.stat.fps = (num - before_sent) / (after - start)
-            self.stat.snapshots[after] = (num, ctr)
+            self.stat.snapshots.append((after, num, ctr))
             start = after
             before_sent = num
 
