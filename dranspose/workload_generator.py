@@ -56,6 +56,7 @@ class WorkloadGenerator:
         self.socket: AcquisitionSocket | None = None
         self.task: Task[Any] | None = None
         self.stat = Statistics()
+        logger.info("Workload generator initialised")
 
     def finished(self) -> bool:
         if self.task is None:
@@ -73,6 +74,7 @@ class WorkloadGenerator:
             self.stat.measured = after
             self.stat.fps = (num - before_sent) / (after - start)
             self.stat.snapshots.append((after, num, ctr))
+            logger.debug("calculated stats %s fps", self.stat.fps)
             start = after
             before_sent = num
 
@@ -83,11 +85,13 @@ class WorkloadGenerator:
         self.socket = AcquisitionSocket(
             self.context, Url(f"tcp://*:{spec.port}"), typ=spec.type
         )
+        logger.info("socket opened to %s", spec)
 
     async def packets(self, spec: WorkloadSpec) -> None:
         if self.socket is None:
             raise Exception("must open socket before sending packets")
         acq = await self.socket.start(filename="")
+        logger.info("sending packets %s", spec)
         self.stat.sent += 1
         width = spec.shape[0]
         height = spec.shape[1]
@@ -98,6 +102,7 @@ class WorkloadGenerator:
             ] = random.randint(0, 10)
         for frameno in range(spec.number):
             await acq.image(img, img.shape, frameno)
+            logger.debug("sent frame %d", frameno)
             self.stat.sent += 1
             await asyncio.sleep(spec.time)
         await acq.close()
@@ -106,9 +111,11 @@ class WorkloadGenerator:
     async def close_socket(self) -> None:
         if self.socket is not None:
             await self.socket.close()
+        logger.info("socket closed")
 
     async def close(self) -> None:
         self.context.destroy(linger=0)
+        logger.info("context destroyed")
 
 
 gen: WorkloadGenerator
@@ -157,7 +164,6 @@ async def sock(sockspec: SocketSpec) -> SocketSpec:
 @app.post("/api/v1/frames")
 async def frames(spec: WorkloadSpec) -> bool:
     global gen
-    logger.debug("start of packets: %s", spec)
     gen.task = asyncio.create_task(gen.packets(spec))
     return True
 
