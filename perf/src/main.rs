@@ -36,7 +36,7 @@ struct Cli {
 async fn main() -> Result<()> {
     let args = Cli::parse();
 
-    env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let signals =
         Signals::new(&[SIGHUP, SIGTERM, SIGINT, SIGQUIT]).expect("unable to register signals");
