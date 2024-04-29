@@ -15,7 +15,7 @@ from psutil._common import snicaddr, snetio, snicstats
 from pydantic import BaseModel, Field, field_serializer
 from pydantic_core import Url
 
-from dranspose.helpers.utils import cancel_and_wait
+from dranspose.helpers.utils import cancel_and_wait, done_callback
 from tests.stream1 import AcquisitionSocket
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,11 @@ class SocketSpec(BaseModel):
     port: int = 9999
 
 
+class ConnectSpec(BaseModel):
+    type: int = zmq.PULL
+    url: Url = Url("tcp://127.0.0.1:9999")
+
+
 class WorkloadSpec(BaseModel):
     number: int = 1
     time: float = 0.1
@@ -33,15 +38,17 @@ class WorkloadSpec(BaseModel):
 
 
 class Statistics(BaseModel):
-    snapshots: list[tuple[float, int, dict[str, snetio]]] = Field(
+    snapshots: deque[tuple[float, int, dict[str, snetio]]] = Field(
         default_factory=lambda: deque(maxlen=100)
     )
     fps: float = 0
-    sent: int = 0
+    packets: int = 0
     measured: float = 0
 
     @field_serializer("snapshots", mode="wrap")
-    def serialize_sn(self, snapshots, _info):
+    def serialize_sn(
+        self, snapshots: deque[tuple[float, int, dict[str, snetio]]], _info: Any
+    ) -> list[tuple[float, int, dict[str, snetio]]]:
         return list(snapshots)
 
 
@@ -53,7 +60,7 @@ class NetworkConfig(BaseModel):
 class WorkloadGenerator:
     def __init__(self, **kwargs: Any) -> None:
         self.context = zmq.asyncio.Context()
-        self.socket: AcquisitionSocket | None = None
+        self.socket: AcquisitionSocket | None | zmq.Socket[Any] = None
         self.task: Task[Any] | None = None
         self.stat = Statistics()
         logger.info("Workload generator initialised")
@@ -65,34 +72,55 @@ class WorkloadGenerator:
 
     async def calc_stat(self) -> None:
         start = time.time()
-        before_sent = self.stat.sent
+        before_packets = self.stat.packets
         while True:
             await asyncio.sleep(0.5)
             after = time.time()
-            num = self.stat.sent
+            num = self.stat.packets
             ctr = psutil.net_io_counters(pernic=True)
             self.stat.measured = after
-            self.stat.fps = (num - before_sent) / (after - start)
+            self.stat.fps = (num - before_packets) / (after - start)
             self.stat.snapshots.append((after, num, ctr))
             logger.debug("calculated stats %s fps", self.stat.fps)
             start = after
-            before_sent = num
+            before_packets = num
 
     async def open_socket(self, spec: SocketSpec) -> None:
         await self.close_socket()
-        self.fps = 0
-        self.sent = 0
+        self.stat = Statistics()
         self.socket = AcquisitionSocket(
             self.context, Url(f"tcp://*:{spec.port}"), typ=spec.type
         )
-        logger.info("socket opened to %s", spec)
+        logger.info("socket opened to %s is %s", spec, self.socket)
 
-    async def packets(self, spec: WorkloadSpec) -> None:
+    async def sink_packets(self) -> None:
+        if not isinstance(self.socket, zmq.Socket):
+            raise Exception("only sink packets from connected socket")
+        while True:
+            pkt = await self.socket.recv_multipart(copy=False)
+            logger.debug("sinked packet %s", pkt)
+            self.stat.packets += 1
+
+    async def connect_socket(self, spec: ConnectSpec) -> None:
+        await self.close_socket()
+        self.stat = Statistics()
+        self.socket = self.context.socket(spec.type)
+        self.socket.connect(str(spec.url))
+        if spec.type == zmq.SUB:
+            self.socket.setsockopt(zmq.SUBSCRIBE, b"")
+        logger.info("socket connected to %s", spec)
+        self.task = asyncio.create_task(self.sink_packets())
+        self.task.add_done_callback(done_callback)
+
+    async def send_packets(self, spec: WorkloadSpec) -> None:
+        logger.info("send packets from socket %s", self.socket)
         if self.socket is None:
             raise Exception("must open socket before sending packets")
+        if not isinstance(self.socket, AcquisitionSocket):
+            raise Exception("must be AcquisitionSocket to send, is %s", self.socket)
         acq = await self.socket.start(filename="")
         logger.info("sending packets %s", spec)
-        self.stat.sent += 1
+        self.stat.packets += 1
         width = spec.shape[0]
         height = spec.shape[1]
         img = np.zeros((width, height), dtype=np.uint16)
@@ -103,14 +131,17 @@ class WorkloadGenerator:
         for frameno in range(spec.number):
             await acq.image(img, img.shape, frameno)
             logger.debug("sent frame %d", frameno)
-            self.stat.sent += 1
+            self.stat.packets += 1
             await asyncio.sleep(spec.time)
         await acq.close()
-        self.stat.sent += 1
+        self.stat.packets += 1
 
     async def close_socket(self) -> None:
         if self.socket is not None:
-            await self.socket.close()
+            if isinstance(self.socket, zmq.Socket):
+                self.socket.close()
+            else:
+                await self.socket.close()
         logger.info("socket closed")
 
     async def close(self) -> None:
@@ -154,7 +185,7 @@ async def get_stat() -> Statistics:
 
 
 @app.post("/api/v1/open_socket")
-async def sock(sockspec: SocketSpec) -> SocketSpec:
+async def open_sock(sockspec: SocketSpec) -> SocketSpec:
     global gen
     print(sockspec)
     await gen.open_socket(sockspec)
@@ -164,7 +195,8 @@ async def sock(sockspec: SocketSpec) -> SocketSpec:
 @app.post("/api/v1/frames")
 async def frames(spec: WorkloadSpec) -> bool:
     global gen
-    gen.task = asyncio.create_task(gen.packets(spec))
+    gen.task = asyncio.create_task(gen.send_packets(spec))
+    gen.task.add_done_callback(done_callback)
     return True
 
 
@@ -173,3 +205,10 @@ async def close_sock() -> bool:
     global gen
     await gen.close_socket()
     return True
+
+
+@app.post("/api/v1/connect_socket")
+async def connect_sock(sockspec: ConnectSpec) -> ConnectSpec:
+    global gen
+    await gen.connect_socket(sockspec)
+    return sockspec

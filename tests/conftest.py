@@ -24,6 +24,7 @@ import pytest_asyncio
 import uvicorn
 import zmq
 from _pytest.fixtures import FixtureRequest
+from aiohttp import ClientConnectionError
 from fastapi import FastAPI
 from pydantic import HttpUrl
 from pydantic_core import Url
@@ -339,6 +340,20 @@ async def debug_worker(
     await asyncio.sleep(0.1)
 
 
+class UvicornServer(multiprocessing.Process):
+    def __init__(self, config: uvicorn.Config):
+        super().__init__()
+        self.server = uvicorn.Server(config=config)
+        self.config = config
+        logging.info("started server with config %s", config)
+
+    def stop(self):
+        self.terminate()
+
+    def run(self, *args, **kwargs):
+        self.server.run()
+
+
 @pytest_asyncio.fixture()
 async def workload_generator(
     tmp_path: Any,
@@ -347,16 +362,26 @@ async def workload_generator(
 
     async def start_generator(port: int = 5003) -> None:
         config = uvicorn.Config(generator_app, port=port, log_level="debug")
-        server = uvicorn.Server(config)
-        server_tasks.append((server, asyncio.create_task(server.serve())))
-        while server.started is False:
-            await asyncio.sleep(0.1)
+        instance = UvicornServer(config=config)
+        instance.start()
+
+        async with aiohttp.ClientSession() as session:
+            while True:
+                try:
+                    st = await session.get(f"http://localhost:{port}/api/v1/finished")
+                    if st.status == 200:
+                        break
+                    else:
+                        await asyncio.sleep(0.5)
+                except ClientConnectionError:
+                    await asyncio.sleep(0.5)
+
+        server_tasks.append(instance)
 
     yield start_generator
 
-    for server, task in server_tasks:
-        server.should_exit = True
-        await task
+    for server in server_tasks:
+        server.stop()
 
     await asyncio.sleep(0.1)
 

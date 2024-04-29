@@ -65,7 +65,7 @@ async def test_debugger(
 
         st = await session.post(
             "http://localhost:5003/api/v1/frames",
-            json={"number": nframes, "time": 0.1, "shape": [100, 100]},
+            json={"number": nframes, "time": 0.0001, "shape": [100, 100]},
         )
         state = await st.json()
         logging.info("sending frames %s", state)
@@ -107,3 +107,61 @@ async def test_debugger(
                     last[ifname] = nst
     await task
     ctx.destroy(linger=0)
+
+
+@pytest.mark.asyncio
+async def test_sink(
+    workload_generator: Callable[[Optional[int]], Awaitable[None]]
+) -> None:
+    await workload_generator(5003)
+    await workload_generator(5004)
+
+    async with aiohttp.ClientSession() as session:
+        nframes = 10000
+
+        st = await session.post(
+            "http://localhost:5003/api/v1/open_socket",
+            json={"type": zmq.PUSH, "port": 9999},
+        )
+        state = await st.json()
+        logging.info("open %s", state)
+
+        st = await session.post(
+            "http://localhost:5004/api/v1/connect_socket",
+            json={"type": zmq.PULL, "url": "tcp://127.0.0.1:9999"},
+        )
+        state = await st.json()
+        logging.info("open %s", state)
+
+        await asyncio.sleep(0.4)
+
+        st = await session.post(
+            "http://localhost:5003/api/v1/frames",
+            json={"number": nframes, "time": 0.000001, "shape": [100, 100]},
+        )
+        state = await st.json()
+        logging.info("sending frames %s", state)
+
+        st = await session.get("http://localhost:5003/api/v1/finished")
+        state = await st.json()
+        logging.info("is finished %s", state)
+        while not state:
+            await asyncio.sleep(0.5)
+            st = await session.get("http://localhost:5003/api/v1/finished")
+            state = await st.json()
+
+            st = await session.get("http://localhost:5003/api/v1/statistics")
+            stat = await st.json()
+            logging.info("sender fps %s", stat["fps"])
+
+            st = await session.get("http://localhost:5004/api/v1/statistics")
+            stat = await st.json()
+            logging.info("receiver fps %s", stat["fps"])
+
+        st = await session.post("http://localhost:5003/api/v1/close_socket")
+        state = await st.json()
+        logging.info("close source %s", state)
+
+        st = await session.post("http://localhost:5004/api/v1/close_socket")
+        state = await st.json()
+        logging.info("close sink %s", state)
