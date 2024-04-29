@@ -46,7 +46,7 @@ async def test_single_ingester(ingester) -> None:
 
         await asyncio.sleep(1)
 
-        ntrig = 100
+        ntrig = 1000
         resp = await session.post(
             get_url("mapping"),
             json={
@@ -69,7 +69,7 @@ async def test_single_ingester(ingester) -> None:
 
         st = await session.post(
             get_gen("frames", svc=ingester),
-            json={"number": ntrig, "time": 0.1, "shape": [100, 100]},
+            json={"number": ntrig, "time": 0.005, "shape": [100, 100]},
         )
         state = await st.json()
         logging.info("sending frames %s", state)

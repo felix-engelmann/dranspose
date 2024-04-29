@@ -120,7 +120,7 @@ class DistributedService(abc.ABC):
     async def register(self) -> None:
         """
         Background job in every distributed service to publish the service's configuration.
-        It publishes the `state` every 6 seconds or faster if there are updates from the controller with a new trigger map or parameters.
+        It publishes the `state` every 1.3 seconds or faster if there are updates from the controller with a new trigger map or parameters.
         """
         latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
         last = 0
@@ -130,7 +130,7 @@ class DistributedService(abc.ABC):
             await self.publish_config()
             try:
                 update_msgs = await self.redis.xread(
-                    {RedisKeys.updates(): last}, block=6000
+                    {RedisKeys.updates(): last}, block=1300
                 )
                 if RedisKeys.updates() in update_msgs:
                     update_msg = update_msgs[RedisKeys.updates()][0][-1]
