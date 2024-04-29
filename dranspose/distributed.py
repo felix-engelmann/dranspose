@@ -219,9 +219,9 @@ class DistributedService(abc.ABC):
             old = self.state.processed_events
             await asyncio.sleep(1.0)
             end = time.time()
+            rate = (self.state.processed_events - old) / (end - start)
+            self.state.event_rate = rate
             if (self.state.processed_events - old) > 0:
-                rate = (self.state.processed_events - old) / (end - start)
-                self.state.event_rate = rate
                 self._logger.info("receiving %lf frames per second", rate)
 
     async def run(self) -> None:
