@@ -357,6 +357,7 @@ class Controller:
                 )
                 self.start_time = time.perf_counter()
         if len(assignments) > 0:
+            logger.debug("send out assignment %s", assignments)
             await self.redis.xadd(
                 RedisKeys.assigned(self.mapping.uuid),
                 {"data": WorkAssignmentList.dump_json(assignments)},

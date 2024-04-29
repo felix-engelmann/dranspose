@@ -156,7 +156,8 @@ class Ingester(DistributedService):
                 was = WorkAssignmentList.validate_json(assignment[1]["data"])
                 for wa in was:
                     mywa = wa.get_workers_for_streams(self.state.streams)
-                    await self.assignment_queue.put(mywa)
+                    if len(mywa.assignments) > 0:
+                        await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
 
     async def work(self) -> None:
