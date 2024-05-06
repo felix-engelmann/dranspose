@@ -3,6 +3,7 @@
 .pyre_configuration
 .pyre
 .coverage
+.ipynb_checkpoints
 __pycache__
 scratch
 *.egg-info
@@ -10,3 +11,4 @@ dist
 site
 build
 plots
+bench
