@@ -139,7 +139,7 @@ def reducer(args: argparse.Namespace) -> None:
         if args.reducerclass:
             os.environ["REDUCER_CLASS"] = args.reducerclass
         config = uvicorn.Config(
-            reducer_app, port=5002, host=args.host, log_level="info"
+            reducer_app, port=args.port or 5000, host=args.host, log_level="info"
         )
         server = uvicorn.Server(config)
         server.run()
@@ -200,6 +200,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser_reducer = subparsers.add_parser("reducer", help="run reducer")
     parser_reducer.set_defaults(func=reducer)
     parser_reducer.add_argument("--host", help="host to listen on")
+    parser_reducer.add_argument("-p", "--port", help="port to listen on")
     parser_reducer.add_argument(
         "-c",
         "--reducerclass",
