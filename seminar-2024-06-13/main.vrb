@@ -1,0 +1,19 @@
+\frametitle{Development: Reducer}
+\begin{python}
+class FluorescenceReducer:
+    def __init__(self):
+        self.publish = {"map": {}}
+
+    def process_result(self,
+                      result: ResultData,
+                      parameters=None):
+        print(result.event_number)
+        print(result.worker)
+        print(result.parameters_uuid)
+        data = result.payload
+        self.publish["map"][data["position"]] = \
+                data["concentrations"]
+\end{python}
+
+reinstantiated for every scan (new Trigger Map)
+
