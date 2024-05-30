@@ -43,7 +43,9 @@ class PositioncapParser:
                     self.arm_time = datetime.fromisoformat(line[len("arm_time: ") :])
                 if line.startswith(" "):
                     parts = line.strip().split(" ")
-                    self.fields.append(PositionCapField(name=parts[0], type=parts[1]))
+                    self.fields.append(
+                        PositionCapField(name=f"{parts[0]}.{parts[2]}", type=parts[1])
+                    )
             if self.arm_time is None:
                 raise Exception("unable to parse header")
             return PositionCapStart(arm_time=self.arm_time)

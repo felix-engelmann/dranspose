@@ -262,6 +262,8 @@ class DistributedState(BaseModel):
     processed_events: int = 0
     event_rate: float = 0.0
 
+    # write a h5 dump function for metadata
+
 
 class ConnectedWorker(BaseModel):
     name: WorkerName
