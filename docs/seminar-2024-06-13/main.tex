@@ -12,10 +12,16 @@
 
 % TODO: table for use cases
 % TODO: fix trigger map
+
 \usepackage{appendixnumberbeamer}
 
+\usepackage{tabularx}
+\usepackage{array}
 \usepackage{tikz}
 \usepackage{fontawesome5}
+
+\usepackage{pgfplots}
+\usetikzlibrary{pgfplots.groupplots}
 
 \DeclareFixedFont{\ttb}{T1}{txtt}{bx}{n}{12} % for bold
 \DeclareFixedFont{\ttm}{T1}{txtt}{m}{n}{12}  % for normal
@@ -60,7 +66,7 @@ showstringspaces=false
 \begin{frame}{Experimental Feedback Loop}
  \begin{tikzpicture}[xscale=0.2,yscale=0.8]
  \node[below right, text width=15cm] (sc) at (-1,-0.9) {\textbf{Scanning}\\[1mm]
- Sardana, Contrast, Hula};
+ Sardana, Contrast, \dots};
 
  \node[text width=4cm, below right] at (52,-0.9) {\textbf{ Analysis}\\[1mm]
    Event formation,\\
@@ -225,6 +231,8 @@ showstringspaces=false
   \begin{itemize}
    \item only one detector data available
    \item simple tools, e.g. azint, crop, time integration
+
+   \includegraphics[height=2cm]{dets/azint}
    \item beyond limits: normalisation to $I_0$, sorting by motor position
   \end{itemize}
  \end{block}
@@ -280,6 +288,7 @@ showstringspaces=false
 
 \begin{frame}{Event Formation}
  \centering
+ \begin{minipage}{0.7\textwidth}
  \begin{tikzpicture}
   \node at (-2,0) {Detectors};
   \node (det1) at (0,0) {\faCamera};
@@ -317,33 +326,54 @@ showstringspaces=false
   \draw[line width=2mm] (ef) -- (crop);
   \draw[very thick] (crop) -- (file);
  \end{tikzpicture}
+\end{minipage}
+\begin{minipage}{0.29\textwidth}
+\vspace{1cm}
+ \begin{tabular}{rcccc}
+   %$\stackrel{t}{\rightarrow}$ & ev 1 & ev 2 & ev 3 & ev 4 & ev 5 & ev 6 \\
+   %\faCamera & \faImage & \faImage & \faImage & \faImage & \faImage & \faImage \\
+   %\faVideo & \faCloudMoon & \faCloudMoonRain &  \faCloudShowersHeavy & \faCloudRain  & \faCloudSunRain & \faCloudSun \\
+   %\faSlidersH & 0.5 &  & 0.6 &  & 0.5 & \\
+   %\faTemperatureHigh &  & \faThermometerEmpty &  & \faThermometerHalf  &   & \faThermometerFull  \\
+
+   $t \downarrow$  &\faCamera  &\faVideo  &\faSlidersH  &\faTemperatureHigh   \\
+ e1  & \faImage  & \faCloudMoon  & 0.5  &   \\
+ e2  & \faImage  & \faCloudMoonRain  &   & \faThermometerEmpty  \\
+ e3  & \faImage  &  \faCloudShowersHeavy  & 0.6  \\
+ e4  & \faImage  & \faCloudRain   &   & \faThermometerHalf   \\
+ e5  & \faImage  & \faCloudSunRain  & 0.5     \\
+ e6 & \faImage & \faCloudSun & & \faThermometerFull \\
+  \end{tabular}
+\end{minipage}
 \end{frame}
 
-\begin{frame}{Trigger Map}
- \begin{block}{Event Definitions}
-  Which \emph{frames} from which \emph{detectors} belong to the same \emph{event} and have to be processed by the same \emph{worker}?
- \end{block}
+\begin{frame}{Balder DAQ}
+\begin{minipage}{0.59\textwidth}
+\begin{block}{Hardware Orchestrated Scans}
+ \begin{itemize}
+  \item Trajectories managed by ACS controller
+  \item Complex trigger sequences
+ \end{itemize}
+\end{block}
 
-\begin{block}{Virtual Workers}
+\begin{block}{Concentrator Tango Device (Michele)}
 \begin{itemize}
- \item virtual workers are dynamically assigned to real workers
- \item special \emph{all} workers (stream headers), or discard frame with $\emptyset$
- \item \emph{none} if stream has no frame for event
+ \item Connects to low bandwidth streams
+ \begin{itemize}
+  \item AlbaEM
+  \item PandAbox
+  \item XSpress3 window counts
+ \end{itemize}
+ \item Correlates acquisitions according to trigger sequence
+ \item Expose event stream for live viewing
+ \item runs on EC, no access to DAQ cluster streams
 \end{itemize}
 
-\medskip
- \begin{tabular}{rcccccc}
-   \faCamera & all & 1 & 3 & 5 & 7 & 8 \\
-   \faVideo & all & 2 & 4  & 6 & 7 & 9\\
-   \faSlidersH & all & all & none & none & $\emptyset$ &none \\
-   \faThermometerHalf & all & \{1,2\} & none & \{5,6\} & none  & \{8,9\} \\
-  \end{tabular}
-  \end{block}
-
-  \begin{block}{Scanning}
-   trigger map specified by scanning software, append-only extendable
-  \end{block}
-
+\end{block}
+\end{minipage}
+\begin{minipage}{0.39\textwidth}
+ \includegraphics[width=\textwidth]{img/balder}
+\end{minipage}
 \end{frame}
 
 
@@ -388,9 +418,9 @@ showstringspaces=false
  \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{Parallelisation}
+\begin{frame}{Parallelisation by Event, not Stream (\texttt{map})}
  \centering
- \begin{tikzpicture}
+ \begin{tikzpicture}[xscale=1.4]
   \node at (-2,0) {Detectors};
   \node (det1) at (0,0) {\faCamera};
   \node (mot) at (4,0) {\faSlidersH}; %\faCameraRetro};
@@ -425,6 +455,17 @@ showstringspaces=false
   \node (crop5) at (4,-3) {\faCrop};
   \node (crop6) at (5,-3) {\faCrop};
   \node (crop7) at (6,-3) {\faCrop};
+
+  \node[below, text width=1cm, align=center] at (-1,-3.5) {$t \downarrow$};
+
+  \node[below, text width=1cm, align=center] at (0,-3.3) {e3$\rightsquigarrow${\tiny r3}};
+  \node[below, text width=1cm, align=center] at (1,-3.3) {e1$\rightsquigarrow${\tiny r1}};
+  \node[below, text width=1cm, align=center] at (2,-3.3) {e5$\rightsquigarrow${\tiny r5}\\e8$\rightsquigarrow${\tiny r8}};
+  \node[below, text width=1cm, align=center] at (3,-3.3) {e2$\rightsquigarrow${\tiny r2}\\e4$\rightsquigarrow${\tiny r4}};
+  \node[below, text width=1cm, align=center] at (4,-3.3) {e9$\rightsquigarrow${\tiny r9}};
+  \node[below, text width=1cm, align=center] at (5,-3.3) {e6$\rightsquigarrow${\tiny r6}};
+  \node[below, text width=1cm, align=center] at (6,-3.3) {e7$\rightsquigarrow${\tiny r7}};
+
 
   \foreach \i in {1,2,...,7} {
     \draw (ef.south) -- (crop\i.north);
@@ -471,6 +512,8 @@ showstringspaces=false
   \node at (-2,-3) {Reduce};
   \node (red) at (3,-3) {\faCog};
 
+  \node[below left, text width=1cm, align=right] at (2.7,-3) {r1\\r2\\r3};
+
 
   \foreach \i in {1,2,...,7} {
     \draw (ef.south) -- (crop\i.north);
@@ -493,9 +536,6 @@ showstringspaces=false
 \end{frame}
 
 
-
-
-
 \begin{frame}{Development: Testing}
  \begin{block}{Recording}
   ingesters optionally write all streams to disk (sequential pickle dumps)
@@ -514,6 +554,60 @@ showstringspaces=false
 
 \end{frame}
 
+\begin{frame}{Performance Estimates}
+\begin{minipage}[t]{0.4\textwidth}
+ \begin{block}{Bandwidth}
+  \begin{description}
+   \item[Per Ingest:] 3GB/s (over purple)
+   \item[Overall:] Horizontally scalable
+  \end{description}
+ \end{block}
+
+ \begin{block}{Throughput}
+  32KiB ZMQ Frames
+ \begin{tikzpicture}
+  \begin{axis}[width=\textwidth, height=0.45\textheight,
+  ylabel={kf/s}, xlabel={time (s)}, xmin=2, xmax=9,yticklabel style={/pgf/number format/fixed}]
+   \addplot coordinates {(10.380399465560913, 14.501476464309178) (9.878519535064697, 21.788493549538696) (9.37830138206482, 21.711024275757275) (8.878094673156738, 21.819953837546976) (8.377772808074951, 21.392951753518407) (7.877561330795288, 21.83222341971658) (7.377383232116699, 21.585261536100315) (6.877180814743042, 21.79673939571305) (6.3769683837890625, 21.80639898793212) (5.876794099807739, 21.828599423317918) (5.376624584197998, 21.783015287292713) (4.876418352127075, 21.8193124437854) (4.376219272613525, 21.87152109782575) (3.876025438308716, 21.874831386190195) (3.3758158683776855, 21.91085807761292) (2.8756072521209717, 21.753235025598222) (2.375405788421631, 21.81360136946087) (1.8751215934753418, 21.80714051641465) (1.3749184608459473, 15.089143103896134) (0.8746912479400635, 0.0)};
+   \addplot coordinates {(10.16192364692688, 21.82714945460939) (9.661537647247314, 21.816687123756957) (9.16045331954956, 21.74311267039809) (8.660156965255737, 21.70321142524401) (8.159816265106201, 21.409636063603646) (7.659480810165405, 21.646535144695545) (7.158292055130005, 21.670975052963726) (6.657945394515991, 21.886267307491757) (6.157266139984131, 21.80935038663435) (5.656884431838989, 21.780615556144816) (5.15607213973999, 21.78919417514113) (4.655548810958862, 21.892744812979668) (4.154834985733032, 21.95235413949882) (3.6542508602142334, 21.862465426041314) (3.1538498401641846, 21.835561230328018) (2.653381824493408, 21.87431748647256) (2.1527490615844727, 21.738510085703236) (1.6521167755126953, 21.839631883654874)};
+  \end{axis}
+ \end{tikzpicture}
+\end{block}
+ \end{minipage}
+ \begin{minipage}[t]{0.59\textwidth}
+ \begin{block}{DAQ cluster SRIOV 2MiB ZMQ frames}
+ \medskip
+  \begin{tikzpicture}
+   \begin{groupplot}[group style={
+        %group name=my plots,
+        group size=1 by 2,
+        xlabels at=edge bottom,
+        xticklabels at=edge bottom,
+        vertical sep=0pt
+    },xmin=2, xmax=20,
+    height=0.45\textheight,
+    width=\textwidth,
+    xlabel={time (s)}
+    ]
+
+    \nextgroupplot[ylabel={GiB/s}]
+    \addplot coordinates {(20.797361612319946, 4.923770531089224) (20.29696536064148, 4.901552713878653) (19.796687841415405, 5.134769475410679) (19.295762300491333, 4.959629557647154) (18.79537081718445, 4.883359373436164) (18.295119524002075, 4.888394370292193) (17.794289588928223, 4.857872413703535) (17.29404592514038, 4.893592007333276) (16.79277777671814, 4.863546546896665) (16.2924063205719, 5.0008993548235345) (15.791933536529541, 5.088044510452932) (15.291680097579956, 4.926736902510002) (14.789785623550415, 5.076570276104684) (14.287625551223755, 4.952535433589058) (13.786998510360718, 4.94628297227653) (13.286029577255249, 4.944890611082552) (12.784682750701904, 4.883465258101199) (12.283599615097046, 4.8920311604167015) (11.782504558563232, 4.844104151743324) (11.281583547592163, 4.958320090986815) (10.780465126037598, 5.143801290622429) (10.279725074768066, 4.70395048675125) (9.779169797897339, 4.673487807948467) (9.278823137283325, 4.625356614281664) (8.777704954147339, 4.857535447193261) (8.277234315872192, 4.676893264624194) (7.776344299316406, 4.6435565583388) (7.275920629501343, 4.86599903028497) (6.774894714355469, 5.036412382476347) (6.273428916931152, 4.934324778711939) (5.771974086761475, 4.8437573664416895) (5.271067380905151, 4.853864757833792) (4.769809007644653, 4.904457493978991) (4.268798112869263, 4.957495084350879) (3.7678487300872803, 5.035713180497982) (3.266826629638672, 5.152137368004789) (2.7660391330718994, 5.3157281885901115) (2.2655892372131348, 5.12283832267629) (1.7651479244232178, 5.183829431894635) (1.2640602588653564, 2.4067046870855116) (0.7634463310241699, 0.0)};
+
+  \addplot coordinates {(21.081162929534912, 3.8055844482433856) (20.580693006515503, 4.915946141293159) (20.08040189743042, 4.989872637333955) (19.578692197799683, 5.116592420067025) (19.078346490859985, 4.897542410639878) (18.57768416404724, 4.867679023294724) (18.077306270599365, 4.867526626999779) (17.576810359954834, 4.880775645707177) (17.076268911361694, 4.869769461100315) (16.57594132423401, 4.969844046872365) (16.07550883293152, 5.028826235184526) (15.574950456619263, 5.003764883872513) (15.074379682540894, 4.989616652298228) (14.57402515411377, 5.054041412047791) (14.073650121688843, 4.913346560781156) (13.573388576507568, 4.950903667406186) (13.07292103767395, 4.922039466669796) (12.572577714920044, 4.883488196117977) (12.072171926498413, 4.8237829150683025) (11.57147765159607, 4.915459111436058) (11.071205615997314, 5.040623581775495) (10.57081389427185, 4.991479568728631) (10.070268869400024, 4.678268216699773) (9.569754362106323, 4.631490701655744) (9.069285869598389, 4.717073374979874) (8.568779945373535, 4.853184323591083) (8.068257331848145, 4.588862320914876) (7.567583322525024, 4.747191981058262) (7.067082405090332, 4.957411925091056) (6.56677508354187, 5.006047740204339) (6.06650710105896, 4.865742206222385) (5.565587043762207, 4.88136394711021) (5.0651562213897705, 4.851598656955901) (4.564631223678589, 4.930090710512113) (4.064127683639526, 4.978197879582554) (3.563526153564453, 5.084587608915841) (3.063089609146118, 5.181193527326358) (2.5628411769866943, 5.345427182936751) (2.062587261199951, 5.011262611009884) (1.5622212886810303, 5.31287934118657)};
+
+  \nextgroupplot[ylabel={kf/s} ]%, legend to name={CommonLegend}, legend style={legend columns=2}]
+    \addplot coordinates {(20.797361612319946, 2.00241308091141) (20.29696536064148, 1.9988905388892808) (19.796687841415405, 2.9944570149745315) (19.295762300491333, 2.8058031498088902) (18.79537081718445, 2.1908988840943167) (18.295119524002075, 2.583711374618984) (17.794289588928223, 2.410825138429892) (17.29404592514038, 2.350039601973107) (16.79277777671814, 2.6420371980883495) (16.2924063205719, 2.5395986365812586) (15.791933536529541, 2.456754725326051) (15.291680097579956, 2.9886760616370354) (14.789785623550415, 1.9913968774273434) (14.287625551223755, 2.9962424670751533) (13.786998510360718, 1.9961317637025418) (13.286029577255249, 2.991940749505065) (12.784682750701904, 1.9956768227549668) (12.283599615097046, 2.9934440191364793) (11.782504558563232, 1.9963227297282504) (11.281583547592163, 2.993304447572916) (10.780465126037598, 1.9970441698535797) (10.279725074768066, 2.9966720346599947) (9.779169797897339, 1.9986143182665064) (9.278823137283325, 2.1771311373547584) (8.777704954147339, 2.8153499770857016) (8.277234315872192, 1.9964462595525219) (7.776344299316406, 2.9974601332393807) (7.275920629501343, 1.99590474219053) (6.774894714355469, 2.9912309228355443) (6.273428916931152, 1.9941975624437183) (5.771974086761475, 2.994569612390556) (5.271067380905151, 1.9949791431819373) (4.769809007644653, 2.9939468695036435) (4.268798112869263, 1.996209665828072) (3.7678487300872803, 2.993879908005895) (3.266826629638672, 1.9968549671380724) (2.7660391330718994, 2.9973030515392995) (2.2655892372131348, 2.9973544582832896) (1.7651479244232178, 1.99565878135655) (1.2640602588653564, 2.996320950294967) (0.7634463310241699, 0.0)};
+    \addlegendentry{source};
+    \addplot coordinates {(21.081162929534912, 1.9461708989897208) (20.580693006515503, 2.5045418102501316) (20.08040189743042, 2.5313443230910844) (19.578692197799683, 2.600202184120667) (19.078346490859985, 2.4887033301110035) (18.57768416404724, 2.474130084903444) (18.077306270599365, 2.473546683739577) (17.576810359954834, 2.479315156593026) (17.076268911361694, 2.476377541188434) (16.57594132423401, 2.5258152137766885) (16.07550883293152, 2.5551465334028105) (15.574950456619263, 2.54309693238443) (15.074379682540894, 2.5362016888087946) (14.57402515411377, 2.5680737781271965) (14.073650121688843, 2.496694003428573) (13.573388576507568, 2.515647674041369) (13.07292103767395, 2.502281819429408) (12.572577714920044, 2.4819856778985105) (12.072171926498413, 2.452594450454843) (11.57147765159607, 2.4966416491881733) (11.071205615997314, 2.5619928235011042) (10.57081389427185, 2.537234288414328) (10.070268869400024, 2.3775534628044452) (9.569754362106323, 2.3537945297951475) (9.069285869598389, 2.397574018446377) (8.568779945373535, 2.4674209848409787) (8.068257331848145, 2.3308579600081716) (7.567583322525024, 2.413581989402897) (7.067082405090332, 2.5184520508320225) (6.56677508354187, 2.5446361641652477) (6.06650710105896, 2.4714522446574527) (5.565587043762207, 2.4798632388722215) (5.0651562213897705, 2.4674092316017213) (4.564631223678589, 2.505476784244383) (4.064127683639526, 2.528957511995904) (3.563526153564453, 2.585742417161073) (3.063089609146118, 2.632691909327736) (2.5628411769866943, 2.7166204143804) (2.062587261199951, 2.5461363681196865) (1.5622212886810303, 2.7002398853667757)};
+    \addlegendentry{sink};
+   \end{groupplot}
+   %\path (group c1r2.north east) -- node[above]{\ref{CommonLegend}} (group c2r2.north west);
+  \end{tikzpicture}
+  \end{block}
+ \end{minipage}
+\end{frame}
+
+
 \begin{frame}{Case Study: NanoMAX}
   \begin{block}{Sources}
    \begin{itemize}
@@ -528,7 +622,6 @@ showstringspaces=false
     \item Concentration Map
    \end{itemize}
   \end{block}
-
 
 \end{frame}
 
@@ -558,32 +651,24 @@ showstringspaces=false
 
 \end{frame}
 
-
-
 \begin{frame}{Case Study: DanMAX}
-\begin{minipage}{0.5\textwidth}
-  \begin{block}{Sources}
-   \begin{itemize}
-    \item Basler
-    \item Pilatus
-    \item Orca
-    \item PandAbox
-   \end{itemize}
-  \end{block}
+ \begin{tabularx}{\textwidth}{rm{3cm}cccl}
+ Sardana & Basler & Pilatus & Orca & PandAbox &\\
+  \multicolumn{2}{c}{Beam CoG,
+    Beam Alignment}
+    & & & & \raisebox{-0.5\totalheight}{\includegraphics[width=1.5cm]{img/beamcog} } \\
+  & & Pileup File & & & \raisebox{-0.5\totalheight}{\includegraphics[width=1.5cm]{img/pileup}} \\
+  & & & \multicolumn{2}{c}{Encoder angle} & \raisebox{-0.5\totalheight}{\includegraphics[width=1.5cm]{img/tomo}} \\
+ \end{tabularx}
+\end{frame}
 
-  \begin{block}{Analysis / Output}
-   \begin{itemize}
-    \item Beam CoG
-    \item Slit Scan, Beam Alignment
-    \item Pileup File
-    \item Tomography Rotation Angle
-   \end{itemize}
-  \end{block}
-
-\end{minipage}
-\begin{minipage}{0.49\textwidth}
-\includegraphics[width=6cm]{img/beamcog}
-\end{minipage}
+\begin{frame}{Live Mode (coming soon)}
+\begin{itemize}
+ \item Select sources in Tango Devices
+ \item Automatically create trigger map
+ \item Arm detectors for live mode
+ \item Jointly preview analysis
+\end{itemize}
 
 \end{frame}
 
@@ -591,6 +676,9 @@ showstringspaces=false
 \begin{frame}
  \centering
  \Huge \usebeamercolor[fg]{title} \texttt{pip install dranspose}
+\bigskip
+
+ https://dranspo.se
 \end{frame}
 
 
@@ -600,6 +688,34 @@ showstringspaces=false
  \centering
  \Huge \usebeamercolor[fg]{title} Internals
 \end{frame}
+
+\begin{frame}{Trigger Map}
+ \begin{block}{Event Definitions}
+  Which \emph{frames} from which \emph{detectors} belong to the same \emph{event} and have to be processed by the same \emph{worker}?
+ \end{block}
+
+\begin{block}{Virtual Workers}
+\begin{itemize}
+ \item virtual workers are dynamically assigned to real workers
+ \item special \emph{all} workers (stream headers), or discard frame with $\emptyset$
+ \item \emph{none} if stream has no frame for event
+\end{itemize}
+
+\medskip
+ \begin{tabular}{rcccccc}
+   \faCamera & all & 1 & 3 & 5 & 7 & 8 \\
+   \faVideo & all & 2 & 4  & 6 & 7 & 9\\
+   \faSlidersH & all & all & none & none & $\emptyset$ &none \\
+   \faThermometerHalf & all & \{1,2\} & none & \{5,6\} & none  & \{8,9\} \\
+  \end{tabular}
+  \end{block}
+
+  \begin{block}{Scanning}
+   trigger map specified by scanning software, append-only extendable
+  \end{block}
+
+\end{frame}
+
 
 
 \begin{frame}[fragile]{Development: Worker}
