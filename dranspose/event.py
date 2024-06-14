@@ -1,6 +1,7 @@
 from typing import Any, Optional
 
 import zmq
+from cbor2 import CBORTag
 
 from dranspose.protocol import EventNumber, StreamName, WorkerName, Digest
 from pydantic import BaseModel, ConfigDict, computed_field
@@ -60,6 +61,25 @@ class InternalWorkerMessage(BaseModel):
 
     def get_all_frames(self) -> list[zmq.Frame | bytes]:
         return [frame for stream in self.streams.values() for frame in stream.frames]
+
+
+def message_encoder(encoder, value):
+    # Tag number 4000 was chosen arbitrarily
+    if isinstance(value, InternalWorkerMessage):
+        encoder.encode(CBORTag(42877, (value.event_number, value.streams)))
+    elif isinstance(value, StreamData):
+        encoder.encode(CBORTag(42878, (value.typ, value.frames)))
+    else:
+        raise TypeError(type(value).__name__)
+
+
+def message_tag_hook(decoder, tag, shareable_index=None):
+    if tag.tag == 42877:
+        return InternalWorkerMessage(event_number=tag.value[0], streams=tag.value[1])
+    elif tag.tag == 42878:
+        return StreamData(typ=tag.value[0], frames=tag.value[1])
+    else:
+        return tag
 
 
 class ResultData(BaseModel):

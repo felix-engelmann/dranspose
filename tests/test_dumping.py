@@ -1,16 +1,16 @@
 import asyncio
 import logging
-import pickle
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
+import cbor2
 
 import pytest
 import zmq.asyncio
 import zmq
 from pydantic_core import Url
 
-from dranspose.event import InternalWorkerMessage
+from dranspose.event import InternalWorkerMessage, message_tag_hook
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
@@ -47,7 +47,7 @@ async def test_dump(
     await create_worker(WorkerName("w2"))
     await create_worker(WorkerName("w3"))
 
-    p_eiger = tmp_path / "eiger_dump.pkls"
+    p_eiger = tmp_path / "eiger_dump.cbors"
     print(p_eiger, type(p_eiger))
 
     await create_ingester(
@@ -187,7 +187,7 @@ async def test_dump(
         evs = []
         while True:
             try:
-                dat: InternalWorkerMessage = pickle.load(f)
+                dat: InternalWorkerMessage = cbor2.load(f, tag_hook=message_tag_hook)
                 evs.append(dat.event_number)
                 print("loaded dump type", type(dat))
             except EOFError:
@@ -197,11 +197,11 @@ async def test_dump(
     assert evs == list(range(0, ntrig + 1))
 
     # read prefix dump
-    with open(f"{p_prefix}orca-ingester-{uuid}.pkls", "rb") as f:
+    with open(f"{p_prefix}orca-ingester-{uuid}.cbors", "rb") as f:
         evs = []
         while True:
             try:
-                dat = pickle.load(f)
+                dat = cbor2.load(f, tag_hook=message_tag_hook)
                 evs.append(dat.event_number)
                 print("loaded dump type", type(dat))
             except EOFError:

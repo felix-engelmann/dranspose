@@ -1,17 +1,18 @@
 import asyncio
 import time
 import os
-import pickle
 from typing import AsyncGenerator, Optional, Awaitable, Any, IO
 from uuid import UUID
 
+import cbor2
 import redis.exceptions as rexceptions
 import zmq.asyncio
+from cbor2 import CBORTag
 
 from pydantic import UUID4, model_validator
 
 from dranspose.distributed import DistributedService, DistributedSettings
-from dranspose.event import StreamData, InternalWorkerMessage
+from dranspose.event import StreamData, InternalWorkerMessage, message_encoder
 from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
     IngesterState,
@@ -175,7 +176,7 @@ class Ingester(DistributedService):
         if self.dump_filename is None and "dump_prefix" in self.parameters:
             val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
             if len(val) > 0:
-                self.dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.pkls"
+                self.dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
         if self.dump_filename:
             self.dump_file = open(self.dump_filename, "ab")
             self._logger.info(
@@ -212,7 +213,11 @@ class Ingester(DistributedService):
                         streams={k: v.get_bytes() for k, v in zmqparts.items()},
                     )
                     try:
-                        pickle.dump(allstr, self.dump_file)
+                        cbor2.dump(
+                            CBORTag(55799, allstr),
+                            self.dump_file,
+                            default=message_encoder,
+                        )
                     except Exception as e:
                         self._logger.error("cound not dump %s", e.__repr__())
                     self._logger.debug("written dump")
