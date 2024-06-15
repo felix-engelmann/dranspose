@@ -9,14 +9,21 @@ import time
 import traceback
 from typing import Iterator, Any, Optional
 
+import cbor2
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import TypeAdapter
 from starlette.responses import Response
 
 from dranspose.helpers import utils
-from dranspose.event import InternalWorkerMessage, EventData, ResultData
+from dranspose.event import (
+    InternalWorkerMessage,
+    EventData,
+    ResultData,
+    message_tag_hook,
+)
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
+from dranspose.parameters import ParameterBase
 from dranspose.protocol import WorkerName, Digest, WorkParameter
 
 
@@ -24,7 +31,10 @@ def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMe
     with open(filename, "rb") as f:
         while True:
             try:
-                frames = pickle.load(f)
+                if str(filename).endswith(".pkls"):
+                    frames = pickle.load(f)
+                else:
+                    frames = cbor2.load(f, tag_hook=message_tag_hook)
                 assert isinstance(frames, InternalWorkerMessage)
                 yield frames
             except EOFError:
@@ -89,6 +99,8 @@ def get_parameters(
             with open(parameter_file, "rb") as fb:
                 parameters = pickle.load(fb)
 
+    logger.info("params from file %s", parameters)
+
     param_description = {}
     if hasattr(workercls, "describe_parameters"):
         param_description.update({p.name: p for p in workercls.describe_parameters()})
@@ -99,7 +111,17 @@ def get_parameters(
     for p in parameters:
         if p in param_description:
             parameters[p].value = param_description[p].from_bytes(parameters[p].data)
+    logger.info("parsed params are %s", parameters)
 
+    for p in param_description:
+        if p not in parameters:
+            parameters[p] = WorkParameter(
+                name=p,
+                value=param_description[p].default,
+                data=ParameterBase.to_bytes(param_description[p].default),
+            )
+
+    logger.info("final params are %s", parameters)
     return parameters
 
 

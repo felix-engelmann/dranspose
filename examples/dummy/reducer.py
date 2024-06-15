@@ -6,7 +6,7 @@ class FluorescenceReducer:
     def __init__(self, state=None, **kwargs):
         self.number = 0
         self.publish = {"map": {}}
-        if state.mapreduce_version is not None:
+        if state is not None and state.mapreduce_version is not None:
             self.publish["version"] = state.mapreduce_version.model_dump(mode="json")
 
     @staticmethod
