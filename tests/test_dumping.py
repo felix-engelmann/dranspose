@@ -215,3 +215,79 @@ async def test_dump(
     await r.aclose()
 
     print(content)
+
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_dump_xrd(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_small_xrd: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    await reducer(None)
+    await create_worker(WorkerName("w1"))
+
+    await create_ingester(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
+                ingester_streams=[StreamName("xrd")],
+                upstream_url=Url("tcp://localhost:9999"),
+                ingester_url=Url("tcp://localhost:10010"),
+            ),
+        )
+    )
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/config")
+        state = EnsembleState.model_validate(await st.json())
+        logging.debug("content %s", state)
+        while {"xrd"} - set(state.get_streams()) != set():
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/config")
+            state = EnsembleState.model_validate(await st.json())
+
+        logging.info("startup done")
+
+        p_prefix = tmp_path / "dump_"
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
+
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/dump_prefix",
+            data=str(p_prefix).encode("utf8"),
+        )
+        assert resp.status == 200
+
+        ntrig = 10
+        resp = await session.post(
+            "http://localhost:5000/api/v1/mapping",
+            json={
+                "xrd": [
+                    [
+                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
+                            mode="json"
+                        )
+                    ]
+                    for i in range(1, ntrig)
+                ],
+            },
+        )
+        assert resp.status == 200
+
+    context = zmq.asyncio.Context()
+
+    asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/progress")
+        content = await st.json()
+        while not content["finished"]:
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/progress")
+            content = await st.json()
+
+    context.destroy()
+
+    print(content)

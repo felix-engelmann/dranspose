@@ -517,6 +517,53 @@ async def stream_small() -> Callable[
 
 
 @pytest_asyncio.fixture
+async def stream_small_xrd() -> Callable[
+    [zmq.Context[Any], int | str, int], Coroutine[Any, Any, None]
+]:
+    async def _make_xrd(
+        ctx: zmq.Context[Any], port: int | str, nframes: int, frame_time: float = 0.1
+    ) -> None:
+        if type(port) is str:
+            socket = AcquisitionSocket(ctx, Url(port))
+        else:
+            socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
+        acq = await socket.start(filename="output/xrd.h5")
+        start = time.perf_counter()
+        for frameno in range(nframes):
+            base = np.zeros((10, 10), dtype=np.uint16)
+            for x in range(base.shape[0]):
+                for y in range(base.shape[1]):
+                    base[x, y] = max(
+                        np.sin(
+                            (
+                                (x - base.shape[0] / 2) ** 2
+                                + (y - base.shape[1] / 2) ** 2
+                            )
+                            / (3 + frameno)
+                        )
+                        * 10
+                        + 10
+                        + random.randrange(-2, 2),
+                        0,
+                    )
+            await acq.image(base, base.shape, frameno)
+            if frame_time:
+                await asyncio.sleep(frame_time)
+            if frameno % 1000 == 0:
+                end = time.perf_counter()
+                logging.info(
+                    "send 1000 packets took %s: %lf p/s",
+                    end - start,
+                    1000 / (end - start),
+                )
+                start = end
+        await acq.close()
+        await socket.close()
+
+    return _make_xrd
+
+
+@pytest_asyncio.fixture
 async def time_beacon() -> Callable[
     [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
 ]:

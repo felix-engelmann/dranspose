@@ -24,6 +24,8 @@ markdown_extensions:
   - pymdownx.superfences
 
 exclude_docs: |
+  /seminar-2024-06-13
+  !/seminar-2024-06-13/main.pdf
   /seminar-2023-11-30
   !/seminar-2023-11-30/main.pdf
   /poster-2024-01-15
