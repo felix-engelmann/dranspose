@@ -17,7 +17,7 @@ class PcapWorker:
         if "pcap" in event.streams:
             res = self.pcap.parse(event.streams["pcap"])
             if isinstance(res, PositionCapValues):
-                triggertime = timedelta(seconds=res.fields["PCAP.TS_TRIG"].value)
+                triggertime = timedelta(seconds=res.fields["PCAP.TS_TRIG.Value"].value)
                 logger.info(
                     "got values %s at timestamp %s",
                     res,
