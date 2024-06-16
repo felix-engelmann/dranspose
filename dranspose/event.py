@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 import zmq
-from cbor2 import CBORTag
+from cbor2 import CBORTag, CBOREncoder, CBORDecoder
 
 from dranspose.protocol import EventNumber, StreamName, WorkerName, Digest
 from pydantic import BaseModel, ConfigDict, computed_field
@@ -63,7 +63,7 @@ class InternalWorkerMessage(BaseModel):
         return [frame for stream in self.streams.values() for frame in stream.frames]
 
 
-def message_encoder(encoder, value):
+def message_encoder(encoder: CBOREncoder, value: Any) -> None:
     # Tag number 4000 was chosen arbitrarily
     if isinstance(value, InternalWorkerMessage):
         encoder.encode(CBORTag(42877, (value.event_number, value.streams)))
@@ -73,7 +73,9 @@ def message_encoder(encoder, value):
         raise TypeError(type(value).__name__)
 
 
-def message_tag_hook(decoder, tag, shareable_index=None):
+def message_tag_hook(
+    decoder: CBORDecoder, tag: CBORTag, shareable_index: Any = None
+) -> Any:
     if tag.tag == 42877:
         return InternalWorkerMessage(event_number=tag.value[0], streams=tag.value[1])
     elif tag.tag == 42878:

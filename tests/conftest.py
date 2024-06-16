@@ -347,10 +347,10 @@ class UvicornServer(multiprocessing.Process):
         self.config = config
         logging.info("started server with config %s", config)
 
-    def stop(self):
+    def stop(self) -> None:
         self.terminate()
 
-    def run(self, *args, **kwargs):
+    def run(self, *args: Any, **kwargs: Any) -> None:
         self.server.run()
 
 

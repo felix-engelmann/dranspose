@@ -1,7 +1,8 @@
 import asyncio
 import time
 import os
-from typing import AsyncGenerator, Optional, Awaitable, Any, IO
+from io import BufferedWriter
+from typing import AsyncGenerator, Optional, Awaitable, Any
 from uuid import UUID
 
 import cbor2
@@ -72,7 +73,7 @@ class Ingester(DistributedService):
         )
         self.state: IngesterState
 
-        self.dump_file: Optional[IO[bytes]] = None
+        self.dump_file: Optional[BufferedWriter] = None
 
     def open_socket(self) -> None:
         self.ctx = zmq.asyncio.Context()

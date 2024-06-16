@@ -109,7 +109,8 @@ async def test_simple(
             conf = EnsembleState.model_validate(await st.json())
             msg = []
             for k in conf.workers + conf.ingesters + [conf.reducer]:
-                msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
+                if k is not None:
+                    msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
             logging.info("config is \n%s", "\n".join(msg))
 
     context.destroy()

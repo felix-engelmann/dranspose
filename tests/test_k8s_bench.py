@@ -4,6 +4,7 @@ import json
 import logging
 import time
 from collections import defaultdict
+from typing import Optional, Any
 
 import aiohttp
 import pytest
@@ -18,7 +19,7 @@ def get_url(path: str, svc: str = "controller") -> str:
     return f"http://dranspose-bench-{svc}.daq.maxiv.lu.se/api/v1/{path}"
 
 
-def get_gen(path, svc: str = "large"):
+def get_gen(path: str, svc: str = "large") -> str:
     return f"http://dranspose-workload-generator-{svc}.daq.maxiv.lu.se/api/v1/{path}"
 
 
@@ -29,19 +30,19 @@ def get_gen(path, svc: str = "large"):
     reason="explicitly enable --k8s remote bench, optional --plots",
 )
 @pytest.mark.asyncio
-async def est_single_ingester(ingester, plt, size) -> None:
+async def est_single_ingester(ingester: str, plt: Any, size: int) -> None:
     async with aiohttp.ClientSession() as session:
         st = await session.get(get_url("config"))
-        state = EnsembleState.model_validate(await st.json())
-        logging.info("available streams %s", state.get_streams())
+        estate = EnsembleState.model_validate(await st.json())
+        logging.info("available streams %s", estate.get_streams())
 
         st = await session.get(get_gen("config", svc=ingester))
-        state = NetworkConfig.model_validate(await st.json())
-        logging.info("config is %s", state)
+        nstate = NetworkConfig.model_validate(await st.json())
+        logging.info("config is %s", nstate)
 
         st = await session.get(get_gen("statistics", svc=ingester))
-        state = Statistics.model_validate(await st.json())
-        logging.info("stat is %s, %s", len(state.snapshots), state.snapshots[-1])
+        sstate = Statistics.model_validate(await st.json())
+        logging.info("stat is %s, %s", len(sstate.snapshots), sstate.snapshots[-1])
 
         st = await session.post(
             get_gen("open_socket", svc=ingester),
@@ -85,7 +86,7 @@ async def est_single_ingester(ingester, plt, size) -> None:
         ingester_times = defaultdict(list)
         measured_times = []
 
-        exp_start = None
+        exp_start: Optional[float] = None
 
         st = await session.get(get_url("progress"))
         content = await st.json()
@@ -101,12 +102,13 @@ async def est_single_ingester(ingester, plt, size) -> None:
             measured_times.append(time.time() - exp_start)
             conf = EnsembleState.model_validate(await st.json())
             msg = []
-            for k in conf.workers:
-                worker_times[k.name].append(k.event_rate)
-            for k in conf.ingesters:
-                ingester_times[k.name].append(k.event_rate)
+            for wk in conf.workers:
+                worker_times[wk.name].append(wk.event_rate)
+            for ik in conf.ingesters:
+                ingester_times[ik.name].append(ik.event_rate)
             for k in conf.workers + conf.ingesters + [conf.reducer]:
-                msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
+                if k is not None:
+                    msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
             logging.info("state is \n%s", "\n".join(msg))
 
         st = await session.post(get_gen("close_socket", svc=ingester))
@@ -135,6 +137,9 @@ async def est_single_ingester(ingester, plt, size) -> None:
                     delta = snetio(*map(lambda x: x[1] - x[0], zip(last[ifname], nst)))
                     logging.info("   Δ%s: %s", ifname, delta)
                     last[ifname] = nst
+
+        if exp_start is None:
+            return
 
         bytes_times = []
         sent_times = []
@@ -165,8 +170,8 @@ async def est_single_ingester(ingester, plt, size) -> None:
             list(map(sum, zip(*worker_times.values()))),
             label="worker sum",
         )
-        for i in ingester_times:
-            plt.plot(measured_times, ingester_times[i], label=i)
+        for dname in ingester_times:
+            plt.plot(measured_times, ingester_times[dname], label=dname)
         plt.plot(stat_times, sent_times, label="generated packets")
         plt.plot(stat_times, bytes_times, label="outgoing MiBi/s")
         plt.title(f"{ntrig} frames, {delay}s delay, {size*size*2} bytes/f")
@@ -181,7 +186,7 @@ async def est_single_ingester(ingester, plt, size) -> None:
     reason="explicitly enable --k8s remote bench, optional --plots",
 )
 @pytest.mark.asyncio
-async def est_dual_ingester(plt, size) -> None:
+async def est_dual_ingester(plt: Any, size: int) -> None:
     async with aiohttp.ClientSession() as session:
         ingesters = ["fast", "large"]
         st = await session.get(get_url("config"))
@@ -242,18 +247,22 @@ async def est_dual_ingester(plt, size) -> None:
             measured_times.append(time.time() - exp_start)
             conf = EnsembleState.model_validate(await st.json())
             msg = []
-            for k in conf.workers:
-                worker_times[k.name].append(k.event_rate)
-            for k in conf.ingesters:
-                ingester_times[k.name].append(k.event_rate)
+            for wk in conf.workers:
+                worker_times[wk.name].append(wk.event_rate)
+            for ik in conf.ingesters:
+                ingester_times[ik.name].append(ik.event_rate)
             for k in conf.workers + conf.ingesters + [conf.reducer]:
-                msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
+                if k is not None:
+                    msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
             logging.info("state is \n%s", "\n".join(msg))
 
         st = await session.post(get_gen("close_socket", svc=ingesters[0]))
         st = await session.post(get_gen("close_socket", svc=ingesters[1]))
         state = await st.json()
         logging.info("close %s", state)
+
+        if exp_start is None:
+            return
 
         bytes_times = defaultdict(list)
         sent_times = defaultdict(list)
@@ -288,8 +297,8 @@ async def est_dual_ingester(plt, size) -> None:
             list(map(sum, zip(*worker_times.values()))),
             label="worker sum",
         )
-        for i in ingester_times:
-            plt.plot(measured_times, ingester_times[i], label=i)
+        for dname in ingester_times:
+            plt.plot(measured_times, ingester_times[dname], label=dname)
         for ing in ingesters:
             plt.plot(stat_times[ing], sent_times[ing], label="generated packets")
             plt.plot(stat_times[ing], bytes_times[ing], label="outgoing MiBi/s")
@@ -307,7 +316,7 @@ async def est_dual_ingester(plt, size) -> None:
     reason="explicitly enable --k8s remote bench, optional --plots",
 )
 @pytest.mark.asyncio
-async def test_raw_zmq(plt, size) -> None:
+async def test_raw_zmq(plt: Any, size: int) -> None:
     async with aiohttp.ClientSession() as session:
         st = await session.get(get_url("config"))
         state = EnsembleState.model_validate(await st.json())

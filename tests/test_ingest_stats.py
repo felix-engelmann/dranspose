@@ -98,7 +98,10 @@ async def test_map(
         st = await session.get("http://localhost:5000/api/v1/config")
         conf = EnsembleState.model_validate(await st.json())
         msg = []
+
         for k in conf.workers + conf.ingesters + [conf.reducer]:
+            if k is None:
+                continue
             msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
             if k.name == "eiger-ingester":
                 assert k.processed_events > 0
