@@ -161,10 +161,10 @@ def replay(
             try:
                 internals = [next(gen) for gen in gens]
                 event = EventData.from_internals(internals)
-
                 wi = random.randint(0, len(workers) - 1)
                 data = workers[wi].process_event(event, parameters=parameters)
-
+                if data is None:
+                    continue
                 rd = ResultData(
                     event_number=event.event_number,
                     worker=WorkerName(f"development{wi}"),
