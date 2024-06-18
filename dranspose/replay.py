@@ -125,6 +125,15 @@ def get_parameters(
     return parameters
 
 
+def timer(red):
+    while True:
+        delay = 1
+        if hasattr(red, "timer"):
+            delay = red.timer()
+
+        time.sleep(delay)
+
+
 def replay(
     wclass: str,
     rclass: str,
@@ -149,6 +158,8 @@ def replay(
     global reducer
     workers = [workercls(parameters=parameters, context={}) for _ in range(nworkers)]
     reducer = reducercls(parameters=parameters, context={})
+
+    threading.Thread(target=timer, daemon=True, args=(reducer,)).start()
 
     config = uvicorn.Config(
         reducer_app, port=port or 5000, host="localhost", log_level="info"

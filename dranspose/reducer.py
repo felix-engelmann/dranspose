@@ -76,6 +76,8 @@ class Reducer(DistributedService):
     async def run(self) -> None:
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+        self.timer_task = asyncio.create_task(self.timer())
+        self.timer_task.add_done_callback(done_callback)
         self.metrics_task = asyncio.create_task(self.update_metrics())
         self.metrics_task.add_done_callback(done_callback)
         await self.register()
@@ -119,12 +121,39 @@ class Reducer(DistributedService):
             self._logger.debug("processed result %s", result)
             self.state.processed_events += 1
 
+    async def timer(self) -> None:
+        self._logger.info("started timer task")
+        while True:
+            delay = 1
+            if self.reducer:
+                if hasattr(self.reducer, "timer"):
+                    try:
+                        loop = asyncio.get_event_loop()
+                        delay = await loop.run_in_executor(None, self.reducer.timer)
+                    except Exception as e:
+                        self._logger.error(
+                            "custom reducer timer failed: %s\n%s",
+                            e.__repr__(),
+                            traceback.format_exc(),
+                        )
+
+            if not isinstance(delay, (int, float)):
+                self._logger.error(
+                    "custom reducer time is not a number: %s",
+                    delay,
+                )
+                delay = 1
+            await asyncio.sleep(delay)
+
     async def restart_work(self, new_uuid: UUID4) -> None:
         self._logger.info("resetting config %s", new_uuid)
+        await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)
         self.state.mapping_uuid = new_uuid
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
+        self.timer_task = asyncio.create_task(self.timer())
+        self.timer_task.add_done_callback(done_callback)
 
     async def finish_work(self) -> None:
         self._logger.info("finishing reducer work")
@@ -151,6 +180,7 @@ class Reducer(DistributedService):
         )
 
     async def close(self) -> None:
+        await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.metrics_task)
         await self.redis.delete(RedisKeys.config("reducer", self.state.name))
