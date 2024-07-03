@@ -84,6 +84,7 @@ class Controller:
         self.processed_event_no: int = 0
         self.completed_events: list[int] = []
         self.finished_components: list[UnionType] = []
+        self.external_stop = False
         self.assign_task: Task[None]
         self.config_fetch_time: float = 0
         self.config_cache: EnsembleState
@@ -398,6 +399,7 @@ class Controller:
 
     async def assign_work(self) -> None:
         last = 0
+        self.external_stop = False
         self.processed_event_no = 0
         self.completed = defaultdict(list)
         self.reduced = defaultdict(list)
@@ -445,11 +447,13 @@ class Controller:
                     self.to_reduce,
                 )
                 if (
-                    len(self.completed_events) > 0
-                    and len(self.completed_events) == self.mapping.len()
-                    and len(self.to_reduce) == 0
-                    and notify_finish
-                ):
+                    (
+                        len(self.completed_events) > 0
+                        and len(self.completed_events) == self.mapping.len()
+                        and len(self.to_reduce) == 0
+                    )
+                    or self.external_stop
+                ) and notify_finish:
                     # all events done, send close
                     cupd = ControllerUpdate(
                         mapping_uuid=self.mapping.uuid,
@@ -577,6 +581,13 @@ async def set_mapping(
 async def get_mapping() -> Dict[StreamName, List[Optional[List[VirtualWorker]]]]:
     global ctrl
     return ctrl.mapping.mapping
+
+
+@app.post("/api/v1/stop")
+async def stop():
+    global ctrl
+    logger.info("externally stopped scan")
+    ctrl.external_stop = True
 
 
 @app.post("/api/v1/sardana_hook")
