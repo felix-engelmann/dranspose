@@ -125,7 +125,7 @@ def get_parameters(
     return parameters
 
 
-def timer(red):
+def timer(red: Any) -> None:
     while True:
         delay = 1
         if hasattr(red, "timer"):

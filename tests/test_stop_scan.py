@@ -1,7 +1,5 @@
-import os
-
 import asyncio
-from typing import Awaitable, Callable, Any, Coroutine, Optional
+from typing import Awaitable, Callable, Optional
 import zmq.asyncio
 
 import aiohttp
@@ -9,7 +7,10 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters import ZmqPullSingleIngester, ZmqPullSingleSettings
+from dranspose.ingesters.zmqpull_single import (
+    ZmqPullSingleIngester,
+    ZmqPullSingleSettings,
+)
 from dranspose.protocol import (
     EnsembleState,
     StreamName,
@@ -26,10 +27,6 @@ async def test_stop_scans(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
-        [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
-        Coroutine[Any, Any, None],
-    ],
 ) -> None:
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(WorkerName("w1"))

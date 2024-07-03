@@ -584,7 +584,7 @@ async def get_mapping() -> Dict[StreamName, List[Optional[List[VirtualWorker]]]]
 
 
 @app.post("/api/v1/stop")
-async def stop():
+async def stop() -> None:
     global ctrl
     logger.info("externally stopped scan")
     ctrl.external_stop = True
