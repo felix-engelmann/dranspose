@@ -223,10 +223,14 @@ logger = logging.getLogger(__name__)
 class TestReducer:
     def __init__(self, *args, **kwargs):
         self.evolution = [0]
+        self.last_value = 0
 
     def process_result(self, result, parameters=None):
-        self.evolution.append(result.payload-self.evolution[-1])
-
+        if result.event_number > (len(self.evolution) - 1):
+            self.evolution += [None] * (1 + result.event_number - len(self.evolution))
+        self.evolution[result.event_number] = result.payload - self.evolution
+        self.last_value = result.payload.intensity
+        
     def finish(self, parameters=None):
         logger.info("delta were %s", self.evolution)
 ```
@@ -235,4 +239,187 @@ is
 
 ```
 INFO:src.reducer:delta were [0, 9.5, 1.0, 10.0, -4.5, 6.75, -3.75, 9.0, -1.5, 11.75]
+```
+
+The `process_result` function takes a lot of care on how to append data to the list.
+This function may be called with different results, coming from different workers, for the *same* event.
+Or a worker returns `None` for an event, so the `process_result` is never called for this event.
+Due to these possibilities, there is no guarantee on the order of the events.
+The code above takes care of this, by filling the list with `None` to the event received.
+
+## Write results to file
+
+Now that we have the delta values, it is nice to save them to a file.
+This is best performed in the reducer.
+To decide where to save the data, it is nice to get the path of the raw data first.
+The STINS stream has a `filename` attribute in the series start message. 
+By convention, it might be `""` (empty string) to indicate a live viewing without saving data.
+Your pipeline should honor this as well and only save data if a filename is set.
+
+The quickest way is for the worker to return a dictionary with either a `filename` key or an `intensity` key:
+
+```python
+import logging
+import numpy as np
+
+from dranspose.middlewares.stream1 import parse as parse_stins
+from dranspose.data.stream1 import Stream1Data, Stream1Start, Stream1End
+
+logger = logging.getLogger(__name__)
+
+class TestWorker:
+    def __init__(self, *args, **kwargs):
+        pass
+    def process_event(self, event, parameters=None):
+        logger.debug(event)
+        if "xrd" in event.streams:
+            acq = parse_stins(event.streams["xrd"])
+            if isinstance(acq, Stream1Start):
+                logger.info("start message %s", acq)
+                return {"filename": acq.filename}
+            elif isinstance(acq, Stream1Data):
+                intensity = np.mean(acq.data[:2,8:])
+                logger.debug("intensity is %f", intensity)
+                return {"intensity": intensity}
+```
+
+The reducer then has to check which keys are present in the result and process them differently.
+
+With only two keys, it is easy to keep an overview, however using dictionaries to pass data quickly becomes messy.
+A cleaner solution is to return a dataclass depending on the intent.
+
+```python
+import logging
+from dataclasses import dataclass
+import numpy as np
+
+from dranspose.middlewares.stream1 import parse as parse_stins
+from dranspose.data.stream1 import Stream1Data, Stream1Start, Stream1End
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class Start:
+    filename: str
+
+@dataclass
+class Result:
+    intensity: float
+
+class TestWorker:
+    def __init__(self, *args, **kwargs):
+        pass
+    def process_event(self, event, parameters=None):
+        logger.debug(event)
+        if "xrd" in event.streams:
+            acq = parse_stins(event.streams["xrd"])
+            if isinstance(acq, Stream1Start):
+                logger.info("start message %s", acq)
+                return Start(acq.filename)
+            elif isinstance(acq, Stream1Data):
+                intensity = np.mean(acq.data[:2,8:])
+                logger.debug("intensity is %f", intensity)
+                return Result(intensity)
+```
+
+The reducer is then able to separate the different event types cleanly by importing the two dataclasses and checking with `isinstance`
+
+```python
+import logging
+import h5py
+import numpy as np
+
+from .worker import Start, Result
+
+logger = logging.getLogger(__name__)
+
+class TestReducer:
+    def __init__(self, *args, **kwargs):
+        self.evolution = [0]
+        self.last_value = 0
+
+    def process_result(self, result, parameters=None):
+        if isinstance(result.payload, Start):
+            logger.info("start message")
+        elif isinstance(result.payload, Result):
+            logger.debug("got result %s", result.payload)
+            if result.event_number > (len(self.evolution) - 1):
+                self.evolution += [None] * (1 + result.event_number - len(self.evolution))
+            self.evolution[result.event_number] = result.payload.intensity - self.last_value
+            self.last_value = result.payload.intensity
+```
+
+This explicitly writes out the protocol on how the workers pass data to the reducer and avoids implicit contracts which are hard for others to understand and maintain.
+
+Like in most trigger maps, the first packet of each stream is broadcast to all workers in the replay.
+This makes sense as it is normally sent before the first trigger and contains only meta information.
+
+This needs care when using the Start message in the reducer to open a file. The file should only be opened once, no matter how many worker messages it receives.
+A simple way is to set a `None` file handle in `__init__` and only open the file if it is still `None`.
+
+Before opening the file, the containing directory needs to be created with `os.makedirs`.
+For this tutorial, the sample data has a filename of `output/xrd.h5` but it is usually an absolute path.
+Beware that this is the filename where upstream the raw data is saved to. The analysis pipeline should write to a modified filename.
+
+The reducer now saves the intensity values to a `_processed` suffixed file:
+
+```python
+import logging
+import h5py
+import os
+import numpy as np
+
+from .worker import Start, Result
+
+logger = logging.getLogger(__name__)
+
+class TestReducer:
+    def __init__(self, *args, **kwargs):
+        self.evolution = [0]
+        self.last_value = 0
+        self._fh = None
+        self._dset = None
+
+    def process_result(self, result, parameters=None):
+        if isinstance(result.payload, Start):
+            logger.info("start message")
+            if self._fh is None:
+                name, ext = os.path.splitext(result.payload.filename)
+                dest_filename = f"{name}_processed{ext}"
+                os.makedirs(os.path.dirname(dest_filename), exist_ok=True)
+                self._fh = h5py.File(dest_filename, 'w')
+                self._dset = self._fh.create_dataset("reduced", (0,), maxshape=(None, ), dtype=np.float32)
+        elif isinstance(result.payload, Result):
+            logger.debug("got result %s", result.payload)
+            if result.event_number > (len(self.evolution) - 1):
+                self.evolution += [None] * (1 + result.event_number - len(self.evolution))
+            self.evolution[result.event_number] = result.payload.intensity - self.last_value
+            self.last_value = result.payload.intensity
+
+            oldsize = self._dset.shape[0]
+            self._dset.resize(max(1 + result.event_number, oldsize), axis=0)
+            self._dset[result.event_number] = result.payload.intensity
+
+
+    def finish(self, parameters=None):
+        logger.info("delta were %s", self.evolution)
+        if self._fh is not None:
+            self._fh.close()
+```
+
+The file contains all the processed values
+
+```
+$ h5dump output/xrd_processed.h5
+HDF5 "output/xrd_processed.h5" {
+GROUP "/" {
+   DATASET "reduced" {
+      DATATYPE  H5T_IEEE_F32LE
+      DATASPACE  SIMPLE { ( 10 ) / ( H5S_UNLIMITED ) }
+      DATA {
+      (0): 0, 9.25, 11.25, 11.75, 4.25, 2.25, 3, 4.75, 7.75, 10.75
+      }
+   }
+}
+}
 ```
