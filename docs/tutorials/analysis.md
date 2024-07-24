@@ -532,3 +532,139 @@ GROUP "/" {
 }
 }
 ```
+
+## Heavy Processing
+
+For some applications the mean of a small rectangle might be sufficient, but more often it is interesting to analysse the full 2d image.
+One option is to azimuthally integrate the image to get the intensity on a radial.
+An approachable packet is the `azint` conda package.
+After installing it, it needs the detector geometry. Intially we will provide it fully manually by creating a `Detector` and a `Pony` instance.
+
+After creating an `AzimuthalIntegrator` instance, we send the radial axis of *q* values to the reducer to save them to the h5 file and prepare the dimensions of the dataset with values, having the same length.
+
+```python
+import logging
+from dataclasses import dataclass
+import numpy as np
+import azint
+
+from dranspose.middlewares.stream1 import parse as parse_stins
+from dranspose.data.stream1 import Stream1Data, Stream1Start, Stream1End
+from dranspose.parameters import IntParameter
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class Start:
+    filename: str
+    radial_axis: list[float]
+
+@dataclass
+class Result:
+    intensity: float
+    integrated: list[float]
+
+class TestWorker:
+    def __init__(self, *args, **kwargs):
+        pixel_size = 0.75e-6
+        det = azint.detector.Detector(pixel_size, pixel_size, (10,10))
+        poni = azint.Poni(det,  dist=30*pixel_size,
+                                poni1 = 5*pixel_size,
+                                poni2 = 5*pixel_size,
+                                rot1 = 0,
+                                rot2 = 0,
+                                rot3 = 0,
+                                wavelength = 1e-10)
+        self.ai = azint.AzimuthalIntegrator(poni,
+                                 4,
+                                 5,
+                                 unit='q',
+                                 solid_angle=True)
+
+    @staticmethod
+    def describe_parameters():
+        params = [
+            IntParameter(name="till_x", default=2),
+            IntParameter(name="from_y", default=8),
+        ]
+        return params
+
+    def process_event(self, event, parameters=None):
+        logger.debug(event)
+        if "xrd" in event.streams:
+            acq = parse_stins(event.streams["xrd"])
+            if isinstance(acq, Stream1Start):
+                logger.info("start message %s", acq)
+                return Start(acq.filename, self.ai.radial_axis)
+            elif isinstance(acq, Stream1Data):
+                intensity = np.mean(acq.data[:parameters["till_x"].value,parameters["from_y"].value:])
+                logger.debug("intensity is %f", intensity)
+                I, _ = self.ai.integrate(acq.data)
+                logger.info("I %s %s", I, self.ai.radial_axis)
+                return Result(intensity, I)
+
+```
+
+### Poni file sources
+
+There are multiple options on how to provide the geometry to build the poni file.
+The individual float values could be exposed as parameters, however that will be invonvenient for users used to poni files.
+There is a `FileParameter` available which holds the full content of a file. The advantage is that the workers don't need filesystem access to read the poni file.
+However, another process needs to upload the poni file, which is normally the tango device server displaying the paramters.
+
+## Writing the diffractograms
+
+It remains to place the data calculated by the workers into the h5 file by the reducer.
+
+```python
+import logging
+import h5py
+import os
+import numpy as np
+
+from .worker import Start, Result
+
+logger = logging.getLogger(__name__)
+
+class TestReducer:
+    def __init__(self, *args, **kwargs):
+        self.evolution = [0]
+        self.last_value = 0
+        self._fh = None
+        self._dset = None
+        self._Iset = None
+
+    def process_result(self, result, parameters=None):
+        if isinstance(result.payload, Start):
+            logger.info("start message")
+            if self._fh is None:
+                name, ext = os.path.splitext(result.payload.filename)
+                dest_filename = f"{name}_processed{ext}"
+                os.makedirs(os.path.dirname(dest_filename), exist_ok=True)
+                self._fh = h5py.File(dest_filename, 'w')
+                self._dset = self._fh.create_dataset("reduced", (0,), maxshape=(None, ), dtype=np.float32)
+                self._fh.create_dataset("till_x", data=parameters["till_x"].value)
+                self._fh.create_dataset("from_y", data=parameters["from_y"].value)
+                number_qbins = len(result.payload.radial_axis)
+                self._Iset = self._fh.create_dataset("I", (0, number_qbins), maxshape=(None, number_qbins), dtype=np.float32)
+                self._fh.create_dataset("radial_axis", data=result.payload.radial_axis)
+        elif isinstance(result.payload, Result):
+            logger.debug("got result %s", result.payload)
+            if result.event_number > (len(self.evolution) - 1):
+                self.evolution += [None] * (1 + result.event_number - len(self.evolution))
+            self.evolution[result.event_number] = result.payload.intensity - self.last_value
+            self.last_value = result.payload.intensity
+
+            oldsize = self._dset.shape[0]
+            self._dset.resize(max(1 + result.event_number, oldsize), axis=0)
+            self._dset[result.event_number] = result.payload.intensity
+
+            oldsize = self._Iset.shape[0]
+            self._Iset.resize(max(1 + result.event_number, oldsize), axis=0)
+            self._Iset[result.event_number] = result.payload.integrated
+
+    def finish(self, parameters=None):
+        logger.info("delta were %s", self.evolution)
+        if self._fh is not None:
+            self._fh.close()
+```
