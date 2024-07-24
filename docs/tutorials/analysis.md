@@ -423,3 +423,112 @@ GROUP "/" {
 }
 }
 ```
+
+## Processing Parameters
+
+The current worker calulates the mean of a fixed area (`[:2,8:]`). Changing requires updating the code and pushing a new image, which is time consuming.
+To provide flexibility, dranspose supports parameters, which can change at any time.
+Though, if you change them during an active scan, you get no guarantees on when which worker gets the new paramters.
+
+To register parameters, the worker or reducer needs to implement a static `describe_parameters` method wich returns a list of `dranspose.parameters` instances.
+The paramter values, depending on their type, are available in the `parameters` dict and the `value` attribute:
+
+```python
+import logging
+from dataclasses import dataclass
+import numpy as np
+
+from dranspose.middlewares.stream1 import parse as parse_stins
+from dranspose.data.stream1 import Stream1Data, Stream1Start, Stream1End
+from dranspose.parameters import IntParameter
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class Start:
+    filename: str
+
+@dataclass
+class Result:
+    intensity: float
+
+class TestWorker:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    @staticmethod
+    def describe_parameters():
+        params = [
+            IntParameter(name="till_x", default=2),
+            IntParameter(name="from_y", default=8),
+        ]
+        return params
+
+    def process_event(self, event, parameters=None):
+        logger.debug(event)
+        if "xrd" in event.streams:
+            acq = parse_stins(event.streams["xrd"])
+            if isinstance(acq, Stream1Start):
+                logger.info("start message %s", acq)
+                return Start(acq.filename)
+            elif isinstance(acq, Stream1Data):
+                intensity = np.mean(acq.data[:parameters["till_x"].value,parameters["from_y"].value:])
+                logger.debug("intensity is %f", intensity)
+                return Result(intensity)
+```
+
+These parameters are managed by the dranspose controller and are get/set via the REST interface.
+For replay testing, the parameters are provided in a json file with the value encoded as string in the `data` field:
+
+```json
+[{"name": "till_x", "data": "3"},
+{"name": "from_y", "data": "7"}]
+```
+
+To provide the parameter file to the replay, add the `-p` argument
+
+```shell
+dranspose replay -w "src.worker:TestWorker" -r "src.reducer:TestReducer" -f data/dump_xrd.cbors -p test_params.json
+```
+
+As a good practice, it is recommended to store the parameters along with the processed data to be able to reconstruct how it was reduced.
+The parameters defined in the worker are also available in the reducer:
+
+```python
+                self._fh = h5py.File(dest_filename, 'w')
+                self._dset = self._fh.create_dataset("reduced", (0,), maxshape=(None, ), dtype=np.float32)
+                self._fh.create_dataset("till_x", data=parameters["till_x"].value)
+                self._fh.create_dataset("from_y", data=parameters["from_y"].value)
+```
+
+To result in a self descriptive file:
+
+```
+$ h5dump output/xrd_processed.h5
+HDF5 "output/xrd_processed.h5" {
+GROUP "/" {
+   DATASET "from_y" {
+      DATATYPE  H5T_STD_I64LE
+      DATASPACE  SCALAR
+      DATA {
+      (0): 7
+      }
+   }
+   DATASET "reduced" {
+      DATATYPE  H5T_IEEE_F32LE
+      DATASPACE  SIMPLE { ( 10 ) / ( H5S_UNLIMITED ) }
+      DATA {
+      (0): 0, 8.88889, 8.66667, 8.11111, 6, 6.66667, 8.22222, 10.6667,
+      (8): 12.4444, 14.3333
+      }
+   }
+   DATASET "till_x" {
+      DATATYPE  H5T_STD_I64LE
+      DATASPACE  SCALAR
+      DATA {
+      (0): 3
+      }
+   }
+}
+}
+```
