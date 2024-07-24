@@ -141,7 +141,8 @@ def replay(
     parameter_file: os.PathLike[Any] | str,
     port: Optional[int] = None,
     keepalive: bool = False,
-    nworkers: int = 1,
+    nworkers: int = 2,
+    broadcast_first: bool = True,
 ) -> None:
     gens = [get_internals(f) for f in zmq_files]
 
@@ -158,7 +159,7 @@ def replay(
     global reducer
     workers = [workercls(parameters=parameters, context={}) for _ in range(nworkers)]
     reducer = reducercls(parameters=parameters, context={})
-
+    logger.info("created workers %s", workers)
     threading.Thread(target=timer, daemon=True, args=(reducer,)).start()
 
     config = uvicorn.Config(
@@ -167,31 +168,40 @@ def replay(
     server = Server(config)
     # server.run()
 
+    first = True
+
     with server.run_in_thread(port):
         while True:
             try:
                 internals = [next(gen) for gen in gens]
                 event = EventData.from_internals(internals)
-                wi = random.randint(0, len(workers) - 1)
-                data = workers[wi].process_event(event, parameters=parameters)
-                if data is None:
-                    continue
-                rd = ResultData(
-                    event_number=event.event_number,
-                    worker=WorkerName(f"development{wi}"),
-                    payload=data,
-                    parameters_hash=Digest(
-                        "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
-                    ),
-                )
 
-                header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
-                body = pickle.dumps(rd.payload)
-                prelim = json.loads(header)
-                prelim["payload"] = pickle.loads(body)
-                result = ResultData.model_validate(prelim)
+                dst_worker_ids = [random.randint(0, len(workers) - 1)]
+                if first and broadcast_first:
+                    dst_worker_ids = range(len(workers))
+                    first = False
 
-                reducer.process_result(result, parameters=parameters)
+                for wi in dst_worker_ids:
+                    logger.warning("spread to wi %d", wi)
+                    data = workers[wi].process_event(event, parameters=parameters)
+                    if data is None:
+                        continue
+                    rd = ResultData(
+                        event_number=event.event_number,
+                        worker=WorkerName(f"development{wi}"),
+                        payload=data,
+                        parameters_hash=Digest(
+                            "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
+                        ),
+                    )
+
+                    header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
+                    body = pickle.dumps(rd.payload)
+                    prelim = json.loads(header)
+                    prelim["payload"] = pickle.loads(body)
+                    result = ResultData.model_validate(prelim)
+
+                    reducer.process_result(result, parameters=parameters)
 
             except StopIteration:
                 for worker in workers:

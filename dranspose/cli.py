@@ -284,7 +284,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser_replay.add_argument(
         "--nworkers",
         help="number of workers to distribute events to",
-        default=1,
+        default=2,
         type=int,
     )
 
