@@ -430,3 +430,43 @@ def test_uniform() -> None:
     a = b[0]
     assert isinstance(a, VirtualWorker)
     assert a.constraint == 9
+
+
+def test_huge_map() -> None:
+    ntrig = 10_000
+    m = Mapping(
+        {
+            StreamName("test"): [
+                [VirtualWorker(constraint=VirtualConstraint(i))] for i in range(ntrig)
+            ]
+        },
+        add_start_end=False,
+    )
+
+    assert m.len() == ntrig
+
+
+def test_assign_with_completed() -> None:
+    ntrig = 10
+    m = Mapping(
+        {
+            StreamName("test"): [
+                [VirtualWorker(constraint=VirtualConstraint(i))] for i in range(ntrig)
+            ]
+        },
+        add_start_end=False,
+    )
+
+    m.print()
+    all_workers = [
+        WorkerState(name=WorkerName("w1")),
+        WorkerState(name=WorkerName("w2")),
+    ]
+    m.assign_next(all_workers[0], all_workers)
+    m.assign_next(all_workers[1], all_workers)
+
+    m.print()
+
+    m.assign_next(all_workers[0], all_workers, completed=EventNumber(1))
+
+    m.print()

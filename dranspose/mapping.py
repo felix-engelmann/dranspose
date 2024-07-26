@@ -10,7 +10,6 @@ from dranspose.protocol import (
     VirtualWorker,
     WorkerName,
     EventNumber,
-    WorkerTag,
     WorkerState,
     VirtualConstraint,
 )
@@ -131,14 +130,6 @@ class Mapping:
                     )
             minimum = max(minimum, len(workers))
         return minimum
-
-    def required_tags(self) -> set[WorkerTag]:
-        tags = set()
-        for i in zip(*self.mapping.values()):
-            for val in i:
-                if val is not None:
-                    tags.update([v.tags for v in val])
-        return tags
 
     def get_event_workers(self, no: EventNumber) -> WorkAssignment:
         ret: dict[StreamName, set[WorkerName]] = defaultdict(set)
