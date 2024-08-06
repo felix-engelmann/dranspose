@@ -30,11 +30,12 @@ def parse(data: StreamData) -> UnionType:
     packet = Stream1Packet.validate_python(val)
     if isinstance(packet, Stream1Data):
         assert data.length == 2
-        bufframe = data.frames[1]
-        if isinstance(bufframe, zmq.Frame):
-            bufframe = bufframe.bytes
-        buf = np.frombuffer(bufframe, dtype=packet.type)
-        img = buf.reshape(packet.shape)
-        packet.data = img
+        if packet.compression == "none":
+            bufframe = data.frames[1]
+            if isinstance(bufframe, zmq.Frame):
+                bufframe = bufframe.bytes
+            buf = np.frombuffer(bufframe, dtype=packet.type)
+            img = buf.reshape(packet.shape)
+            packet.data = img
 
     return packet
