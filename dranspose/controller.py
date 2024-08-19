@@ -253,20 +253,21 @@ class Controller:
     async def consistent_parameters(self) -> None:
         while True:
             try:
-                consistent = True
+                consistent = []
                 cfg = await self.get_configs()
                 if cfg.reducer and cfg.reducer.parameters_hash != self.parameters_hash:
-                    consistent = False
+                    consistent.append(("reducer", cfg.reducer.parameters_hash))
                 for wo in cfg.workers:
                     if wo.parameters_hash != self.parameters_hash:
-                        consistent = False
+                        consistent.append((wo.name, wo.parameters_hash))
                 for ing in cfg.ingesters:
                     if ing.parameters_hash != self.parameters_hash:
-                        consistent = False
+                        consistent.append((ing.name, ing.parameters_hash))
 
-                if not consistent:
+                if len(consistent) > 0:
                     logger.info(
-                        "inconsistent parameters, redistribute hash %s",
+                        "inconsistent parameters %s, redistribute hash %s",
+                        consistent,
                         self.parameters_hash,
                     )
                     cupd = ControllerUpdate(
