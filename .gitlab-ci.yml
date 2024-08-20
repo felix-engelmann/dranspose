@@ -11,17 +11,6 @@ variables:
   REDIS_URL: "redis://redis:6379/0"
   PYTEST_EXTRA_ARGS: "--log-cli-level=INFO"
 
-test-python311:
-  allow_failure: false
-  services:
-    - redis:latest
-
-test-python311-pytango95:
-  allow_failure: false
-  services:
-    - redis:latest
-
-test-python312-pytango95:
-  allow_failure: false
+.test-python:
   services:
     - redis:latest
