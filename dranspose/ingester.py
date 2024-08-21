@@ -162,6 +162,23 @@ class Ingester(DistributedService):
                         await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
 
+    async def _send_workermessages(self, workermessages):
+        for worker, message in workermessages.items():
+            self._logger.debug(
+                "header is %s",
+                message.model_dump_json(exclude={"streams": {"__all__": "frames"}}),
+            )
+            await self.out_socket.send_multipart(
+                [worker.encode("ascii")]
+                + [
+                    message.model_dump_json(
+                        exclude={"streams": {"__all__": "frames"}}
+                    ).encode("utf8")
+                ]
+                + message.get_all_frames()
+            )
+            self._logger.debug("sent message to worker %s", worker)
+
     async def work(self) -> None:
         """
         The heavy liftig function of an ingester. It consumes a generator `run_source()` which
@@ -203,7 +220,11 @@ class Ingester(DistributedService):
                 for stream in work_assignment.assignments:
                     zmqyields.append(anext(sourcegens[stream]))
                     streams.append(stream)
-                zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+                try:
+                    zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+                except StopAsyncIteration:
+                    self._logger.warning("stream source stopped before end")
+                    raise asyncio.exceptions.CancelledError()
                 zmqparts: dict[StreamName, StreamData] = {
                     stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
                 }
@@ -230,23 +251,7 @@ class Ingester(DistributedService):
                             )
                         workermessages[worker].streams[stream] = zmqparts[stream]
                 self._logger.debug("workermessages %s", workermessages)
-                for worker, message in workermessages.items():
-                    self._logger.debug(
-                        "header is %s",
-                        message.model_dump_json(
-                            exclude={"streams": {"__all__": "frames"}}
-                        ),
-                    )
-                    await self.out_socket.send_multipart(
-                        [worker.encode("ascii")]
-                        + [
-                            message.model_dump_json(
-                                exclude={"streams": {"__all__": "frames"}}
-                            ).encode("utf8")
-                        ]
-                        + message.get_all_frames()
-                    )
-                    self._logger.debug("sent message to worker %s", worker)
+                await self._send_workermessages(workermessages)
                 end = time.perf_counter()
                 took.append(end - start)
                 if len(took) > 1000:

@@ -35,37 +35,45 @@ class TcpPcapIngester(Ingester):
         self.writer.write(b"\n")
         data = await reader.readline()
         assert data == b"OK\n"
-
+        stop = False
         self._logger.info("connected to %s", self._pcap_settings.upstream_url)
 
         while True:
-            self._logger.debug("clear up insocket")
-            line = await reader.readline()
-            self._logger.debug("received line %s", line)
-            if not line.startswith(b"arm_time: "):
-                self._logger.debug("discard non-start packet")
-            else:
-                self._logger.info("start of new sequence %s", line)
-                header = [line]
-                while line := await reader.readline():
-                    header.append(line)
-                    if line.strip() == b"":
-                        break
-                self._logger.info("use header %s", header)
-                frame = zmq.Frame(b"".join(header))
+            while True:
+                self._logger.debug("clear up insocket")
+                line = await reader.readline()
+                self._logger.debug("received line %s", line)
+                if line == b"":
+                    stop = True
+                    break
+                if not line.startswith(b"arm_time: "):
+                    self._logger.debug("discard non-start packet")
+                else:
+                    self._logger.info("start of new sequence %s", line)
+                    header = [line]
+                    while line := await reader.readline():
+                        header.append(line)
+                        if line.strip() == b"":
+                            break
+                    self._logger.info("use header %s", header)
+                    frame = zmq.Frame(b"".join(header))
+                    yield StreamData(typ="PCAP", frames=[frame])
+                    break
+            if stop:
+                break
+            while True:
+                line = await reader.readline()
+                self._logger.debug("send frame %s", line)
+                frame = zmq.Frame(line)
                 yield StreamData(typ="PCAP", frames=[frame])
-                break
-        while True:
-            line = await reader.readline()
-            self._logger.debug("send frame %s", line)
-            frame = zmq.Frame(line)
-            yield StreamData(typ="PCAP", frames=[frame])
-            if line.startswith(b"END"):
-                break
+                if line.startswith(b"END"):
+                    break
 
         while True:
             self._logger.debug("discarding messages until next run")
-            await reader.readline()
+            line = await reader.readline()
+            if line == b"":
+                break
 
     async def stop_source(self, stream: StreamName) -> None:
         if self.writer:
