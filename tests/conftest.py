@@ -693,15 +693,17 @@ async def stream_pcap() -> AsyncIterator[
 ]:
     server_tasks = []
 
-    async def _make_pcap(nframes: int = 10, port: int = 8889) -> None:
+    async def _make_pcap(
+        nframes: int = 10, port: int = 8889, repetitions: int = 1
+    ) -> None:
         async def handle_client(reader: StreamReader, writer: StreamWriter) -> None:
             request = (await reader.read(255)).decode("utf8")
             if request.strip() != "":
                 logging.error("bad initial hello %s", request)
             writer.write(b"OK\n")
             await writer.drain()
-
-            header = b"""arm_time: 2023-12-19T07:51:12.754Z
+            for i in range(repetitions):
+                header = b"""arm_time: 2023-12-19T07:51:12.754Z
 missed: 0
 process: Scaled
 format: ASCII
@@ -714,10 +716,10 @@ fields:
  SFP3_SYNC_IN.POS1 double Mean scale: 1 offset: 0 units: (null)
 
 """
-            writer.write(header)
-            await writer.drain()
+                writer.write(header)
+                await writer.drain()
 
-            data = b""" 301989857 0 0 0.32175968 0 592910924.7
+                data = b""" 301989857 0 0 0.32175968 0 592910924.7
  33554401 0 0 0.43175968 0 592910919
  33554401 0 0 0.54175968 0 592910930.9
  33554401 0 0 0.65175968 0 592910930.2
@@ -728,16 +730,16 @@ fields:
  301989857 0 0 1.20175968 0 592910962.2
  301989857 0 0 1.31175968 0 592910916.7
  301989857 0 0 1.42175968 0 592910829.8""".split(
-                b"\n"
-            )
+                    b"\n"
+                )
 
-            for i in range(nframes):
-                writer.write(data[i % 11] + b"\n")
+                for i in range(nframes):
+                    writer.write(data[i % 11] + b"\n")
+                    await writer.drain()
+                    await asyncio.sleep(0.1)
+
+                writer.write(f"END {nframes} Disarmed\n".encode("utf8"))
                 await writer.drain()
-                await asyncio.sleep(0.1)
-
-            writer.write(f"END {nframes} Disarmed".encode("utf8"))
-            await writer.drain()
             writer.close()
 
         server = await asyncio.start_server(handle_client, "localhost", port)
