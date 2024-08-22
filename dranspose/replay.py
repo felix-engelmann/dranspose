@@ -171,10 +171,20 @@ def replay(
     first = True
 
     with server.run_in_thread(port):
+        cache = [None for _ in gens]
         while True:
             try:
-                internals = [next(gen) for gen in gens]
-                event = EventData.from_internals(internals)
+                internals = [
+                    next(gen) if ch is None else ch for gen, ch in zip(gens, cache)
+                ]
+                lowestevn = min([ev.event_number for ev in internals])
+                lowinternals = []
+                cache = internals
+                for idx, ie in enumerate(internals):
+                    if ie.event_number == lowestevn:
+                        lowinternals.append(ie)
+                        cache[idx] = None
+                event = EventData.from_internals(lowinternals)
 
                 dst_worker_ids = [random.randint(0, len(workers) - 1)]
                 if first and broadcast_first:
