@@ -137,14 +137,22 @@ def timer(red: Any) -> None:
 def replay(
     wclass: str,
     rclass: str,
-    zmq_files: list[os.PathLike[Any] | str],
-    parameter_file: os.PathLike[Any] | str,
+    zmq_files: Optional[list[os.PathLike[Any] | str]] = None,
+    source: Optional[str] = None,
+    parameter_file: os.PathLike[Any] | str = None,
     port: Optional[int] = None,
     keepalive: bool = False,
     nworkers: int = 2,
     broadcast_first: bool = True,
 ) -> None:
-    gens = [get_internals(f) for f in zmq_files]
+    if source is not None:
+        sourcecls = utils.import_class(source)
+        inst = sourcecls()
+        gens = inst.get_source_generators()
+    elif zmq_files is not None:
+        gens = [get_internals(f) for f in zmq_files]
+    else:
+        gens = []
 
     workercls = utils.import_class(wclass)
     logger.info("custom worker class %s", workercls)
@@ -152,7 +160,9 @@ def replay(
     reducercls = utils.import_class(rclass)
     logger.info("custom reducer class %s", reducercls)
 
-    parameters = get_parameters(parameter_file, workercls, reducercls)
+    parameters = {}
+    if parameter_file is not None:
+        parameters = get_parameters(parameter_file, workercls, reducercls)
 
     logger.info("use parameters %s", parameters)
 
@@ -177,6 +187,8 @@ def replay(
                 internals = [
                     next(gen) if ch is None else ch for gen, ch in zip(gens, cache)
                 ]
+                if len(internals) == 0:
+                    break
                 lowestevn = min([ev.event_number for ev in internals])
                 lowinternals = []
                 cache = internals

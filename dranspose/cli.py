@@ -181,6 +181,7 @@ def replay(args: argparse.Namespace) -> None:
         args.workerclass,
         args.reducerclass,
         args.files,
+        args.source,
         args.parameters,
         args.port,
         args.keep_alive,
@@ -270,7 +271,10 @@ def create_parser() -> argparse.ArgumentParser:
         required=True,
     )
     parser_replay.add_argument(
-        "-f", "--files", nargs="+", help="List of files to replay", required=True
+        "-f", "--files", nargs="+", help="List of files to replay"
+    )
+    parser_replay.add_argument(
+        "-s", "--source", help="python class with sources to get data from"
     )
     parser_replay.add_argument(
         "-p", "--parameters", help="parameter file, json or pickle"
