@@ -4,6 +4,7 @@ import logging
 from dranspose.event import EventData
 from dranspose.middlewares import contrast
 from dranspose.middlewares import xspress
+from dranspose.middlewares import stream1
 from dranspose.parameters import StrParameter, FileParameter
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,9 @@ class FluorescenceWorker:
     def process_event(self, event: EventData, parameters=None):
         logger.debug("using parameters %s", parameters)
         roi_slice = json.loads(parameters["roi1"].data)
+        if "pilatus" in event.streams:
+            dat = stream1.parse(event.streams["pilatus"])
+            logger.info("got pilatus frame %s", dat)
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
             logger.error(
                 "missing streams for this worker, only present %s", event.streams.keys()
