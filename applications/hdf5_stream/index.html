@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../analysis/">
+        <link rel="prev" href="../..">
       
       
-        <link rel="next" href="../viewers/">
+        <link rel="next" href="../overview/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Ingesters - dranspose</title>
+        <title>Developing an Analysis from HDF5 Data - dranspose</title>
       
     
     
@@ -67,7 +67,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ingesters" class="md-skip">
+        <a href="#developing-an-analysis-from-hdf5-data" class="md-skip">
           Skip to content
         </a>
       
@@ -103,7 +103,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Ingesters
+              Developing an Analysis from HDF5 Data
             
           </span>
         </div>
@@ -234,19 +234,21 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -260,7 +262,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Applications
@@ -271,10 +273,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../applications/hdf5_stream/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Developing an Analysis from HDF5 Data
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -283,6 +305,35 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#example-with-stins" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example with STINS
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -295,7 +346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../applications/overview/" class="md-nav__link">
+      <a href="../overview/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -771,21 +822,19 @@
       
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
@@ -799,7 +848,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Tutorials
@@ -813,7 +862,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../analysis/" class="md-nav__link">
+      <a href="../../tutorials/analysis/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -831,19 +880,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../tutorials/ingesters/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -852,7 +892,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -865,7 +904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../viewers/" class="md-nav__link">
+      <a href="../../tutorials/viewers/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -906,6 +945,23 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#example-with-stins" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example with STINS
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -919,7 +975,7 @@
                   
 
   
-    <a href="https://github.com/felix-engelmann/dranspose/edit/main/docs/tutorials/ingesters.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/felix-engelmann/dranspose/edit/main/docs/applications/hdf5_stream.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4v-2m10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1 2.1 2.1Z"/></svg>
     </a>
@@ -927,8 +983,75 @@
   
 
 
-<h1 id="ingesters">Ingesters</h1>
-<p>Writing new ingesters is required for consuming new data streams.</p>
+<h1 id="developing-an-analysis-from-hdf5-data">Developing an Analysis from HDF5 Data</h1>
+<p>Sometimes, recording the data to develop an analysis in advance is not feasible.
+The replay module of dranspose usually reads from recorded data via cbors files.</p>
+<p>However, it is possible to provide custom streams instead of cbors.
+Special attention needs to be provided to create a stream which is similar to the one encounted at the experiment.</p>
+<p>Instead of providing the <code>-f</code> parameter to replay, use <code>--source</code> or <code>-s</code> to provide a python class path, e.g.:</p>
+<div class="language-text highlight"><pre><span></span><code>dranspose replay -w &quot;src.worker:FluorescenceWorker&quot; -r &quot;src.reducer:FluorescenceReducer&quot; -s &quot;src.hdf5_sources:FluorescenceSource&quot; -p params.json
+</code></pre></div>
+<p>The <code>FluorescenceSource</code> class only needs to implement one function: <code>get_source_generators</code> which has to return a list of generators.</p>
+<p>The generators themselves may be methods of this class, but can be implemented anywhere.
+The generator is supposed to yield an <a class="autorefs autorefs-internal" href="../../reference/protocols/events/#dranspose.event.InternalWorkerMessage">dranspose.event.InternalWorkerMessage</a> object.</p>
+<h2 id="example-with-stins">Example with STINS</h2>
+<p>To stream 2d images from a hybrid photon counting detector, the following source class could be adapted.
+The images are read from a HDF5 file.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span> <span class="nn">itertools</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span> <span class="nn">dranspose.event</span> <span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">InternalWorkerMessage</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">StreamData</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kn">from</span> <span class="nn">dranspose.data.stream1</span> <span class="kn">import</span> <span class="n">Stream1Start</span><span class="p">,</span> <span class="n">Stream1Data</span><span class="p">,</span> <span class="n">Stream1End</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">import</span> <span class="nn">h5py</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="kn">from</span> <span class="nn">bitshuffle</span> <span class="kn">import</span> <span class="n">compress_lz4</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="k">class</span> <span class="nc">FluorescenceSource</span><span class="p">:</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">fd</span> <span class="o">=</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="s2">&quot;../000008.h5&quot;</span><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="k">def</span> <span class="nf">get_source_generators</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">pilatus_source</span><span class="p">()]</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="k">def</span> <span class="nf">pilatus_source</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="n">msg_number</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="n">stins_start</span> <span class="o">=</span> <span class="n">Stream1Start</span><span class="p">(</span><span class="n">htype</span><span class="o">=</span><span class="s2">&quot;header&quot;</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">msg_number</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">msg_number</span><span class="p">))</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">()</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        <span class="n">start</span> <span class="o">=</span> <span class="n">InternalWorkerMessage</span><span class="p">(</span><span class="n">event_number</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">streams</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;pilatus&quot;</span><span class="p">:</span> <span class="n">StreamData</span><span class="p">(</span><span class="n">typ</span><span class="o">=</span><span class="s2">&quot;STINS&quot;</span><span class="p">,</span> <span class="n">frames</span><span class="o">=</span><span class="p">[</span><span class="n">stins_start</span><span class="p">])})</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="k">yield</span> <span class="n">start</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>        <span class="n">frameno</span> <span class="o">=</span> <span class="mi">0</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        <span class="k">for</span> <span class="n">image</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fd</span><span class="p">[</span><span class="s2">&quot;/entry/measurement/pilatus/frames&quot;</span><span class="p">]:</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>            <span class="n">stins</span> <span class="o">=</span> <span class="n">Stream1Data</span><span class="p">(</span><span class="n">htype</span><span class="o">=</span><span class="s2">&quot;image&quot;</span><span class="p">,</span> <span class="n">msg_number</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">msg_number</span><span class="p">),</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>                                <span class="n">frame</span><span class="o">=</span><span class="n">frameno</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="n">image</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="s2">&quot;bslz4&quot;</span><span class="p">,</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>                                <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">dtype</span><span class="p">))</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">()</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>            <span class="n">dat</span> <span class="o">=</span> <span class="n">compress_lz4</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>            <span class="n">img</span> <span class="o">=</span> <span class="n">InternalWorkerMessage</span><span class="p">(</span><span class="n">event_number</span><span class="o">=</span><span class="n">frameno</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>                                          <span class="n">streams</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;pilatus&quot;</span><span class="p">:</span> <span class="n">StreamData</span><span class="p">(</span><span class="n">typ</span><span class="o">=</span><span class="s2">&quot;STINS&quot;</span><span class="p">,</span> <span class="n">frames</span><span class="o">=</span><span class="p">[</span><span class="n">stins</span><span class="p">,</span> <span class="n">dat</span><span class="o">.</span><span class="n">tobytes</span><span class="p">()])})</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>            <span class="k">yield</span> <span class="n">img</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>            <span class="n">frameno</span> <span class="o">+=</span> <span class="mi">1</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>        <span class="n">stins_end</span> <span class="o">=</span> <span class="n">Stream1End</span><span class="p">(</span><span class="n">htype</span><span class="o">=</span><span class="s2">&quot;series_end&quot;</span><span class="p">,</span> <span class="n">msg_number</span><span class="o">=</span><span class="nb">next</span><span class="p">(</span><span class="n">msg_number</span><span class="p">))</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">()</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>        <span class="n">end</span> <span class="o">=</span> <span class="n">InternalWorkerMessage</span><span class="p">(</span><span class="n">event_number</span><span class="o">=</span><span class="n">frameno</span><span class="p">,</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>                                      <span class="n">streams</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;pilatus&quot;</span><span class="p">:</span> <span class="n">StreamData</span><span class="p">(</span><span class="n">typ</span><span class="o">=</span><span class="s2">&quot;STINS&quot;</span><span class="p">,</span> <span class="n">frames</span><span class="o">=</span><span class="p">[</span><span class="n">stins_end</span><span class="p">])})</span>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>        <span class="k">yield</span> <span class="n">end</span>
+</span></code></pre></div>
+<p>The <code>__init__</code> only opens the <code>.h5</code> file.
+The mandatory method <code>get_source_generators</code> returns a list with a single generator.
+This generator <code>pilatus_source</code> then creates an <a class="autorefs autorefs-internal" href="../../reference/protocols/STINS/#dranspose.data.stream1.Stream1Start">dranspose.data.stream1.Stream1Start</a> object and dumps it to json.
+The bytes resulting from that dump to json are then first wrapped in <a class="autorefs autorefs-internal" href="../../reference/protocols/events/#dranspose.event.StreamData">dranspose.event.StreamData</a>.
+Here we used the stream name <code>pilatus</code>, which needs to match the setup at the experiment.
+Finally, it yields an InternalWorkerMessage.</p>
+<p>For the data packages, the actual data needs to be returned. For the header we use <a class="autorefs autorefs-internal" href="../../reference/protocols/STINS/#dranspose.data.stream1.Stream1Data">dranspose.data.stream1.Stream1Data</a> again and dump it to json.
+For the image, it is important to know if the stream will contain compressed images.
+In the above case, the stream will send bitshuffle lz4 compressed images.
+Therefore, we need to recreate the compressed frames with <code>compress_lz4</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Beware that you have to manually provide the correct <code>event_number</code> for each yield.</p>
+</div>
+<p>In STINS, there is usually a <a class="autorefs autorefs-internal" href="../../reference/protocols/STINS/#dranspose.data.stream1.Stream1End">dranspose.data.stream1.Stream1End</a> message, which needs to be yielded.</p>
 
 
 
