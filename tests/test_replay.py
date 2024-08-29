@@ -193,6 +193,7 @@ async def test_replay(
         "examples.dummy.worker:FluorescenceWorker",
         "examples.dummy.reducer:FluorescenceReducer",
         [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
+        None,
         par_file,
     )
 
