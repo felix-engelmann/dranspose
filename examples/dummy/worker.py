@@ -1,10 +1,12 @@
 import json
 import logging
 
+from dranspose.data.positioncap import PositionCapValues
 from dranspose.event import EventData
 from dranspose.middlewares import contrast
 from dranspose.middlewares import xspress
 from dranspose.middlewares import stream1
+from dranspose.middlewares.positioncap import PositioncapParser
 from dranspose.parameters import StrParameter, FileParameter
 
 logger = logging.getLogger(__name__)
@@ -13,6 +15,7 @@ logger = logging.getLogger(__name__)
 class FluorescenceWorker:
     def __init__(self, **kwargs):
         self.number = 0
+        self.pcap = PositioncapParser()
 
     @staticmethod
     def describe_parameters():
@@ -28,6 +31,18 @@ class FluorescenceWorker:
         if "pilatus" in event.streams:
             dat = stream1.parse(event.streams["pilatus"])
             logger.info("got pilatus frame %s", dat)
+
+        if "pcap" in event.streams:
+            logger.debug("raw pcap:%s", event.streams["pcap"].frames[0])
+            res = self.pcap.parse(event.streams["pcap"])
+            if isinstance(res, PositionCapValues):
+                logger.info(
+                    "got pcap values %s",
+                    res,
+                )
+            else:
+                logger.warning("got pcap %s", res)
+
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
             logger.error(
                 "missing streams for this worker, only present %s", event.streams.keys()

@@ -1,8 +1,15 @@
+import datetime
 import itertools
 
 import numpy as np
 
 from dranspose.data.contrast import ContrastStarted, ContrastRunning, ContrastFinished
+from dranspose.data.positioncap import (
+    PositionCapStart,
+    PositionCapField,
+    PositionCapValues,
+    PositionCapEnd,
+)
 from dranspose.data.xspress3 import XspressStart, XspressImage, XspressEnd
 from dranspose.event import InternalWorkerMessage
 
@@ -18,7 +25,12 @@ class FluorescenceSource:
         pass
 
     def get_source_generators(self):
-        return [self.pilatus_source(), self.contrast_source(), self.xspress3_source()]
+        return [
+            self.pilatus_source(),
+            self.contrast_source(),
+            self.xspress3_source(),
+            self.pcap_source(),
+        ]
 
     def pilatus_source(self):
         msg_number = itertools.count(0)
@@ -114,4 +126,43 @@ class FluorescenceSource:
         yield InternalWorkerMessage(
             event_number=frameno + 1,
             streams={"xspress3": end.to_stream_data()},
+        )
+
+    def pcap_source(self):
+        fields = [
+            PositionCapField(name="PCAP.BITS0.Value", type="uint32"),
+            PositionCapField(name="INENC1.VAL.Mean", type="double"),
+            PositionCapField(name="PCAP.TS_TRIG.Value", type="double"),
+        ]
+        start = PositionCapStart(arm_time=datetime.datetime.utcnow())
+        yield InternalWorkerMessage(
+            event_number=0,
+            streams={"pcap": start.to_stream_data(fields)},
+        )
+
+        data = [
+            np.ones((10,), dtype=np.uint32),
+            np.ones(
+                (10,), dtype=np.float64
+            ),  # self.fd["/entry/measurement/panda0/INENC1.VAL_Mean"][:],
+            np.ones(
+                (10,), dtype=np.float64
+            ),  # self.fd["/entry/measurement/panda0/PCAP.TS_TRIG_Value"][:]
+        ]
+
+        for i in range(len(data[0])):
+            for f, d in zip(fields, data):
+                f.value = d[i]
+
+            print(fields)
+            val = PositionCapValues(fields={f.name: f for f in fields})
+            yield InternalWorkerMessage(
+                event_number=i + 1,
+                streams={"pcap": val.to_stream_data()},
+            )
+
+        end = PositionCapEnd()
+        yield InternalWorkerMessage(
+            event_number=11,
+            streams={"pcap": end.to_stream_data()},
         )
