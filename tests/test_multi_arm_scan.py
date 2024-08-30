@@ -1,7 +1,7 @@
 import logging
 
 import asyncio
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable, Optional, Coroutine, Any
 import zmq.asyncio
 
 import aiohttp
@@ -9,9 +9,11 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters import (
+from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
+)
+from dranspose.ingesters.tcp_positioncap import (
     TcpPcapIngester,
     TcpPcapSettings,
 )
@@ -30,10 +32,10 @@ from dranspose.worker import Worker
 async def test_multiple_scans(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
-    create_worker: Callable[[Worker], Awaitable[Worker]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pcap,
-    stream_eiger,
+    stream_pcap: Callable[[int, int, int], Coroutine[None, None, None]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
 ) -> None:
     await reducer(None)
     await create_worker(WorkerName("w1"))

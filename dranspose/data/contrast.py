@@ -8,7 +8,7 @@ from dranspose.event import StreamData
 
 
 class ContrastBase(BaseModel):
-    def to_stream_data(self):
+    def to_stream_data(self) -> StreamData:
         dat = pickle.dumps(self.model_dump())
         return StreamData(typ="contrast", frames=[zmq.Frame(dat)])
 

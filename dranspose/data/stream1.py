@@ -9,7 +9,7 @@ from dranspose.event import StreamData
 class Stream1(BaseModel):
     msg_number: int
 
-    def to_stream_data(self):
+    def to_stream_data(self) -> StreamData:
         js = self.model_dump_json(exclude={"data"}).encode()
         frames = [zmq.Frame(js)]
         if hasattr(self, "data"):

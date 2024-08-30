@@ -27,6 +27,7 @@ from dranspose.protocol import (
     IngesterUpdate,
     DistributedStateEnum,
     WorkAssignmentList,
+    WorkerName,
 )
 
 
@@ -162,7 +163,9 @@ class Ingester(DistributedService):
                         await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
 
-    async def _send_workermessages(self, workermessages):
+    async def _send_workermessages(
+        self, workermessages: dict[WorkerName, InternalWorkerMessage]
+    ) -> None:
         for worker, message in workermessages.items():
             self._logger.debug(
                 "header is %s",
@@ -214,7 +217,7 @@ class Ingester(DistributedService):
                 if empty:
                     empties.append(work_assignment.event_number)
 
-                workermessages = {}
+                workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 zmqyields: list[Awaitable[StreamData]] = []
                 streams: list[StreamName] = []
                 for stream in work_assignment.assignments:

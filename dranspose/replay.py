@@ -139,7 +139,7 @@ def replay(
     rclass: str,
     zmq_files: Optional[list[os.PathLike[Any] | str]] = None,
     source: Optional[str] = None,
-    parameter_file: os.PathLike[Any] | str = None,
+    parameter_file: Optional[os.PathLike[Any] | str] = None,
     port: Optional[int] = None,
     keepalive: bool = False,
     nworkers: int = 2,
@@ -200,7 +200,7 @@ def replay(
 
                 dst_worker_ids = [random.randint(0, len(workers) - 1)]
                 if first and broadcast_first:
-                    dst_worker_ids = range(len(workers))
+                    dst_worker_ids = list(range(len(workers)))
                     first = False
 
                 for wi in dst_worker_ids:

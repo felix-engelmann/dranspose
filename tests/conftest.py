@@ -689,7 +689,7 @@ async def stream_sardana() -> Callable[[HttpUrl, int], Coroutine[Any, Any, None]
 
 @pytest_asyncio.fixture
 async def stream_pcap() -> AsyncIterator[
-    Callable[[int, int], Coroutine[None, None, None]]
+    Callable[[int, int, int], Coroutine[None, None, None]]
 ]:
     server_tasks = []
 
