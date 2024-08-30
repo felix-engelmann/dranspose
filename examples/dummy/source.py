@@ -2,7 +2,7 @@ import itertools
 
 import numpy as np
 
-from dranspose.event import InternalWorkerMessage, StreamData
+from dranspose.event import InternalWorkerMessage
 
 from dranspose.data.stream1 import Stream1Start, Stream1Data, Stream1End
 
@@ -23,10 +23,10 @@ class FluorescenceSource:
 
         stins_start = Stream1Start(
             htype="header", filename="", msg_number=next(msg_number)
-        ).model_dump_json()
+        )
         start = InternalWorkerMessage(
             event_number=0,
-            streams={"pilatus": StreamData(typ="STINS", frames=[stins_start])},
+            streams={"pilatus": stins_start.to_stream_data()},
         )
         yield start
 
@@ -34,6 +34,7 @@ class FluorescenceSource:
         # for image in self.fd["/entry/measurement/pilatus/frames"]:
         for _ in range(10):
             image = np.ones((10, 10))
+            # dat = compress_lz4(image)
             stins = Stream1Data(
                 htype="image",
                 msg_number=next(msg_number),
@@ -41,22 +42,18 @@ class FluorescenceSource:
                 shape=image.shape,
                 compression="none",  # compression="bslz4"
                 type=str(image.dtype),
-            ).model_dump_json()
-            dat = image  # dat = compress_lz4(image)
+                data=image,
+            )
             img = InternalWorkerMessage(
                 event_number=frameno + 1,
-                streams={
-                    "pilatus": StreamData(typ="STINS", frames=[stins, dat.tobytes()])
-                },
+                streams={"pilatus": stins.to_stream_data()},
             )
             yield img
             frameno += 1
 
-        stins_end = Stream1End(
-            htype="series_end", msg_number=next(msg_number)
-        ).model_dump_json()
+        stins_end = Stream1End(htype="series_end", msg_number=next(msg_number))
         end = InternalWorkerMessage(
             event_number=0,
-            streams={"pilatus": StreamData(typ="STINS", frames=[stins_end])},
+            streams={"pilatus": stins_end.to_stream_data()},
         )
         yield end
