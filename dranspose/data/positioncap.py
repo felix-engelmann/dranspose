@@ -27,7 +27,7 @@ class PositionCapField(BaseModel):
 class PositionCapStart(BaseModel):
     arm_time: datetime
 
-    def to_stream_data(self, fields) -> StreamData:
+    def to_stream_data(self, fields: list[PositionCapField]) -> StreamData:
         data = f"""arm_time: {self.arm_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')}
 missed: 0
 process: Scaled
