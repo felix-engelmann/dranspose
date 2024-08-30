@@ -2,6 +2,8 @@ import itertools
 
 import numpy as np
 
+from dranspose.data.contrast import ContrastStarted, ContrastRunning, ContrastFinished
+from dranspose.data.xspress3 import XspressStart, XspressImage, XspressEnd
 from dranspose.event import InternalWorkerMessage
 
 from dranspose.data.stream1 import Stream1Start, Stream1Data, Stream1End
@@ -12,18 +14,16 @@ from dranspose.data.stream1 import Stream1Start, Stream1Data, Stream1End
 
 class FluorescenceSource:
     def __init__(self):
-        # self.fd = h5py.File("../000008.h5")
+        # self.fd = h5py.File("../nanomax/000008.h5")
         pass
 
     def get_source_generators(self):
-        return [self.pilatus_source()]
+        return [self.pilatus_source(), self.contrast_source(), self.xspress3_source()]
 
     def pilatus_source(self):
         msg_number = itertools.count(0)
 
-        stins_start = Stream1Start(
-            htype="header", filename="", msg_number=next(msg_number)
-        )
+        stins_start = Stream1Start(filename="", msg_number=next(msg_number))
         start = InternalWorkerMessage(
             event_number=0,
             streams={"pilatus": stins_start.to_stream_data()},
@@ -36,7 +36,6 @@ class FluorescenceSource:
             image = np.ones((10, 10))
             # dat = compress_lz4(image)
             stins = Stream1Data(
-                htype="image",
                 msg_number=next(msg_number),
                 frame=frameno,
                 shape=image.shape,
@@ -51,9 +50,68 @@ class FluorescenceSource:
             yield img
             frameno += 1
 
-        stins_end = Stream1End(htype="series_end", msg_number=next(msg_number))
+        stins_end = Stream1End(msg_number=next(msg_number))
         end = InternalWorkerMessage(
-            event_number=0,
+            event_number=frameno + 1,
             streams={"pilatus": stins_end.to_stream_data()},
         )
         yield end
+
+    def contrast_source(self):
+        start = ContrastStarted(path="", scannr=4, description="stepscan")
+        yield InternalWorkerMessage(
+            event_number=0,
+            streams={"contrast": start.to_stream_data()},
+        )
+
+        data = {}
+        data["x"] = np.ones((10,))  # self.fd["entry/measurement/pseudo/x"][:]
+        data["y"] = np.ones((10,))  # self.fd["entry/measurement/pseudo/y"][:]
+        data["z"] = np.ones((10,))  # self.fd["entry/measurement/pseudo/z"][:]
+
+        for i in range(len(data["x"])):
+            pseudo = {k: np.array([v[i]]) for k, v in data.items()}
+            print(pseudo)
+            pos = ContrastRunning(pseudo=pseudo, dt=0.4)
+            yield InternalWorkerMessage(
+                event_number=i + 1,
+                streams={"contrast": pos.to_stream_data()},
+            )
+
+        end = ContrastFinished(path="", scannr=4, description="stepscan")
+        yield InternalWorkerMessage(
+            event_number=11,
+            streams={"contrast": end.to_stream_data()},
+        )
+
+    def xspress3_source(self):
+        start = XspressStart(filename="")
+        yield InternalWorkerMessage(
+            event_number=0,
+            streams={"xspress3": start.to_stream_data()},
+        )
+
+        frameno = 0
+        # for spec in self.fd["/entry/measurement/xspress3/data"]:
+        for _ in range(10):
+            spec = np.ones((4, 10))
+            dat = XspressImage(
+                frame=frameno,
+                shape=spec.shape,
+                exptime=0.099999875,
+                type=str(spec.dtype),
+                compression="none",
+                data=spec,
+                meta={"ocr": 1},
+            )
+            yield InternalWorkerMessage(
+                event_number=frameno + 1,
+                streams={"xspress3": dat.to_stream_data()},
+            )
+            frameno += 1
+
+        end = XspressEnd()
+        yield InternalWorkerMessage(
+            event_number=frameno + 1,
+            streams={"xspress3": end.to_stream_data()},
+        )

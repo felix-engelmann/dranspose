@@ -31,7 +31,7 @@ class Stream1Start(Stream1):
 
     model_config = ConfigDict(extra="allow")
 
-    htype: Literal["header"]
+    htype: Literal["header"] = "header"
     filename: str
 
 
@@ -59,7 +59,7 @@ class Stream1Data(Stream1):
 
     model_config = ConfigDict(extra="allow")
 
-    htype: Literal["image"]
+    htype: Literal["image"] = "image"
     frame: int
     shape: list[int]
     type: str
@@ -79,7 +79,7 @@ class Stream1End(Stream1):
 
     model_config = ConfigDict(extra="allow")
 
-    htype: Literal["series_end"]
+    htype: Literal["series_end"] = "series_end"
 
 
 Stream1Packet = TypeAdapter(Stream1Start | Stream1Data | Stream1End)

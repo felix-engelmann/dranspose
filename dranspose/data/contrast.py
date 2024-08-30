@@ -1,9 +1,19 @@
+import pickle
 from typing import Literal
 
+import zmq
 from pydantic import BaseModel, TypeAdapter, ConfigDict
 
+from dranspose.event import StreamData
 
-class ContrastStarted(BaseModel):
+
+class ContrastBase(BaseModel):
+    def to_stream_data(self):
+        dat = pickle.dumps(self.model_dump())
+        return StreamData(typ="contrast", frames=[zmq.Frame(dat)])
+
+
+class ContrastStarted(ContrastBase):
     """
     Example:
         ``` py
@@ -29,7 +39,7 @@ class ContrastStarted(BaseModel):
     description: str
 
 
-class ContrastRunning(BaseModel):
+class ContrastRunning(ContrastBase):
     """
     Example:
         ``` py
@@ -70,7 +80,7 @@ class ContrastRunning(BaseModel):
     dt: float
 
 
-class ContrastFinished(BaseModel):
+class ContrastFinished(ContrastBase):
     """
     Example:
         ```python
@@ -95,7 +105,7 @@ class ContrastFinished(BaseModel):
     description: str
 
 
-class ContrastHeartbeat(BaseModel):
+class ContrastHeartbeat(ContrastBase):
     """
     Heartbeat message
     """

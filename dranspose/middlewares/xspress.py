@@ -23,15 +23,15 @@ def parse(
     Returns:
         an XspressPacket
     """
-    assert data.typ == "xspress"
-    assert data.length >= 1
+    assert data.typ == "xspress", "wrong packet typ"
+    assert data.length >= 1, "wrong number of multiparts"
     headerframe = data.frames[0]
     if isinstance(headerframe, zmq.Frame):
         headerframe = headerframe.bytes
     packet = XspressPacket.validate_json(headerframe)
     print("packets", packet)
     if isinstance(packet, XspressImage):
-        assert data.length == 3
+        assert data.length == 3, "images does not contain data"
         bufframe = data.frames[1]
         if isinstance(bufframe, zmq.Frame):
             bufframe = bufframe.bytes

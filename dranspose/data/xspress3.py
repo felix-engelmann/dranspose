@@ -1,9 +1,25 @@
+import pickle
 from typing import Literal, Optional
 
+import zmq
 from pydantic import BaseModel, TypeAdapter, ConfigDict
 
+from dranspose.event import StreamData
 
-class XspressStart(BaseModel):
+
+class XspressBase(BaseModel):
+    def to_stream_data(self):
+        js = self.model_dump_json(exclude={"data", "meta"}).encode()
+        frames = [zmq.Frame(js)]
+        if hasattr(self, "data"):
+            frames.append(zmq.Frame(self.data.tobytes()))
+        if hasattr(self, "meta"):
+            pk = pickle.dumps(list(self.meta.values()))
+            frames.append(zmq.Frame(pk))
+        return StreamData(typ="xspress", frames=frames)
+
+
+class XspressStart(XspressBase):
     """
     Example:
         ``` py
@@ -17,11 +33,11 @@ class XspressStart(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    htype: Literal["header"]
+    htype: Literal["header"] = "header"
     filename: str
 
 
-class XspressImage(BaseModel):
+class XspressImage(XspressBase):
     """
     While the original stream sends 3 separate zmq frames (no multipart), this returns a single packet.
 
@@ -54,7 +70,7 @@ class XspressImage(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    htype: Literal["image"]
+    htype: Literal["image"] = "image"
     frame: int
     shape: list[int]
     exptime: Optional[float] = 1
@@ -62,7 +78,7 @@ class XspressImage(BaseModel):
     compression: Optional[str] = "none"
 
 
-class XspressEnd(BaseModel):
+class XspressEnd(XspressBase):
     """
     Example:
         ``` py
@@ -72,7 +88,7 @@ class XspressEnd(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    htype: Literal["series_end"]
+    htype: Literal["series_end"] = "series_end"
 
 
 XspressPacket = TypeAdapter(XspressStart | XspressImage | XspressEnd)
