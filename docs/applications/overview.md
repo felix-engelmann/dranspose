@@ -9,7 +9,7 @@ to a single event at a time. They may store local state, but don't have access t
 For data analysis which has to cross all events, there is a secondary *reduce* step which can only cope with reduced data, but gets all events delivered.
 
 A lot of common analysis tasks are easily mapped to this programming model.
-The map phase perform the heavy lifting, e.g. analysing images and then forwards a spectrum to the reducer which only averages the sprectra or appends them to a list.
+The map phase performs the heavy lifting, e.g. analysing images and then forwards a spectrum to the reducer which only averages the sprectra or appends them to a list.
 
 ## Using `dranspose`
 
@@ -19,7 +19,7 @@ The map phase perform the heavy lifting, e.g. analysing images and then forwards
     Here we assume that you have dumps for all necessary streams
 
 
-To analyse data with dranspose, you need to split your task into a `map` and a `redude` function.
+To analyse data with dranspose, you need to split your task into a `map` and a `reduce` function.
 
 Create a new git repository and create the following structure
 
