@@ -1,5 +1,5 @@
 import time
-from typing import Any, Iterator
+from typing import Any, Iterator, Optional
 
 import zmq
 import itertools
@@ -34,8 +34,11 @@ class Acquisition:
         frameno: int,
         typ: str = "uint16",
         compression: str = "none",
+        extra_fields: Optional[dict] = None,
     ) -> None:
         before = time.perf_counter()
+        if extra_fields is None:
+            extra_fields = {}
         await self._socket.send_json(
             {
                 "htype": "image",
@@ -44,6 +47,7 @@ class Acquisition:
                 "type": typ,
                 "compression": compression,
                 "msg_number": next(self._msg_number),
+                **extra_fields,
             },
             flags=zmq.SNDMORE,
         )

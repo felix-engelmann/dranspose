@@ -4,6 +4,7 @@ import logging
 from typing import Awaitable, Callable, Optional, Any
 
 import aiohttp
+import numpy as np
 
 import pytest
 import zmq.asyncio
@@ -117,7 +118,7 @@ async def test_sink(
     await workload_generator(5004)
 
     async with aiohttp.ClientSession() as session:
-        nframes = 10000
+        nframes = 100
 
         st = await session.post(
             "http://localhost:5003/api/v1/open_socket",
@@ -137,7 +138,7 @@ async def test_sink(
 
         st = await session.post(
             "http://localhost:5003/api/v1/frames",
-            json={"number": nframes, "time": 0.000001, "shape": [100, 100]},
+            json={"number": nframes, "time": 0.01, "shape": [100, 100]},
         )
         state = await st.json()
         logging.info("sending frames %s", state)
@@ -157,6 +158,11 @@ async def test_sink(
             st = await session.get("http://localhost:5004/api/v1/statistics")
             stat = await st.json()
             logging.info("receiver fps %s", stat["fps"])
+            logging.info(
+                "receiver latencies mean %f, max %f",
+                np.mean(stat["deltas"]),
+                max(stat["deltas"]),
+            )
 
         st = await session.post("http://localhost:5003/api/v1/close_socket")
         state = await st.json()

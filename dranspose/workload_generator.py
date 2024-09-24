@@ -1,10 +1,13 @@
 import asyncio
+import json
 import logging
 import random
 import time
 from asyncio import Task
 from collections import deque
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from json import JSONDecodeError
 from typing import AsyncGenerator, Any, Tuple
 
 import numpy as np
@@ -44,6 +47,7 @@ class Statistics(BaseModel):
     fps: float = 0
     packets: int = 0
     measured: float = 0
+    deltas: list[float] = []
 
     @field_serializer("snapshots", mode="wrap")
     def serialize_sn(
@@ -98,6 +102,15 @@ class WorkloadGenerator:
             raise Exception("only sink packets from connected socket")
         while True:
             pkt = await self.socket.recv_multipart(copy=False)
+            try:
+                header = json.loads(pkt[0].bytes)
+                ts = header.get("timestamps", {})
+                now = datetime.now(timezone.utc)
+                delta = now - min(map(lambda x: datetime.fromisoformat(x), ts.values()))
+                logger.debug("delta is %s", delta.total_seconds())
+                self.stat.deltas.append(delta.total_seconds())
+            except (JSONDecodeError, ValueError):
+                pass
             logger.debug("sinked packet %s", pkt)
             self.stat.packets += 1
 
@@ -129,7 +142,10 @@ class WorkloadGenerator:
                 random.randint(0, height - 1)
             ] = random.randint(0, 10)
         for frameno in range(spec.number):
-            await acq.image(img, img.shape, frameno)
+            extra = {
+                "timestamps": {"generator": datetime.now(timezone.utc).isoformat()}
+            }
+            await acq.image(img, img.shape, frameno, extra_fields=extra)
             logger.debug("sent frame %d", frameno)
             self.stat.packets += 1
             await asyncio.sleep(spec.time)
