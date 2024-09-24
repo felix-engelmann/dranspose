@@ -9,6 +9,7 @@ import struct
 import time
 from asyncio import StreamReader, StreamWriter, Task
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from multiprocessing import Process
 from typing import (
     Coroutine,
@@ -403,7 +404,8 @@ async def stream_eiger() -> Callable[
                 img[random.randint(0, width - 1)][
                     random.randint(0, height - 1)
                 ] = random.randint(0, 10)
-            await acq.image(img, img.shape, frameno)
+            extra = {"timestamps": {"dummy": datetime.now(timezone.utc).isoformat()}}
+            await acq.image(img, img.shape, frameno, extra_fields=extra)
             await asyncio.sleep(frame_time)
         await acq.close()
         await socket.close()
