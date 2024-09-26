@@ -88,10 +88,10 @@ class Server(uvicorn.Server):
 
 
 def get_parameters(
-    parameter_file: os.PathLike[Any] | str, workercls: type, reducercls: type
+    parameter_file: Optional[os.PathLike[Any] | str], workercls: type, reducercls: type
 ) -> dict[str, WorkParameter]:
     parameters = {}
-    if parameter_file:
+    if parameter_file is not None:
         try:
             with open(parameter_file) as f:
                 parameters = {p.name: p for p in ParamList.validate_json(f.read())}
@@ -160,9 +160,7 @@ def replay(
     reducercls = utils.import_class(rclass)
     logger.info("custom reducer class %s", reducercls)
 
-    parameters = {}
-    if parameter_file is not None:
-        parameters = get_parameters(parameter_file, workercls, reducercls)
+    parameters = get_parameters(parameter_file, workercls, reducercls)
 
     logger.info("use parameters %s", parameters)
 
