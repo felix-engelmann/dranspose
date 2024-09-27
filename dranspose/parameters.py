@@ -26,16 +26,17 @@ class StrParameter(ParameterBase):
             return ""
 
 
-class FileParameter(ParameterBase):
-    dtype: Literal["file"] = "file"
-    default: str = ""
+class BinaryParameter(ParameterBase):
+    dtype: Literal["binary"] = "binary"
+    default: bytes = b""
 
     @staticmethod
-    def from_bytes(by: bytes) -> str:
-        try:
-            return by.decode("utf8")
-        except ValueError:
-            return ""
+    def from_bytes(by: bytes) -> bytes:
+        return by
+
+    @staticmethod
+    def to_bytes(val: Any) -> bytes:
+        return val
 
 
 class IntParameter(ParameterBase):
@@ -75,7 +76,7 @@ class BoolParameter(ParameterBase):
 
 
 ParameterType = (
-    StrParameter | FileParameter | IntParameter | FloatParameter | BoolParameter
+    StrParameter | BinaryParameter | IntParameter | FloatParameter | BoolParameter
 )
 
 Parameter = TypeAdapter(ParameterType)

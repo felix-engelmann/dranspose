@@ -1,5 +1,5 @@
 from dranspose.event import ResultData
-from dranspose.parameters import StrParameter, FileParameter
+from dranspose.parameters import StrParameter, BinaryParameter
 
 
 class FluorescenceReducer:
@@ -13,7 +13,7 @@ class FluorescenceReducer:
     def describe_parameters():
         params = [
             StrParameter(name="string_parameter"),
-            FileParameter(name="other_file_parameter"),
+            BinaryParameter(name="other_file_parameter"),
         ]
         return params
 

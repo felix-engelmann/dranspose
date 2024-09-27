@@ -1,19 +1,26 @@
 import asyncio
 import logging
-from typing import Callable, Optional, Awaitable
+import os
+from pathlib import PosixPath
+from typing import Callable, Optional, Awaitable, Any, Coroutine
 
 import aiohttp
+import numpy as np
 import pytest
+import zmq
 from pydantic_core import Url
 
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters.zmqpull_single import (
-    ZmqPullSingleIngester,
-    ZmqPullSingleSettings,
-)
+from dranspose.ingesters import ZmqSubContrastSettings, ZmqSubContrastIngester
 from dranspose.parameters import ParameterList
-from dranspose.protocol import WorkerName, StreamName, EnsembleState
+from dranspose.protocol import (
+    WorkerName,
+    StreamName,
+    EnsembleState,
+    VirtualWorker,
+    VirtualConstraint,
+)
 from dranspose.worker import Worker, WorkerSettings
 
 
@@ -23,6 +30,10 @@ async def test_params(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_pkls: Callable[
+        [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
+        Coroutine[Any, Any, None],
+    ],
 ) -> None:
     await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(
@@ -35,10 +46,11 @@ async def test_params(
     )
 
     await create_ingester(
-        ZmqPullSingleIngester(
-            settings=ZmqPullSingleSettings(
-                ingester_streams=[StreamName("eiger")],
-                upstream_url=Url("tcp://localhost:9999"),
+        ZmqSubContrastIngester(
+            settings=ZmqSubContrastSettings(
+                ingester_streams=[StreamName("contrast")],
+                upstream_url=Url("tcp://localhost:5556"),
+                ingester_url=Url("tcp://localhost:10000"),
             ),
         )
     )
@@ -46,7 +58,7 @@ async def test_params(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
+        while {"contrast"} - set(state.get_streams()) != set():
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
@@ -88,6 +100,19 @@ async def test_params(
             data=b"asdasd",
         )
         assert resp.status == 200
+
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/file_parameter",
+            data=b"mydirectnumpyarray",
+        )
+        assert resp.status == 200
+
+        arr = np.ones((10, 10))
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/file_parameter_file",
+            data=arr.tobytes(),
+        )
+        assert resp.status == 200
         hash = await resp.json()
 
         st = await session.get("http://localhost:5000/api/v1/config")
@@ -98,3 +123,31 @@ async def test_params(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
             logging.warning("got state %s", state)
+
+        ntrig = 20
+        mp = {
+            "contrast": [
+                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
+                for i in range(ntrig)
+            ],
+        }
+        resp = await session.post(
+            "http://localhost:5000/api/v1/mapping",
+            json=mp,
+        )
+        assert resp.status == 200
+
+        context = zmq.asyncio.Context()
+
+        await stream_pkls(
+            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        )
+
+        st = await session.get("http://localhost:5000/api/v1/progress")
+        content = await st.json()
+        while not content["finished"]:
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/progress")
+            content = await st.json()
+
+        context.destroy()

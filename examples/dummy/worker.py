@@ -7,7 +7,7 @@ from dranspose.middlewares import contrast
 from dranspose.middlewares import xspress
 from dranspose.middlewares import stream1
 from dranspose.middlewares.positioncap import PositioncapParser
-from dranspose.parameters import StrParameter, FileParameter
+from dranspose.parameters import StrParameter, BinaryParameter
 
 logger = logging.getLogger(__name__)
 
@@ -21,13 +21,17 @@ class FluorescenceWorker:
     def describe_parameters():
         params = [
             StrParameter(name="roi1", default="bla"),
-            FileParameter(name="file_parameter"),
+            StrParameter(name="file_parameter"),
+            BinaryParameter(name="file_parameter_file"),
         ]
         return params
 
     def process_event(self, event: EventData, parameters=None):
-        logger.debug("using parameters %s", parameters)
+        logger.warning("using parameters %s", parameters)
         roi_slice = json.loads(parameters["roi1"].data)
+        if "file_parameter" in parameters:
+            logger.warning("file is given %s", parameters["file_parameter"])
+
         if "pilatus" in event.streams:
             dat = stream1.parse(event.streams["pilatus"])
             logger.info("got pilatus frame %s", dat)

@@ -12,7 +12,7 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
 )
-from dranspose.parameters import ParameterList, FileParameter, StrParameter
+from dranspose.parameters import ParameterList, BinaryParameter, StrParameter
 from dranspose.protocol import WorkerName, StreamName, EnsembleState, ParameterName
 from dranspose.worker import Worker, WorkerSettings
 
@@ -61,13 +61,18 @@ async def test_params(
                 description="Prefix to dump ingester values",
                 dtype="str",
             ),
-            FileParameter(
-                name=ParameterName("file_parameter"), description=None, dtype="file"
+            StrParameter(
+                name=ParameterName("file_parameter"), description=None, dtype="str"
             ),
-            FileParameter(
+            BinaryParameter(
+                name=ParameterName("file_parameter_file"),
+                description=None,
+                dtype="binary",
+            ),
+            BinaryParameter(
                 name=ParameterName("other_file_parameter"),
                 description=None,
-                dtype="file",
+                dtype="binary",
             ),
             StrParameter(
                 name=ParameterName("roi1"), description=None, dtype="str", default="bla"

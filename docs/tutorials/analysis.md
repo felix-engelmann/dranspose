@@ -609,7 +609,7 @@ class TestWorker:
 
 There are multiple options on how to provide the geometry to build the poni file.
 The individual float values could be exposed as parameters, however that will be invonvenient for users used to poni files.
-There is a `FileParameter` available which holds the full content of a file. The advantage is that the workers don't need filesystem access to read the poni file.
+There is a `BinaryParameter` available which holds the full content of a file. The advantage is that the workers don't need filesystem access to read the poni file.
 However, another process needs to upload the poni file, which is normally the tango device server displaying the paramters.
 
 ## Writing the diffractograms
