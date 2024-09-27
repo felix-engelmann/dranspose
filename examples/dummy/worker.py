@@ -1,5 +1,6 @@
 import json
 import logging
+import pickle
 
 from dranspose.data.positioncap import PositionCapValues
 from dranspose.event import EventData
@@ -29,8 +30,10 @@ class FluorescenceWorker:
     def process_event(self, event: EventData, parameters=None):
         logger.warning("using parameters %s", parameters)
         roi_slice = json.loads(parameters["roi1"].data)
-        if "file_parameter" in parameters:
-            logger.warning("file is given %s", parameters["file_parameter"])
+        if "file_parameter_file" in parameters:
+            logger.debug("file is given %s", parameters["file_parameter_file"].value)
+            arr = pickle.loads(parameters["file_parameter_file"].value)
+            logger.info("array param %s", arr)
 
         if "pilatus" in event.streams:
             dat = stream1.parse(event.streams["pilatus"])

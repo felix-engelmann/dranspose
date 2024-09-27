@@ -23,7 +23,6 @@ from dranspose.event import (
     message_tag_hook,
 )
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
-from dranspose.parameters import ParameterBase
 from dranspose.protocol import WorkerName, Digest, WorkParameter
 
 
@@ -97,7 +96,8 @@ def get_parameters(
                 parameters = {p.name: p for p in ParamList.validate_json(f.read())}
         except UnicodeDecodeError:
             with open(parameter_file, "rb") as fb:
-                parameters = pickle.load(fb)
+                plist = pickle.load(fb)
+                parameters = {p.name: p for p in ParamList.validate_python(plist)}
 
     logger.info("params from file %s", parameters)
 
@@ -118,7 +118,7 @@ def get_parameters(
             parameters[p] = WorkParameter(
                 name=p,
                 value=param_description[p].default,
-                data=ParameterBase.to_bytes(param_description[p].default),
+                data=param_description[p].to_bytes(param_description[p].default),
             )
 
     logger.info("final params are %s", parameters)

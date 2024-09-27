@@ -1,9 +1,11 @@
 import asyncio
 import json
 import logging
+import pickle
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
+import numpy as np
 
 import pytest
 import zmq.asyncio
@@ -195,6 +197,26 @@ async def test_replay(
         [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
         None,
         par_file,
+    )
+
+    bin_file = tmp_path / "binparams.pkl"
+
+    with open(bin_file, "wb") as f:
+        arr = np.ones((10, 10))
+        pickle.dump(
+            [
+                {"name": "roi1", "data": "[10,20]"},
+                {"name": "file_parameter_file", "data": pickle.dumps(arr)},
+            ],
+            f,
+        )
+
+    replay(
+        "examples.dummy.worker:FluorescenceWorker",
+        "examples.dummy.reducer:FluorescenceReducer",
+        [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
+        None,
+        bin_file,
     )
 
     context.destroy()
