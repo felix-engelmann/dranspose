@@ -30,7 +30,10 @@ class FluorescenceWorker:
     def process_event(self, event: EventData, parameters=None):
         logger.warning("using parameters %s", parameters)
         roi_slice = json.loads(parameters["roi1"].data)
-        if "file_parameter_file" in parameters:
+        if (
+            "file_parameter_file" in parameters
+            and parameters["file_parameter_file"].value != b""
+        ):
             logger.debug("file is given %s", parameters["file_parameter_file"].value)
             arr = pickle.loads(parameters["file_parameter_file"].value)
             logger.info("array param %s", arr)

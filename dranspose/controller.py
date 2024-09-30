@@ -29,7 +29,6 @@ from dranspose.parameters import (
     Parameter,
     ParameterType,
     StrParameter,
-    ParameterBase,
 )
 from dranspose.protocol import (
     IngesterState,
@@ -241,10 +240,13 @@ class Controller:
                     val: ParameterType = Parameter.validate_json(i)  # type: ignore
                     if val.name not in self.parameters:
                         logger.info(
-                            "set parameter %s to default %s", val.name, val.default
+                            "set parameter %s to default %s, (type %s)",
+                            val.name,
+                            val.default,
+                            val.__class__,
                         )
                         await self.set_param(
-                            val.name, ParameterBase.to_bytes(val.default)
+                            val.name, val.__class__.to_bytes(val.default)
                         )
                 await asyncio.sleep(2)
             except asyncio.exceptions.CancelledError:
