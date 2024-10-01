@@ -12,7 +12,10 @@ from pydantic_core import Url
 
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters import ZmqSubContrastSettings, ZmqSubContrastIngester
+from dranspose.ingesters.zmqsub_contrast import (
+    ZmqSubContrastSettings,
+    ZmqSubContrastIngester,
+)
 from dranspose.parameters import ParameterList
 from dranspose.protocol import (
     WorkerName,

@@ -34,7 +34,7 @@ class Acquisition:
         frameno: int,
         typ: str = "uint16",
         compression: str = "none",
-        extra_fields: Optional[dict] = None,
+        extra_fields: Optional[dict[str, Any]] = None,
     ) -> None:
         before = time.perf_counter()
         if extra_fields is None:
