@@ -21,7 +21,7 @@ class RepubWorker:
         self.sock = context["socket"]
         self.buffer = {}
 
-    def process_event(self, event: EventData, parameters=None, **kwargs):
+    def process_event(self, event: EventData, parameters=None, *args, **kwargs):
         logger.debug("using parameters %s", parameters)
         logger.debug("event %s", event.streams["eiger"])
 

@@ -18,7 +18,7 @@ class SlowWorker:
         ]
         return params
 
-    def process_event(self, event: EventData, parameters=None, **kwargs):
+    def process_event(self, event: EventData, parameters=None, *args, **kwargs):
         logger.debug("using parameters %s", parameters)
         if "sleep_time" in parameters:
             time.sleep(parameters["sleep_time"].value)

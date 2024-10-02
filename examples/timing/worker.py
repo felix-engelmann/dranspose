@@ -11,7 +11,9 @@ class TimingWorker:
     def __init__(self, **kwargs):
         pass
 
-    def process_event(self, event: EventData, parameters=None, tick=False, **kwargs):
+    def process_event(
+        self, event: EventData, parameters=None, tick=False, *args, **kwargs
+    ):
         logger.debug("using parameters %s", parameters)
         logger.info("tick %s", tick)
         times = {}

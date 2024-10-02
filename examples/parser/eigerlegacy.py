@@ -10,7 +10,7 @@ class LegacyWorker:
     def __init__(self, *args, **kwargs):
         pass
 
-    def process_event(self, event: EventData, parameters=None, **kwargs):
+    def process_event(self, event: EventData, parameters=None, *args, **kwargs):
         if "eiger" in event.streams:
             data = parse(event.streams["eiger"])
             logger.info("parsed packet %s", data)

@@ -13,7 +13,7 @@ class PcapWorker:
         self.pcap = PositioncapParser()
         pass
 
-    def process_event(self, event: EventData, **kwargs):
+    def process_event(self, event: EventData, *args, **kwargs):
         if "pcap" in event.streams:
             res = self.pcap.parse(event.streams["pcap"])
             if isinstance(res, PositionCapValues):
