@@ -11,8 +11,9 @@ class TimingWorker:
     def __init__(self, **kwargs):
         pass
 
-    def process_event(self, event: EventData, parameters=None):
+    def process_event(self, event: EventData, parameters=None, tick=False, **kwargs):
         logger.debug("using parameters %s", parameters)
+        logger.info("tick %s", tick)
         times = {}
         for stream in event.streams:
             if stream in ["large", "fast"]:
@@ -25,3 +26,6 @@ class TimingWorker:
                     logger.debug("delta is %s", delta.total_seconds())
                     times[stream] = (oldest, delta.total_seconds())
         return times
+
+    def timer(self):
+        return 1

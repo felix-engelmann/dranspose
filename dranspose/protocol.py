@@ -88,6 +88,12 @@ class RedisKeys:
 
     @staticmethod
     @cache
+    @validate_call
+    def clock(uuid: Optional[UUID4 | Literal["*"]] = None) -> str:
+        return f"{RedisKeys.PREFIX}:clock:{uuid}"
+
+    @staticmethod
+    @cache
     def updates() -> str:
         return f"{RedisKeys.PREFIX}:controller:updates"
 

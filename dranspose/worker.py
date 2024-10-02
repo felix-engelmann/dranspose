@@ -41,6 +41,7 @@ class RedisException(Exception):
 
 
 class ConnectedIngester(BaseModel):
+    "An ingester becomes a connected ingester once the worker opened a socket to it"
     model_config = ConfigDict(arbitrary_types_allowed=True)
     socket: zmq.asyncio.Socket
     config: IngesterState
@@ -48,6 +49,7 @@ class ConnectedIngester(BaseModel):
 
 
 def random_worker_name() -> WorkerName:
+    "without a given worker name, generate a random one"
     randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
     name = "Worker-{}-{}".format(socket.gethostname(), randid)
     return WorkerName(name)
@@ -129,6 +131,7 @@ class Worker(DistributedService):
         await self.register()
 
     async def notify_worker_ready(self) -> None:
+        "send an update to the controller that the worker got the new trigger map and is ready to receive the first event"
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
             {
@@ -142,6 +145,12 @@ class Worker(DistributedService):
         self._logger.info("registered ready message")
 
     async def manage_assignments(self) -> None:
+        """
+        This coroutine listens to the redis stream for the current mapping_uuid.
+        Once it there is a new batch of assignments, it checks for each,
+        if this worker is involved and if yes, from which ingesters it should receive.
+        It places the list of ingesters in the assignment_queue.
+        """
         sub = RedisKeys.assigned(self.state.mapping_uuid)
         lastev = 0
         while True:
@@ -177,6 +186,10 @@ class Worker(DistributedService):
     async def poll_internals(
         self, ingesterset: set[zmq._future._AsyncSocket]
     ) -> list[int]:
+        """
+        A task to simultaneously check if there is a message available from all required ingesters
+        We do not yet receive from the zmq sockets as it is harder to cancel a receive call.
+        """
         self._logger.debug("poll internal sockets %s", ingesterset)
         poll_tasks = [sock.poll() for sock in ingesterset]
         self._logger.debug("await poll tasks %s", poll_tasks)
@@ -188,6 +201,7 @@ class Worker(DistributedService):
     async def build_event(
         self, ingesterset: set[zmq._future._AsyncSocket]
     ) -> EventData:
+        "All relevant ingester sockets have a message, receive it and assemble an EventData object"
         msgs = []
         for sock in ingesterset:
             res = await sock.recv_multipart(copy=False)
@@ -224,6 +238,7 @@ class Worker(DistributedService):
             has_result = []
             accum_times = WorkerTimes(no_events=0)
             accum_start = time.time()
+            tick_wait_until = time.time() - 1
             while True:
                 perf_start = time.perf_counter()
 
@@ -244,10 +259,32 @@ class Worker(DistributedService):
                 self._logger.debug("received work %s", event)
                 result = None
                 if self.worker:
+                    tick = False
+                    # we internally cache when the redis will expire to reduce hitting redis on every event
+                    if tick_wait_until - time.time() < 0:
+                        if hasattr(self.worker, "timer"):
+                            wait_ms = int(self.worker.timer() * 1000)
+                            dist_clock = await self.redis.set(
+                                RedisKeys.clock(self.state.mapping_uuid),
+                                "🕙",
+                                px=wait_ms,
+                                nx=True,
+                            )
+                            if dist_clock is True:
+                                tick = True
+                            else:
+                                expire_ms = await self.redis.pttl(
+                                    RedisKeys.clock(self.state.mapping_uuid)
+                                )
+                                tick_wait_until = time.time() + (expire_ms / 1000)
                     try:
                         loop = asyncio.get_event_loop()
                         result = await loop.run_in_executor(
-                            None, self.worker.process_event, event, self.parameters
+                            None,
+                            self.worker.process_event,
+                            event,
+                            self.parameters,
+                            tick,
                         )
                     except Exception as e:
                         self._logger.error(
@@ -296,6 +333,8 @@ class Worker(DistributedService):
                     perf_sent_result,
                 )
                 accum_times += times
+                # the worker only sends an update to the controller if it is idle or a second has passed
+                # this batching is necessary for high frequency event streams
                 if self.assignment_queue.empty() or time.time() - accum_start > 1:
                     wu = WorkerUpdate(
                         state=DistributedStateEnum.IDLE,
@@ -368,6 +407,7 @@ class Worker(DistributedService):
         self.assign_task.add_done_callback(done_callback)
 
     async def manage_receiver(self) -> None:
+        "Periodically check that the push socket to the receiver is connected to the correct url, which the reducer publishes in redis"
         while True:
             config = await self.redis.get(RedisKeys.config("reducer"))
             if config is None:
@@ -386,6 +426,12 @@ class Worker(DistributedService):
             await asyncio.sleep(10)
 
     async def manage_ingesters(self) -> None:
+        """
+        This function is supposed to run in the background and make sure
+        that the worker has a DEALER socket to every ingester.
+        It periodically pings the ingesters and checks that the pings arrive
+        by fetching the state of the ingesters from redis.
+        """
         while True:
             configs = await self.redis.keys(RedisKeys.config("ingester"))
             processed = []

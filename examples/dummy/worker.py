@@ -27,7 +27,7 @@ class FluorescenceWorker:
         ]
         return params
 
-    def process_event(self, event: EventData, parameters=None):
+    def process_event(self, event: EventData, parameters=None, **kwargs):
         logger.warning("using parameters %s", parameters)
         roi_slice = json.loads(parameters["roi1"].data)
         if (
