@@ -134,6 +134,28 @@ def timer(red: Any) -> None:
         time.sleep(delay)
 
 
+def _work_event(worker, reducer, event, parameters, tick):
+    data = worker.process_event(event, parameters=parameters, tick=tick)
+    if data is None:
+        return
+    rd = ResultData(
+        event_number=event.event_number,
+        worker=WorkerName(f"development{worker.state.name}"),
+        payload=data,
+        parameters_hash=Digest(
+            "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
+        ),
+    )
+
+    header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
+    body = pickle.dumps(rd.payload)
+    prelim = json.loads(header)
+    prelim["payload"] = pickle.loads(body)
+    result = ResultData.model_validate(prelim)
+
+    reducer.process_result(result, parameters=parameters)
+
+
 def replay(
     wclass: str,
     rclass: str,
@@ -180,6 +202,7 @@ def replay(
 
     with server.run_in_thread(port):
         cache = [None for _ in gens]
+        last_tick = 0
         while True:
             try:
                 internals = [
@@ -203,25 +226,15 @@ def replay(
 
                 for wi in dst_worker_ids:
                     logger.warning("spread to wi %d", wi)
-                    data = workers[wi].process_event(event, parameters=parameters)
-                    if data is None:
-                        continue
-                    rd = ResultData(
-                        event_number=event.event_number,
-                        worker=WorkerName(f"development{wi}"),
-                        payload=data,
-                        parameters_hash=Digest(
-                            "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
-                        ),
-                    )
-
-                    header = rd.model_dump_json(exclude={"payload"}).encode("utf8")
-                    body = pickle.dumps(rd.payload)
-                    prelim = json.loads(header)
-                    prelim["payload"] = pickle.loads(body)
-                    result = ResultData.model_validate(prelim)
-
-                    reducer.process_result(result, parameters=parameters)
+                    tick = False
+                    if hasattr(workers[wi], "get_tick_interval"):
+                        interval_ms = workers[wi].get_tick_interval(
+                            parameters=parameters
+                        )
+                        if last_tick + (interval_ms / 1000) < time.time():
+                            tick = True
+                            last_tick = time.time()
+                    _work_event(workers[wi], reducer, event, parameters, tick)
 
             except StopIteration:
                 for worker in workers:

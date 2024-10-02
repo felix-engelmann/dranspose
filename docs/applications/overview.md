@@ -52,14 +52,14 @@ from dranspose.middlewares import xspress
 logger = logging.getLogger(__name__)
 
 class FluorescenceWorker:
-    def __init__(self, parameters=None, **kwargs):
+    def __init__(self, parameters=None, *args, **kwargs):
         self.number = 0
 
 ```
 The `process_event` function gets an [EventData](../reference/protocols/events.md) object which contains all required streams for the current event.
 The first step should be to check that the required streams for the analyis are present.
 ```python
-    def process_event(self, event: EventData, parameters=None):
+    def process_event(self, event: EventData, parameters=None, *args, **kwargs):
         logger.debug("using parameters %s", parameters)
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
             logger.error(
