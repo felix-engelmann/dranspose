@@ -546,6 +546,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../reference/internals/controller/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Controller
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../reference/internals/distributed_service/" class="md-nav__link">
         
   
@@ -572,6 +593,48 @@
   
   <span class="md-ellipsis">
     Ingester
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/internals/reducer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reducer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/internals/worker/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worker
   </span>
   
 
@@ -1716,7 +1779,7 @@ After installing it, it needs the detector geometry. Intially we will provide it
 <h3 id="poni-file-sources">Poni file sources</h3>
 <p>There are multiple options on how to provide the geometry to build the poni file.
 The individual float values could be exposed as parameters, however that will be invonvenient for users used to poni files.
-There is a <code>FileParameter</code> available which holds the full content of a file. The advantage is that the workers don't need filesystem access to read the poni file.
+There is a <code>BinaryParameter</code> available which holds the full content of a file. The advantage is that the workers don't need filesystem access to read the poni file.
 However, another process needs to upload the poni file, which is normally the tango device server displaying the paramters.</p>
 <h2 id="writing-the-diffractograms">Writing the diffractograms</h2>
 <p>It remains to place the data calculated by the workers into the h5 file by the reducer.</p>

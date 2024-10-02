@@ -642,6 +642,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../internals/controller/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Controller
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../internals/distributed_service/" class="md-nav__link">
         
   
@@ -668,6 +689,48 @@
   
   <span class="md-ellipsis">
     Ingester
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../internals/reducer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reducer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../internals/worker/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worker
   </span>
   
 
@@ -1375,15 +1438,15 @@
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">    Returns:</span>
 </span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">        an XspressPacket</span>
 </span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>    <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">typ</span> <span class="o">==</span> <span class="s2">&quot;xspress&quot;</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a>    <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;=</span> <span class="mi">1</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26"></a>    <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">typ</span> <span class="o">==</span> <span class="s2">&quot;xspress&quot;</span><span class="p">,</span> <span class="s2">&quot;wrong packet typ&quot;</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27"></a>    <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">length</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;wrong number of multiparts&quot;</span>
 </span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28"></a>    <span class="n">headerframe</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 </span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">headerframe</span><span class="p">,</span> <span class="n">zmq</span><span class="o">.</span><span class="n">Frame</span><span class="p">):</span>
 </span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30"></a>        <span class="n">headerframe</span> <span class="o">=</span> <span class="n">headerframe</span><span class="o">.</span><span class="n">bytes</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31"></a>    <span class="n">packet</span> <span class="o">=</span> <span class="n">XspressPacket</span><span class="o">.</span><span class="n">validate_json</span><span class="p">(</span><span class="n">headerframe</span><span class="p">)</span>
 </span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;packets&quot;</span><span class="p">,</span> <span class="n">packet</span><span class="p">)</span>
 </span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">packet</span><span class="p">,</span> <span class="n">XspressImage</span><span class="p">):</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a>        <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">3</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34"></a>        <span class="k">assert</span> <span class="n">data</span><span class="o">.</span><span class="n">length</span> <span class="o">==</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;images does not contain data&quot;</span>
 </span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35"></a>        <span class="n">bufframe</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">frames</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 </span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bufframe</span><span class="p">,</span> <span class="n">zmq</span><span class="o">.</span><span class="n">Frame</span><span class="p">):</span>
 </span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37"></a>            <span class="n">bufframe</span> <span class="o">=</span> <span class="n">bufframe</span><span class="o">.</span><span class="n">bytes</span>
