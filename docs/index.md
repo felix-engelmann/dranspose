@@ -20,6 +20,12 @@ To get a feel of building an analysis, please follow the [tutorial](tutorials/an
 The packet provides a cli `dranspose` to run the components separately or all combined. 
 To run the full distributed system, a `redis` server is required. A convenient way is to use the [docker image](https://hub.docker.com/r/redis/redis-stack)
 
+!!! info "NOBUGS 2024"
+    There is a [conference talk](https://indico.esrf.fr/event/114/contributions/750/) with a new overview and performance measurements.
+
+    [Slides](nobugs-2024-09-25/main.pdf){ .md-button }
+
+
 !!! info "Presentation"
     There is a seminar talk with a general overview available. Some details might be out of date.
 

@@ -35,7 +35,8 @@ exclude_docs: |
   !/seminar-2023-11-30/main.pdf
   /poster-2024-01-15
   !/poster-2024-01-15/main.pdf
-
+  /nobugs-2024-09-25
+  !/nobugs-2024-09-25/main.pdf
 #nav:
 #  - "index.md"
 #  - "Reference":
