@@ -40,5 +40,20 @@ sequenceDiagram
     
 ```
 
+## Worker Ingester Ping Sequence
+
+```mermaid
+sequenceDiagram
+    Worker ->> Ingester: ping with uuid
+    Ingester ->> Redis: update connected workers
+
+    Redis ->> Worker: fetch ingester state with connected workers
+
+    Worker ->> Worker: Check if pings reached Ingester
+    
+    
+    
+```
+
 ::: dranspose.worker
 
