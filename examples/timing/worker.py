@@ -29,5 +29,5 @@ class TimingWorker:
                     times[stream] = (oldest, delta.total_seconds())
         return times
 
-    def timer(self):
+    def get_tick_interval(self, parameters=None):
         return 1

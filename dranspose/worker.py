@@ -262,8 +262,10 @@ class Worker(DistributedService):
                     tick = False
                     # we internally cache when the redis will expire to reduce hitting redis on every event
                     if tick_wait_until - time.time() < 0:
-                        if hasattr(self.worker, "timer"):
-                            wait_ms = int(self.worker.timer() * 1000)
+                        if hasattr(self.worker, "get_tick_interval"):
+                            wait_ms = int(
+                                self.worker.get_tick_interval(self.parameters) * 1000
+                            )
                             dist_clock = await self.redis.set(
                                 RedisKeys.clock(self.state.mapping_uuid),
                                 "🕙",
