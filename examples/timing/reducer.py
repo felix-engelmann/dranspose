@@ -1,12 +1,14 @@
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from dranspose.event import ResultData
+from dranspose.protocol import ReducerState, StreamName
 
 
 class TimingReducer:
-    def __init__(self, state=None, **kwargs):
-        self.publish = {}
+    def __init__(self, state: ReducerState | None = None, **kwargs: Any) -> None:
+        self.publish: dict[StreamName, list[tuple[float, float]]] = {}
         pass
 
     def process_result(self, result: ResultData, parameters=None):

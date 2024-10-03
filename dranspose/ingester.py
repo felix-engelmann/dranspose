@@ -189,7 +189,9 @@ class Ingester(DistributedService):
     async def _get_zmqparts(
         self,
         work_assignment: WorkAssignment,
-        sourcegens: dict[StreamName, AsyncGenerator[StreamData, None]],
+        sourcegens: dict[
+            StreamName, AsyncGenerator[StreamData | IsSoftwareTriggered, None]
+        ],
         swtriggen: Iterator[dict[StreamName, StreamData]] | None,
     ) -> dict[StreamName, StreamData]:
         zmqyields: list[Awaitable[StreamData]] = []
