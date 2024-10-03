@@ -49,6 +49,10 @@ class IngesterSettings(DistributedSettings):
         return data
 
 
+class IsSoftwareTriggered(Exception):
+    pass
+
+
 class Ingester(DistributedService):
     """
     The Ingester class provides a basis to write custom ingesters for any protocol.
@@ -182,6 +186,27 @@ class Ingester(DistributedService):
             )
             self._logger.debug("sent message to worker %s", worker)
 
+    async def _get_zmqparts(self, work_assignment, sourcegens, swtriggen):
+        zmqyields: list[Awaitable[StreamData]] = []
+        streams: list[StreamName] = []
+        for stream in work_assignment.assignments:
+            zmqyields.append(anext(sourcegens[stream]))
+            streams.append(stream)
+        try:
+            zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+        except StopAsyncIteration:
+            self._logger.warning("stream source stopped before end")
+            raise asyncio.exceptions.CancelledError()
+        zmqparts: dict[StreamName, StreamData] = {
+            stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
+        }
+        self._logger.debug("stream triggered zmqparts %s", zmqparts)
+        if swtriggen is not None:
+            swparts = next(swtriggen)
+            zmqparts.update(swparts)
+
+        return zmqparts
+
     async def work(self) -> None:
         """
         The heavy liftig function of an ingester. It consumes a generator `run_source()` which
@@ -192,6 +217,9 @@ class Ingester(DistributedService):
         """
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
+        swtriggen = None
+        if hasattr(self, "software_trigger"):
+            swtriggen = self.software_trigger()
         self.dump_file = None
         self.dump_filename = self._ingester_settings.dump_path
         if self.dump_filename is None and "dump_prefix" in self.parameters:
@@ -217,20 +245,10 @@ class Ingester(DistributedService):
                 if empty:
                     empties.append(work_assignment.event_number)
 
-                workermessages: dict[WorkerName, InternalWorkerMessage] = {}
-                zmqyields: list[Awaitable[StreamData]] = []
-                streams: list[StreamName] = []
-                for stream in work_assignment.assignments:
-                    zmqyields.append(anext(sourcegens[stream]))
-                    streams.append(stream)
-                try:
-                    zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
-                except StopAsyncIteration:
-                    self._logger.warning("stream source stopped before end")
-                    raise asyncio.exceptions.CancelledError()
-                zmqparts: dict[StreamName, StreamData] = {
-                    stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
-                }
+                zmqparts = await self._get_zmqparts(
+                    work_assignment, sourcegens, swtriggen
+                )
+
                 if self.dump_file:
                     self._logger.debug("writing dump to path %s", self.dump_filename)
                     allstr = InternalWorkerMessage(
@@ -246,6 +264,8 @@ class Ingester(DistributedService):
                     except Exception as e:
                         self._logger.error("cound not dump %s", e.__repr__())
                     self._logger.debug("written dump")
+
+                workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
                     for worker in workers:
                         if worker not in workermessages:

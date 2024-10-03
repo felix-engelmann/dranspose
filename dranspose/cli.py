@@ -12,6 +12,7 @@ from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
 from dranspose.controller import app
+from dranspose.helpers import utils
 from dranspose.helpers.utils import done_callback
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
@@ -33,6 +34,8 @@ class CliSettings(BaseSettings):
 settings = CliSettings()
 
 logging.basicConfig(level=settings.log_level.upper())
+
+logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
@@ -111,8 +114,14 @@ ingester_task = None
 
 def ingester(args: argparse.Namespace) -> None:
     print(args.ingesterclass)
-    ing = globals()[args.ingesterclass]
-    sett = globals()[args.ingesterclass.replace("Ingester", "Settings")]
+    try:
+        ing = globals()[args.ingesterclass]
+        sett = globals()[args.ingesterclass.replace("Ingester", "Settings")]
+    except KeyError:
+        ing = utils.import_class(args.ingesterclass)
+        parent_name = ing.__bases__[0].__name__
+        sett = globals()[parent_name.replace("Ingester", "Settings")]
+        logger.info("custom worker class %s", ing)
 
     def stop(*args: Any) -> None:
         global ingester_task
@@ -230,7 +239,7 @@ def create_parser() -> argparse.ArgumentParser:
         "-c", "--ingesterclass", help="Ingester Class", required=True
     )
     parser_ingester.add_argument(
-        "-u", "--upstream_url", help="Where to connect to upstream", required=True
+        "-u", "--upstream_url", help="Where to connect to upstream", required=False
     )
     parser_ingester.add_argument(
         "-n", "--name", help="Name of the ingester", required=True

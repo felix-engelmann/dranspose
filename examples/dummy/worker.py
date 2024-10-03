@@ -29,7 +29,11 @@ class FluorescenceWorker:
 
     def process_event(self, event: EventData, parameters=None, *args, **kwargs):
         logger.warning("using parameters %s", parameters)
-        roi_slice = json.loads(parameters["roi1"].data)
+
+        if "dummy" in event.streams:
+            logger.info("got dummy data %s", event.streams["dummy"])
+            temp = json.loads(event.streams["dummy"].frames[0].bytes)
+            logger.info("temperature is %s", temp)
         if (
             "file_parameter_file" in parameters
             and parameters["file_parameter_file"].value != b""
@@ -71,6 +75,8 @@ class FluorescenceWorker:
             return
         logger.debug("contrast: %s", con)
         logger.debug("spectrum: %s", spec)
+
+        roi_slice = json.loads(parameters["roi1"].data)
 
         if con.status == "running":
             # new data
