@@ -62,7 +62,7 @@ async def test_debugger(
         state = await st.json()
         logging.info("open %s", state)
 
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(1)
 
         st = await session.post(
             "http://localhost:5003/api/v1/frames",
