@@ -11,7 +11,7 @@ import pytest
 from pydantic_core import Url
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters import TcpPcapSettings
+from dranspose.ingesters.tcp_positioncap import TcpPcapSettings
 from dranspose.ingesters.zmqsub_contrast import (
     ZmqSubContrastIngester,
     ZmqSubContrastSettings,

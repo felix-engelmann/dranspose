@@ -187,9 +187,10 @@ async def test_dump(
         evs = []
         while True:
             try:
-                dat: InternalWorkerMessage = cbor2.load(f, tag_hook=message_tag_hook)
-                evs.append(dat.event_number)
-                print("loaded dump type", type(dat))
+                dat = cbor2.load(f, tag_hook=message_tag_hook)
+                if isinstance(dat, InternalWorkerMessage):
+                    evs.append(dat.event_number)
+                    print("loaded dump type", type(dat))
             except EOFError:
                 break
 
@@ -202,8 +203,9 @@ async def test_dump(
         while True:
             try:
                 dat = cbor2.load(f, tag_hook=message_tag_hook)
-                evs.append(dat.event_number)
-                print("loaded dump type", type(dat))
+                if isinstance(dat, InternalWorkerMessage):
+                    evs.append(dat.event_number)
+                    print("loaded dump type", type(dat))
             except EOFError:
                 break
 

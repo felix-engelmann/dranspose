@@ -23,7 +23,7 @@ from dranspose.event import (
     message_tag_hook,
 )
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
-from dranspose.protocol import WorkerName, Digest, WorkParameter
+from dranspose.protocol import WorkerName, Digest, WorkParameter, ParameterName
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
@@ -88,16 +88,20 @@ class Server(uvicorn.Server):
 
 def get_parameters(
     parameter_file: Optional[os.PathLike[Any] | str], workercls: type, reducercls: type
-) -> dict[str, WorkParameter]:
+) -> dict[ParameterName, WorkParameter]:
     parameters = {}
     if parameter_file is not None:
         try:
             with open(parameter_file) as f:
-                parameters = {p.name: p for p in ParamList.validate_json(f.read())}
+                parameters = {
+                    ParameterName(p.name): p for p in ParamList.validate_json(f.read())
+                }
         except UnicodeDecodeError:
             with open(parameter_file, "rb") as fb:
                 plist = pickle.load(fb)
-                parameters = {p.name: p for p in ParamList.validate_python(plist)}
+                parameters = {
+                    ParameterName(p.name): p for p in ParamList.validate_python(plist)
+                }
 
     logger.info("params from file %s", parameters)
 
@@ -134,13 +138,20 @@ def timer(red: Any) -> None:
         time.sleep(delay)
 
 
-def _work_event(worker, reducer, event, parameters, tick):
+def _work_event(
+    worker: Any,
+    index: int,
+    reducer: Any,
+    event: EventData,
+    parameters: dict[ParameterName, WorkParameter],
+    tick: bool,
+) -> None:
     data = worker.process_event(event, parameters=parameters, tick=tick)
     if data is None:
         return
     rd = ResultData(
         event_number=event.event_number,
-        worker=WorkerName(f"development{worker.state.name}"),
+        worker=WorkerName(f"development{index}"),
         payload=data,
         parameters_hash=Digest(
             "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
@@ -202,7 +213,7 @@ def replay(
 
     with server.run_in_thread(port):
         cache = [None for _ in gens]
-        last_tick = 0
+        last_tick = 0.0
         while True:
             try:
                 internals = [
@@ -234,7 +245,7 @@ def replay(
                         if last_tick + (interval_ms / 1000) < time.time():
                             tick = True
                             last_tick = time.time()
-                    _work_event(workers[wi], reducer, event, parameters, tick)
+                    _work_event(workers[wi], wi, reducer, event, parameters, tick)
 
             except StopIteration:
                 for worker in workers:

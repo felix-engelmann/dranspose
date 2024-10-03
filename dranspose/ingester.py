@@ -2,7 +2,7 @@ import asyncio
 import time
 import os
 from io import BufferedWriter
-from typing import AsyncGenerator, Optional, Awaitable, Any
+from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator
 from uuid import UUID
 
 import cbor2
@@ -186,7 +186,12 @@ class Ingester(DistributedService):
             )
             self._logger.debug("sent message to worker %s", worker)
 
-    async def _get_zmqparts(self, work_assignment, sourcegens, swtriggen):
+    async def _get_zmqparts(
+        self,
+        work_assignment: WorkAssignment,
+        sourcegens: dict[StreamName, AsyncGenerator[StreamData, None]],
+        swtriggen: Iterator[dict[StreamName, StreamData]] | None,
+    ) -> dict[StreamName, StreamData]:
         zmqyields: list[Awaitable[StreamData]] = []
         streams: list[StreamName] = []
         for stream in work_assignment.assignments:
@@ -217,7 +222,7 @@ class Ingester(DistributedService):
         """
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
-        swtriggen = None
+        swtriggen: Iterator[dict[StreamName, StreamData]] | None = None
         if hasattr(self, "software_trigger"):
             swtriggen = self.software_trigger()
         self.dump_file = None

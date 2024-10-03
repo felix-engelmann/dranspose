@@ -50,7 +50,7 @@ def test_simple() -> None:
         (["debugworker"], "Uvicorn running on"),
     ],
 )
-def test_component(cmd, output) -> None:
+def test_component(cmd: list[str], output: str) -> None:
     p = subprocess.Popen(
         ["dranspose", *cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )

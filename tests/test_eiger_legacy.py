@@ -29,7 +29,7 @@ from dranspose.worker import Worker, WorkerSettings
 async def test_eiger_legacy(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
-    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pkls: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],

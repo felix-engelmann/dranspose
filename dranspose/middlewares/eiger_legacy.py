@@ -1,5 +1,6 @@
 import json
 from types import UnionType
+from typing import Any
 
 import zmq
 
@@ -11,7 +12,7 @@ from dranspose.data.eiger_legacy import (
 from dranspose.event import StreamData
 
 
-def _get_json(frame):
+def _get_json(frame: zmq.Frame | bytes) -> Any:
     if isinstance(frame, zmq.Frame):
         val = json.loads(frame.bytes)
     elif isinstance(frame, bytes):
@@ -40,11 +41,12 @@ def parse(data: StreamData) -> UnionType:
 
     if isinstance(packet, EigerLegacyImage):
         assert data.length == 5
-        packet.data = _get_json(data.frames[1])
+        info = _get_json(data.frames[1])
         buffer = data.frames[2]
         if isinstance(buffer, zmq.Frame):
             buffer = buffer.bytes
-        packet.data["buffer"] = buffer
+        info["buffer"] = buffer
+        packet.data = info
         packet.config = _get_json(data.frames[3])
 
     return packet
