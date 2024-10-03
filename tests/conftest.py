@@ -21,6 +21,7 @@ from typing import (
 
 import aiohttp
 import numpy as np
+import pytest
 import pytest_asyncio
 import uvicorn
 import zmq
@@ -62,6 +63,31 @@ def pytest_addoption(parser: Parser) -> None:
         default=False,
         help="enable k8s remote tests",
     )
+
+
+class ErrorLoggingHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.error_found = False
+
+    def emit(self, record):
+        # Check if the log message starts with "ERROR"
+        if record.levelname == "ERROR":
+            self.error_found = True
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def fail_on_error_log(caplog):
+    handler = ErrorLoggingHandler()
+    logging.getLogger().addHandler(handler)
+
+    yield
+
+    # After the test runs, check if any "ERROR" log was encountered
+    logging.getLogger().removeHandler(handler)
+
+    if handler.error_found:
+        pytest.fail("Test failed due to log message starting with 'ERROR'")
 
 
 @pytest_asyncio.fixture()

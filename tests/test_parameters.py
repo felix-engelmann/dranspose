@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import pickle
 from pathlib import PosixPath
 from typing import Callable, Optional, Awaitable, Any, Coroutine
 
@@ -113,7 +114,7 @@ async def test_params(
         arr = np.ones((10, 10))
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/file_parameter_file",
-            data=arr.tobytes(),
+            data=pickle.dumps(arr),
         )
         assert resp.status == 200
         hash = await resp.json()

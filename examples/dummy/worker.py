@@ -58,7 +58,7 @@ class FluorescenceWorker:
                 logger.warning("got pcap %s", res)
 
         if {"contrast", "xspress3"} - set(event.streams.keys()) != set():
-            logger.error(
+            logger.warning(
                 "missing streams for this worker, only present %s", event.streams.keys()
             )
             return
