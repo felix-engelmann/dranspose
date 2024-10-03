@@ -69,25 +69,31 @@ async def test_debugger(
             json={"number": nframes, "time": 0.0001, "shape": [100, 100]},
         )
         state = await st.json()
+        st.close()
         logging.info("sending frames %s", state)
 
         st = await session.get("http://localhost:5003/api/v1/finished")
         state = await st.json()
+        st.close()
         while not state:
             await asyncio.sleep(0.5)
             st = await session.get("http://localhost:5003/api/v1/finished")
             state = await st.json()
+            st.close()
 
             st = await session.get("http://localhost:5003/api/v1/statistics")
             stat = await st.json()
+            st.close()
             logging.info("fps %s", stat["fps"])
 
         st = await session.post("http://localhost:5003/api/v1/close_socket")
         state = await st.json()
+        st.close()
         logging.info("close %s", state)
 
         st = await session.get("http://localhost:5003/api/v1/statistics")
         stat = Statistics.model_validate_json(await st.read())
+        st.close()
         last = {}
         last_sent = 0
         for t, sent, stats in stat.snapshots:
