@@ -107,7 +107,7 @@ async def test_debugger(
                     logging.info("   Δ%s: %s", ifname, delta)
                     last[ifname] = nst
     await task
-    ctx.destroy(linger=0)
+    ctx.destroy()
 
 
 @pytest.mark.asyncio
