@@ -383,7 +383,9 @@ class Worker(DistributedService):
             },
         )
 
-    async def restart_work(self, new_uuid: UUID4) -> None:
+    async def restart_work(
+        self, new_uuid: UUID4, active_streams: list[StreamName]
+    ) -> None:
         self._logger.info("resetting config %s", new_uuid)
         if self.poll_task:
             await cancel_and_wait(self.poll_task)

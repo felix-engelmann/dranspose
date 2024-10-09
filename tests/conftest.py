@@ -73,6 +73,8 @@ class ErrorLoggingHandler(logging.Handler):
     def emit(self, record):
         # Check if the log message starts with "ERROR"
         if record.levelname == "ERROR":
+            if "Unclosed connection" in record.message:  # aiohttp benign error
+                return
             self.error_found = True
 
 

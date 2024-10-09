@@ -22,6 +22,7 @@ from dranspose.protocol import (
     RedisKeys,
     ReducerUpdate,
     DistributedStateEnum,
+    StreamName,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,7 +146,9 @@ class Reducer(DistributedService):
                 delay = 1
             await asyncio.sleep(delay)
 
-    async def restart_work(self, new_uuid: UUID4) -> None:
+    async def restart_work(
+        self, new_uuid: UUID4, active_streams: list[StreamName]
+    ) -> None:
         self._logger.info("resetting config %s", new_uuid)
         await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)

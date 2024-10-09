@@ -123,6 +123,7 @@ class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
     parameters_version: dict[ParameterName, UUID4]
     target_parameters_hash: Optional[Digest] = None
+    active_streams: list[StreamName] = []
     finished: bool = False
 
 

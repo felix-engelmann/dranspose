@@ -6,7 +6,7 @@ import asyncio
 from asyncio import Task
 from collections import defaultdict
 from types import UnionType
-from typing import Dict, List, Any, AsyncGenerator, Optional, Annotated, Literal
+from typing import Any, AsyncGenerator, Optional, Annotated, Literal
 
 import logging
 import time
@@ -175,6 +175,7 @@ class Controller:
             cupd = ControllerUpdate(
                 mapping_uuid=self.mapping.uuid,
                 parameters_version={n: p.uuid for n, p in self.parameters.items()},
+                active_streams=list(m.mapping.keys()),
             )
             logger.debug("send controller update %s", cupd)
             await self.redis.xadd(
@@ -551,7 +552,7 @@ async def get_progress() -> dict[str, Any]:
 
 @app.post("/api/v1/mapping")
 async def set_mapping(
-    mapping: Dict[StreamName, List[Optional[List[VirtualWorker]]]],
+    mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]],
     all_wrap: bool = True,
 ) -> UUID4 | str:
     global ctrl
@@ -581,7 +582,7 @@ async def set_mapping(
 
 
 @app.get("/api/v1/mapping")
-async def get_mapping() -> Dict[StreamName, List[Optional[List[VirtualWorker]]]]:
+async def get_mapping() -> dict[StreamName, list[Optional[list[VirtualWorker]]]]:
     global ctrl
     return ctrl.mapping.mapping
 
@@ -595,7 +596,7 @@ async def stop() -> None:
 
 @app.post("/api/v1/sardana_hook")
 async def set_sardana_hook(
-    info: Dict[Literal["streams"] | Literal["scan"], Any]
+    info: dict[Literal["streams"] | Literal["scan"], Any]
 ) -> UUID4 | str:
     global ctrl
     config = await ctrl.get_configs()
