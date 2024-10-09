@@ -51,33 +51,28 @@ class ZmqSubPCAPIngester(Ingester):
                 self._logger.error("packet not valid %s", e.__repr__())
                 continue
             if type(packet) is PCAPData:
-                # vect_keys = [k for k, v in parts.items() if isinstance(v, list)]
-                # lenghts = {len(parts[k]) for k, v in parts.items() if isinstance(v, list)}
+                if len(parts) != 1:
+                    self._logger.error("PCAP multipart messages are not supported")
+                    continue
                 vect_keys = {
-                    k: len(parts[k]) for k, v in parts.items() if isinstance(v, list)
+                    k: len(parts[0][k])
+                    for k, v in parts[0].items()
+                    if isinstance(v, list)
                 }
                 lenghts = set(vect_keys.values())
                 if len(lenghts) != 1:
-                    raise ValueError(
-                        "All lists in a PCAP frame must have the same length"
-                    )
-                # iterator comprehension from hell
-                # frames_it = ({k: (v[i] if k in vect_keys.keys() else v + i if k == "frame_number" else v)
-                #            for k, v in parts.items()}
-                #            for i in range(lenghts.pop()))
-                # for frame in frames_it:
-                #     yield StreamData(typ="PCAP", frames=frame)
-                # equivalent for loop
+                    self._logger.error("All lists in msg must have the same length")
+                    continue
                 for i in range(lenghts.pop()):
                     frame = {}
-                    for k, v in parts.items():
+                    for k, v in parts[0].items():
                         if k in vect_keys.keys():
                             frame[k] = v[i]
                         elif k == "frame_number":
                             frame[k] = v + i  # Increment frame_number
                         else:
                             frame[k] = v  # Keep the original scalar value
-                    yield StreamData(typ="PCAP", frames=frame)
+                    yield StreamData(typ="PCAP", frames=[frame])
             elif type(packet) is PCAPEnd:
                 yield StreamData(typ="PCAP", frames=parts)
                 break
