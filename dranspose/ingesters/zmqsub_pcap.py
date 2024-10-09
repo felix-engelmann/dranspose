@@ -53,12 +53,16 @@ class ZmqSubPCAPIngester(Ingester):
             if type(packet) is PCAPData:
                 # vect_keys = [k for k, v in parts.items() if isinstance(v, list)]
                 # lenghts = {len(parts[k]) for k, v in parts.items() if isinstance(v, list)}
-                vect_keys = {k:len(parts[k])  for k, v in parts.items() if isinstance(v, list)}
+                vect_keys = {
+                    k: len(parts[k]) for k, v in parts.items() if isinstance(v, list)
+                }
                 lenghts = set(vect_keys.values())
                 if len(lenghts) != 1:
-                    raise ValueError("All lists in PCAP frame must have the same length")
-                # list comprehension from hell
-                # frames_it = ({k: (v[i] if k in vect_keys.keys() else v + i if k == "frame_number" else v) 
+                    raise ValueError(
+                        "All lists in a PCAP frame must have the same length"
+                    )
+                # iterator comprehension from hell
+                # frames_it = ({k: (v[i] if k in vect_keys.keys() else v + i if k == "frame_number" else v)
                 #            for k, v in parts.items()}
                 #            for i in range(lenghts.pop()))
                 # for frame in frames_it:
@@ -68,9 +72,9 @@ class ZmqSubPCAPIngester(Ingester):
                     frame = {}
                     for k, v in parts.items():
                         if k in vect_keys.keys():
-                            frame[k] = v[i]  
+                            frame[k] = v[i]
                         elif k == "frame_number":
-                            frame[k] = v + i  # Increment frame_number 
+                            frame[k] = v + i  # Increment frame_number
                         else:
                             frame[k] = v  # Keep the original scalar value
                     yield StreamData(typ="PCAP", frames=frame)

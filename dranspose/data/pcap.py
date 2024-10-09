@@ -35,9 +35,9 @@ class PCAPData(PCAPBase):
     Example:
         ``` py
         PCAPImage(
-            message_id=2, 
-            version=1, 
-            message_type="data", 
+            message_id=2,
+            version=1,
+            message_type="data",
             frame_number=0,
             inttime=[7.1160000000000005, 7.315, 7.093800000000001, 7.1584, 7.1322, 7.1062, 7.0206, 6.9082, 7.0164, 6.912, 6.966, 6.885000000000001, 6.7946, 6.731800000000001, 6.9636000000000005],
             triggernumber=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0],
