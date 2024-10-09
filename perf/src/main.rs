@@ -14,7 +14,6 @@ use crate::control_plane::register;
 
 use env_logger::Env;
 
-
 struct TimedMultipart {
     multipart: Vec<Message>,
     received: Instant,

@@ -17,8 +17,8 @@ use uuid::Uuid;
 use futures::{
     future::FutureExt, // for `.fuse()`
 };
-use std::ops::Deref;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 #[derive(Debug, PartialEq, Eq)]
 enum ScanState {
