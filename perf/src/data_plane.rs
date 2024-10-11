@@ -43,11 +43,14 @@ pub(crate) async fn forwarder(
 
     let listenurl = format!("tcp://*:{}", url.port().unwrap());
 
-    let context = Context::new();
+    debug!("listenurl is {}", listenurl);
 
+    let context = Context::new();
+    debug!("zmq context created");
     let mut routersock: Router<IntoIter<Message>, Message> = async_zmq::router(&listenurl)?
         .with_context(&context)
-        .bind()?;
+        .bind()
+        .expect("could not bind router socket");
     routersock
         .as_raw_socket()
         .set_router_mandatory(true)

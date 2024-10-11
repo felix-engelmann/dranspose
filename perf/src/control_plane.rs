@@ -5,7 +5,7 @@ use async_std::task;
 use async_zmq::SinkExt;
 use futures::channel::mpsc;
 use futures::{future::FutureExt, select, StreamExt};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use redis::aio::MultiplexedConnection;
 use redis::streams::{StreamRangeReply, StreamReadOptions, StreamReadReply};
 use redis::{from_redis_value, AsyncCommands};
@@ -52,6 +52,8 @@ pub(crate) async fn register(
         reg_fwd_assignment_r,
     ));
     info!("started forwarder task, waiting for started message");
+
+    let mut timeout = 5;
     loop {
         let start_msg = fwd_reg_connectedworker_r.next().await;
         info!("forwarder notified {:?}", start_msg);
@@ -65,6 +67,11 @@ pub(crate) async fn register(
                 task::sleep(Duration::from_micros(1000_000)).await;
             }
         };
+        timeout -= 1;
+        if timeout < 0 {
+            error!("forwarded did not start within timeout");
+            return Ok(());
+        }
     }
 
     info!("resume registerer");
@@ -104,6 +111,15 @@ pub(crate) async fn register(
         );
 
         let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
+
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        let now = since_the_epoch.as_millis() as f64 / 1000f64;
+        state
+            .connected_workers
+            .retain(|_, v| now - v.last_seen < 3.0);
         trace!("register select");
         select! {
             update_msgs = con.xread_options::<&str, String, StreamReadReply>(&keylist, &ids, &opts).fuse() => {
@@ -167,14 +183,7 @@ pub(crate) async fn register(
                 if let Some(cw) = cw {
                     match cw {
                         ForwarderEvent::ConnectedWorker{connected_worker} => {
-                            let start = SystemTime::now();
-                            let since_the_epoch = start
-                                .duration_since(UNIX_EPOCH)
-                                .expect("Time went backwards");
-                            let now = since_the_epoch.as_millis() as f64/1000f64;
-
                             state.connected_workers.insert(connected_worker.service_uuid, connected_worker);
-                            state.connected_workers.retain(|_, v| now-v.last_seen < 3.0);
                             fast_publish = true;
                         },
                         ForwarderEvent::Ready {mapping_uuid}  => {
