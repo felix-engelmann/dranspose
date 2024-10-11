@@ -343,7 +343,14 @@ class Ingester(DistributedService):
         poller = zmq.asyncio.Poller()
         poller.register(self.out_socket, zmq.POLLIN)
         while True:
-            socks = dict(await poller.poll())
+            socks = dict(await poller.poll(timeout=1))
+            # clean up old workers
+            now = time.time()
+            self.state.connected_workers = {
+                uuid: cw
+                for uuid, cw in self.state.connected_workers.items()
+                if now - cw.last_seen < 4
+            }
             for sock in socks:
                 data = await sock.recv_multipart()
                 connected_worker = ConnectedWorker(
@@ -355,12 +362,6 @@ class Ingester(DistributedService):
                 self.state.connected_workers[
                     connected_worker.service_uuid
                 ] = connected_worker
-                now = time.time()
-                self.state.connected_workers = {
-                    uuid: cw
-                    for uuid, cw in self.state.connected_workers.items()
-                    if now - cw.last_seen < 3
-                }
                 self._logger.debug("worker pinnged %s", connected_worker)
                 if fast_publish:
                     self._logger.debug("fast publish")
