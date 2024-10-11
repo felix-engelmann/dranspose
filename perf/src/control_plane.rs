@@ -2,6 +2,8 @@ use crate::data_plane::forwarder;
 use crate::dranspose::{ConnectedWorker, ControllerUpdate, IngesterState, WorkAssignment};
 use crate::Cli;
 use async_std::task;
+use async_std::future::timeout;
+use async_std::future::TimeoutError;
 use async_zmq::SinkExt;
 use futures::channel::mpsc;
 use futures::{future::FutureExt, select, StreamExt};
@@ -53,7 +55,7 @@ pub(crate) async fn register(
     ));
     info!("started forwarder task, waiting for started message");
 
-    let mut timeout = 5;
+    let mut retries = 5;
     loop {
         let start_msg = fwd_reg_connectedworker_r.next().await;
         info!("forwarder notified {:?}", start_msg);
@@ -67,8 +69,8 @@ pub(crate) async fn register(
                 task::sleep(Duration::from_micros(1000_000)).await;
             }
         };
-        timeout -= 1;
-        if timeout < 0 {
+        retries -= 1;
+        if retries < 0 {
             error!("forwarded did not start within timeout");
             return Ok(());
         }
@@ -99,7 +101,12 @@ pub(crate) async fn register(
         if last_config_upload.elapsed().as_secs() > 6 || fast_publish {
             let config = serde_json::to_string(&state).unwrap();
             debug!("publish config {}", &config);
-            let _: () = con.set_ex(&configkey, &config, 10).await.expect("could not set config in redis");
+            let res: Result<Result<(), redis::RedisError>, TimeoutError> = timeout(Duration::from_secs(1), con.set_ex(&configkey, &config, 10)).await;
+            match res {
+                Ok(_) => debug!("successfully published config"),
+                Err(_) => warn!("could not set config in redis fast enough")
+            }
+            //let _: () = timeout(Duration::from_secs(1), con.set_ex(&configkey, &config, 10)).await.expect().expect("could not set redis config");
             last_config_upload = Instant::now();
             fast_publish = false;
         }
