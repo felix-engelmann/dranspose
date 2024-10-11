@@ -99,7 +99,7 @@ pub(crate) async fn register(
         if last_config_upload.elapsed().as_secs() > 6 || fast_publish {
             let config = serde_json::to_string(&state).unwrap();
             debug!("publish config {}", &config);
-            let _: () = con.set_ex(&configkey, &config, 10).await.unwrap();
+            let _: () = con.set_ex(&configkey, &config, 10).await.expect("could not set config in redis");
             last_config_upload = Instant::now();
             fast_publish = false;
         }
@@ -109,8 +109,10 @@ pub(crate) async fn register(
             "dranspose:assigned:{}",
             state.mapping_uuid.unwrap_or(Uuid::default()).to_string()
         );
+        trace!("use assigned key: {}", assignedkey);
 
         let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
+        trace!("listen to redis keys {:?}", keylist);
 
         let start = SystemTime::now();
         let since_the_epoch = start
@@ -120,7 +122,7 @@ pub(crate) async fn register(
         state
             .connected_workers
             .retain(|_, v| now - v.last_seen < 3.0);
-        trace!("register select");
+        trace!("cleaned stale workers, register select");
         select! {
             update_msgs = con.xread_options::<&str, String, StreamReadReply>(&keylist, &ids, &opts).fuse() => {
                 trace!("raw redis message {:?}", update_msgs);
