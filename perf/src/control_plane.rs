@@ -91,7 +91,7 @@ pub(crate) async fn register(
     loop {
         if last_config_upload.elapsed().as_secs() > 6 || fast_publish {
             let config = serde_json::to_string(&state).unwrap();
-            debug!("{}", &config);
+            debug!("publish config {}", &config);
             let _: () = con.set_ex(&configkey, &config, 10).await.unwrap();
             last_config_upload = Instant::now();
             fast_publish = false;
