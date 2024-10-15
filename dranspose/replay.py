@@ -239,10 +239,10 @@ def replay(
                     logger.warning("spread to wi %d", wi)
                     tick = False
                     if hasattr(workers[wi], "get_tick_interval"):
-                        interval_ms = workers[wi].get_tick_interval(
+                        interval_s = workers[wi].get_tick_interval(
                             parameters=parameters
                         )
-                        if last_tick + (interval_ms / 1000) < time.time():
+                        if last_tick + interval_s < time.time():
                             tick = True
                             last_tick = time.time()
                     _work_event(workers[wi], wi, reducer, event, parameters, tick)
