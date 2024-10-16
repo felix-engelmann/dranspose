@@ -42,6 +42,7 @@ tests = [
     "psutil",
     "types-psutil",
     "pytest-plt",
+    "h5pyd"
 ]
 docs = [
     "mkdocs",
