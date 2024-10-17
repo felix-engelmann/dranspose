@@ -31,7 +31,7 @@ def _uuid_to_obj(data, uuid):
     idstr, path = uuid.split("-")
     path = base64.b16decode(path).decode()
     logger.debug("raw path %s", path)
-    #assert id(data) == int(idstr)
+    # assert id(data) == int(idstr)
     obj = data
     clean_path = []
     for p in path.split("/"):
@@ -168,7 +168,7 @@ def links(req: Request, uuid: str):
     ret = {"links": []}
     if isinstance(obj, dict):
         for key, val in obj.items():
-            if not isinstance(key,str):
+            if not isinstance(key, str):
                 continue
             if isinstance(val, dict):
                 print("path to sub is: ", path, key)
@@ -234,7 +234,9 @@ app = FastAPI()
 
 app.include_router(router, prefix="/results")
 
+
 def get_data():
     return {"image": {}}
+
 
 app.state.get_data = get_data

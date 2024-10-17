@@ -158,11 +158,9 @@ async def test_reduction(
         logging.info("map %s", list(f["map"].keys()))
         logging.info("version %s", f["version/commit_hash"][()])
         assert (
-                f["version"]["commit_hash"][()]
-                == b"1a474d1455f0d6c6113a22179b8fff1e98325916"
+            f["version"]["commit_hash"][()]
+            == b"1a474d1455f0d6c6113a22179b8fff1e98325916"
         )
-
-
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)

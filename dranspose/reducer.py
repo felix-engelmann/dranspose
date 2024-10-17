@@ -203,10 +203,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     reducer = Reducer()
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
+
     def get_data():
         if hasattr(reducer.reducer, "publish"):
             return reducer.reducer.publish
         return {}
+
     app.state.get_data = get_data
     yield
     await cancel_and_wait(run_task)
@@ -217,6 +219,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(router, prefix="/data")
+
 
 @app.get("/api/v1/status")
 async def get_status() -> bool:

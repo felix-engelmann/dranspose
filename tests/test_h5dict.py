@@ -19,12 +19,12 @@ async def test_root():
 
     def get_data():
         return {
-        "live": 34,
-        "other": {"third": [1, 2, 3]},
-        "image": np.ones((1000, 1000)),
-        "hello": "World",
-        "_attrs": {"NX_class": "NXentry"},
-    }
+            "live": 34,
+            "other": {"third": [1, 2, 3]},
+            "image": np.ones((1000, 1000)),
+            "hello": "World",
+            "_attrs": {"NX_class": "NXentry"},
+        }
 
     app.state.get_data = get_data
 
