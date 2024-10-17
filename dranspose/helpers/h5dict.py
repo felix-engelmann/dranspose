@@ -23,7 +23,7 @@ def _path_to_uuid(obj, path: list[str]):
     print("abspath", abspath)
     uuid = base64.b16encode(abspath.encode())
     print("uuid from function is", str(id(obj)).encode() + b"-" + uuid)
-    return str(id(obj)).encode() + b"-" + uuid
+    return b"h5dict-" + uuid
 
 
 def _uuid_to_obj(data, uuid):
@@ -31,7 +31,7 @@ def _uuid_to_obj(data, uuid):
     idstr, path = uuid.split("-")
     path = base64.b16decode(path).decode()
     logger.debug("raw path %s", path)
-    assert id(data) == int(idstr)
+    #assert id(data) == int(idstr)
     obj = data
     clean_path = []
     for p in path.split("/"):
@@ -47,7 +47,7 @@ def _uuid_to_obj(data, uuid):
 
 @router.get("/datasets/{uuid}/value")
 def values(req: Request, uuid, select: str | None = None):
-    data = req.app.state.publish
+    data = req.app.state.get_data()
     obj, _ = _uuid_to_obj(data, uuid)
     logger.debug("return value for obj %s", obj)
     logger.debug("selection %s", select)
@@ -74,7 +74,7 @@ def values(req: Request, uuid, select: str | None = None):
 
 @router.get("/datasets/{uuid}")
 def datasets(req: Request, uuid):
-    data = req.app.state.publish
+    data = req.app.state.get_data()
     obj, _ = _uuid_to_obj(data, uuid)
     logger.debug("return dataset for obj %s", obj)
     ret = {
@@ -133,7 +133,7 @@ def datasets(req: Request, uuid):
 
 @router.get("/groups/{uuid}/links/{name}")
 def link(req: Request, uuid, name):
-    data = req.app.state.publish
+    data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     path.append(name)
     obj = obj[name]
@@ -163,11 +163,13 @@ def link(req: Request, uuid, name):
 
 @router.get("/groups/{uuid}/links")
 def links(req: Request, uuid: str):
-    data = req.app.state.publish
+    data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     ret = {"links": []}
     if isinstance(obj, dict):
         for key, val in obj.items():
+            if not isinstance(key,str):
+                continue
             if isinstance(val, dict):
                 print("path to sub is: ", path, key)
                 ret["links"].append(
@@ -197,7 +199,7 @@ def links(req: Request, uuid: str):
 
 @router.get("/groups/{uuid}")
 def group(req: Request, uuid: str):
-    data = req.app.state.publish
+    data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     logger.debug("start listing group id %s, obj %s, path: %s", uuid, obj, path)
 
@@ -216,8 +218,8 @@ def group(req: Request, uuid: str):
 
 @router.get("/")
 def read_root(request: Request):
-    logging.info("data %s", request.app.state.publish)
-    uuid = _path_to_uuid(request.app.state.publish, [])
+    logging.info("data %s", request.app.state.get_data())
+    uuid = _path_to_uuid(request.app.state.get_data(), [])
     ret = {
         "root": uuid,
         "created": time.time(),
@@ -232,4 +234,7 @@ app = FastAPI()
 
 app.include_router(router, prefix="/results")
 
-app.state.publish = {"image": {}}
+def get_data():
+    return {"image": {}}
+
+app.state.get_data = get_data

@@ -17,13 +17,16 @@ async def test_root():
 
     app.include_router(router, prefix="/results")
 
-    app.state.publish = {
+    def get_data():
+        return {
         "live": 34,
         "other": {"third": [1, 2, 3]},
         "image": np.ones((1000, 1000)),
         "hello": "World",
         "_attrs": {"NX_class": "NXentry"},
     }
+
+    app.state.get_data = get_data
 
     config = uvicorn.Config(app, port=5000, log_level="debug")
     server = uvicorn.Server(config)
