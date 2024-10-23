@@ -232,7 +232,7 @@ async def test_replay(
 
     logging.info("keep webserver alive")
 
-    def work():
+    def work() -> None:
         f = h5pyd.File("/", "r", endpoint="http://localhost:5010/data")
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))

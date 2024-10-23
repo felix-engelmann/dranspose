@@ -152,7 +152,7 @@ async def test_reduction(
             == "1a474d1455f0d6c6113a22179b8fff1e98325916"
         )
 
-    def work():
+    def work() -> None:
         f = h5pyd.File("/", "r", endpoint="http://localhost:5001/data")
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))

@@ -7,7 +7,7 @@ import random
 import threading
 import time
 import traceback
-from typing import Iterator, Any, Optional
+from typing import Iterator, Any, Optional, Generator
 
 import cbor2
 import uvicorn
@@ -47,12 +47,12 @@ ParamList = TypeAdapter(list[WorkParameter])
 
 reducer_app = FastAPI()
 
-reducer = None
+reducer: Any | None = None
 
 
-def get_data():
+def get_data() -> dict[str, Any]:
     global reducer
-    if hasattr(reducer, "publish"):
+    if reducer is not None and hasattr(reducer, "publish"):
         return reducer.publish
     return {}
 
@@ -65,14 +65,14 @@ reducer_app.include_router(router, prefix="/data")
 @reducer_app.get("/api/v1/result/{path:path}")
 async def get_path(path: str) -> Any:
     global reducer
-    if not hasattr(reducer, "publish"):
+    if reducer is None or not hasattr(reducer, "publish"):
         raise HTTPException(status_code=404, detail="no publishable data")
     try:
         if path == "":
             path = "$"
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]  # type: ignore [attr-defined]
+        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]
         data = pickle.dumps(ret)
         return Response(data, media_type="application/x.pickle")
     except Exception as e:
@@ -93,7 +93,7 @@ class Server(uvicorn.Server):
         try:
             while not self.started:
                 time.sleep(1e-3)
-            yield thread
+            yield
         finally:
             self.should_exit = True
             thread.join()
@@ -180,7 +180,9 @@ def _work_event(
     reducer.process_result(result, parameters=parameters)
 
 
-def _finish(workers, reducer, parameters):
+def _finish(
+    workers: list[Any], reducer: Any, parameters: dict[ParameterName, WorkParameter]
+) -> None:
     for worker in workers:
         if hasattr(worker, "finish"):
             try:
@@ -213,7 +215,7 @@ def replay(
     keepalive: bool = False,
     nworkers: int = 2,
     broadcast_first: bool = True,
-) -> None:
+) -> Generator[threading.Event, None, None]:
     if source is not None:
         sourcecls = utils.import_class(source)
         inst = sourcecls()
@@ -295,7 +297,7 @@ def replay(
             stop_evt.set()
         else:
             print("press ctrl-C to stop")
-        yield
+        yield stop_evt
         try:
             stop_evt.wait()
         except KeyboardInterrupt:

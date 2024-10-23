@@ -77,7 +77,7 @@ class Ingester(DistributedService):
             self._ingester_settings,
         )
         self.state: IngesterState
-        self.active_streams = []
+        self.active_streams: list[StreamName] = []
 
         self.dump_file: Optional[BufferedWriter] = None
 
