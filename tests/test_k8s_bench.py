@@ -22,7 +22,7 @@ def get_url(path: str, svc: str = "controller") -> str:
 
 
 def get_gen(path: str, svc: str = "large") -> str:
-    return f"http://dranspose-workload-generator-{svc}.daq.maxiv.lu.se/api/v1/{path}"
+    return f"http://dummymax-workload-{svc}.daq.maxiv.lu.se/api/v1/{path}"
 
 
 @pytest.mark.parametrize("ingester", ["gen1"])  # "fast", "large",small
@@ -397,7 +397,7 @@ async def est_dual_ingester(plt: Any, size: int) -> None:
     reason="explicitly enable --k8s remote bench, optional --plots",
 )
 @pytest.mark.asyncio
-async def test_multi_ingester(plt: Any, size: int, num_ing: int) -> None:
+async def est_multi_ingester(plt: Any, size: int, num_ing: int) -> None:
     async with aiohttp.ClientSession() as session:
         ingesters = [f"gen{i}" for i in range(num_ing)]
         st = await session.get(get_url("config"))
@@ -532,12 +532,8 @@ async def test_multi_ingester(plt: Any, size: int, num_ing: int) -> None:
     reason="explicitly enable --k8s remote bench, optional --plots",
 )
 @pytest.mark.asyncio
-async def est_raw_zmq(plt: Any, size: int) -> None:
+async def test_raw_zmq(plt: Any, size: int) -> None:
     async with aiohttp.ClientSession() as session:
-        st = await session.get(get_url("config"))
-        state = EnsembleState.model_validate(await st.json())
-        logging.info("available streams %s", state.get_streams())
-
         exp_start = time.time()
 
         maxfps = 20000
