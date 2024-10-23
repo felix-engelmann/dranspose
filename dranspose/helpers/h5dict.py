@@ -1,6 +1,7 @@
 import base64
 import logging
 import time
+from typing import Any
 
 import numpy as np
 from fastapi import APIRouter, FastAPI
@@ -18,15 +19,15 @@ def _get_now():
     return time.time()
 
 
-def _path_to_uuid(obj, path: list[str]):
+def _path_to_uuid(path: list[str]) -> bytes:
     abspath = "/" + "/".join(path)
     print("abspath", abspath)
     uuid = base64.b16encode(abspath.encode())
-    print("uuid from function is", str(id(obj)).encode() + b"-" + uuid)
+    # print("uuid from function is", str(id(obj)).encode() + b"-" + uuid)
     return b"h5dict-" + uuid
 
 
-def _uuid_to_obj(data, uuid):
+def _uuid_to_obj(data: dict[str, Any], uuid: str):
     logger.debug("parse %s", uuid)
     idstr, path = uuid.split("-")
     path = base64.b16decode(path).decode()
@@ -131,6 +132,39 @@ def datasets(req: Request, uuid):
     return ret
 
 
+def _get_group_link(obj, path):
+    if isinstance(obj, dict):
+        print("path to sub is: ", path)
+        link = {
+            "class": "H5L_TYPE_HARD",
+            "collection": "groups",
+            "id": _path_to_uuid(path),
+            "title": path[-1],
+            "created": _get_now(),
+        }
+    else:
+        link = {
+            "class": "H5L_TYPE_HARD",
+            "collection": "datasets",
+            "id": _path_to_uuid(path),
+            "title": path[-1],
+            "created": _get_now(),
+        }
+    return link
+
+
+def _get_group_links(obj, path):
+    if isinstance(obj, dict):
+        links = []
+        for key, val in obj.items():
+            if not isinstance(key, str):
+                logger.warning("unable to use non-string key: %s as group name", key)
+                continue
+            link = _get_group_link(val, path + [key])
+            links.append(link)
+        return links
+
+
 @router.get("/groups/{uuid}/links/{name}")
 def link(req: Request, uuid, name):
     data = req.app.state.get_data()
@@ -138,25 +172,7 @@ def link(req: Request, uuid, name):
     path.append(name)
     obj = obj[name]
     logger.debug("generate link for %s at %s", obj, path)
-    ret = {}
-
-    if isinstance(obj, dict):
-        print("path to sub is: ", path)
-        ret["link"] = {
-            "class": "H5L_TYPE_HARD",
-            "collection": "groups",
-            "id": _path_to_uuid(data, path),
-            "title": name,
-            "created": _get_now(),
-        }
-    else:
-        ret["link"] = {
-            "class": "H5L_TYPE_HARD",
-            "collection": "datasets",
-            "id": _path_to_uuid(data, path),
-            "title": name,
-            "created": _get_now(),
-        }
+    ret = {"link": _get_group_link(obj, path)}
     logger.debug("link name is %s", ret)
     return ret
 
@@ -165,34 +181,8 @@ def link(req: Request, uuid, name):
 def links(req: Request, uuid: str):
     data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
-    ret = {"links": []}
-    if isinstance(obj, dict):
-        for key, val in obj.items():
-            if not isinstance(key, str):
-                continue
-            if isinstance(val, dict):
-                print("path to sub is: ", path, key)
-                ret["links"].append(
-                    {
-                        "class": "H5L_TYPE_HARD",
-                        "collection": "groups",
-                        "id": _path_to_uuid(data, path + [key]),
-                        "title": key,
-                        "created": _get_now(),
-                        # "href": "localhost/groups/g-be5996fa-83c5-11e8-a8e6-0242ac120016/links/g1",
-                        # "target": "localhost/groups/g-be6eb652-83c5-11e8-b9ee-0242ac12000a"
-                    }
-                )
-            else:
-                ret["links"].append(
-                    {
-                        "class": "H5L_TYPE_HARD",
-                        "collection": "datasets",
-                        "id": _path_to_uuid(data, path + [key]),
-                        "title": key,
-                        "created": _get_now(),
-                    }
-                )
+    ret = {"links": _get_group_links(obj, path)}
+
     logger.debug("group links %s", ret)
     return ret
 
@@ -205,7 +195,7 @@ def group(req: Request, uuid: str):
 
     group = {
         "id": uuid,
-        "root": _path_to_uuid(data, []),
+        "root": _path_to_uuid([]),
         "linkCount": len(obj),
         "attributeCount": 0,
         "lastModified": _get_now(),
@@ -219,15 +209,17 @@ def group(req: Request, uuid: str):
 @router.get("/")
 def read_root(request: Request):
     logging.info("data %s", request.app.state.get_data())
-    uuid = _path_to_uuid(request.app.state.get_data(), [])
-    ret = {
-        "root": uuid,
-        "created": time.time(),
-        "owner": "admin",
-        "class": "domain",
-        "lastModified": time.time(),
-    }
-    return ret
+    data = request.app.state.get_data()
+    if isinstance(data, dict):
+        uuid = _path_to_uuid([])
+        ret = {
+            "root": uuid,
+            "created": time.time(),
+            "owner": "admin",
+            "class": "domain",
+            "lastModified": time.time(),
+        }
+        return ret
 
 
 app = FastAPI()
