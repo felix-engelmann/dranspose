@@ -22,6 +22,7 @@ from dranspose.event import (
     ResultData,
     message_tag_hook,
 )
+from dranspose.helpers.h5dict import router
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.protocol import WorkerName, Digest, WorkParameter, ParameterName
 
@@ -47,6 +48,18 @@ ParamList = TypeAdapter(list[WorkParameter])
 reducer_app = FastAPI()
 
 reducer = None
+
+
+def get_data():
+    global reducer
+    if hasattr(reducer, "publish"):
+        return reducer.publish
+    return {}
+
+
+reducer_app.state.get_data = get_data
+
+reducer_app.include_router(router, prefix="/data")
 
 
 @reducer_app.get("/api/v1/result/{path:path}")
@@ -80,7 +93,7 @@ class Server(uvicorn.Server):
         try:
             while not self.started:
                 time.sleep(1e-3)
-            yield
+            yield thread
         finally:
             self.should_exit = True
             thread.join()
@@ -167,6 +180,29 @@ def _work_event(
     reducer.process_result(result, parameters=parameters)
 
 
+def _finish(workers, reducer, parameters):
+    for worker in workers:
+        if hasattr(worker, "finish"):
+            try:
+                worker.finish(parameters=parameters)
+            except Exception as e:
+                logger.error(
+                    "worker finished failed with %s\n%s",
+                    e.__repr__(),
+                    traceback.format_exc(),
+                )
+
+    if hasattr(reducer, "finish"):
+        try:
+            reducer.finish(parameters=parameters)
+        except Exception as e:
+            logger.error(
+                "reducer finish failed with %s\n%s",
+                e.__repr__(),
+                traceback.format_exc(),
+            )
+
+
 def replay(
     wclass: str,
     rclass: str,
@@ -209,6 +245,9 @@ def replay(
     server = Server(config)
     # server.run()
 
+    stop_evt = threading.Event()
+    yield stop_evt
+
     first = True
 
     with server.run_in_thread(port):
@@ -236,7 +275,7 @@ def replay(
                     first = False
 
                 for wi in dst_worker_ids:
-                    logger.warning("spread to wi %d", wi)
+                    logger.info("spread to wi %d", wi)
                     tick = False
                     if hasattr(workers[wi], "get_tick_interval"):
                         interval_s = workers[wi].get_tick_interval(
@@ -248,26 +287,16 @@ def replay(
                     _work_event(workers[wi], wi, reducer, event, parameters, tick)
 
             except StopIteration:
-                for worker in workers:
-                    if hasattr(worker, "finish"):
-                        try:
-                            worker.finish(parameters=parameters)
-                        except Exception as e:
-                            logger.error(
-                                "worker finished failed with %s\n%s",
-                                e.__repr__(),
-                                traceback.format_exc(),
-                            )
-
-                if hasattr(reducer, "finish"):
-                    try:
-                        reducer.finish(parameters=parameters)
-                    except Exception as e:
-                        logger.error(
-                            "reducer finish failed with %s\n%s",
-                            e.__repr__(),
-                            traceback.format_exc(),
-                        )
+                logger.debug("end of replay, calling finish")
+                _finish(workers, reducer, parameters)
                 break
-        if keepalive:
-            input("press key to stop server")
+        logger.info("check if webserver should stay alive %s", keepalive)
+        if not keepalive:
+            stop_evt.set()
+        else:
+            print("press ctrl-C to stop")
+        yield
+        try:
+            stop_evt.wait()
+        except KeyboardInterrupt:
+            pass

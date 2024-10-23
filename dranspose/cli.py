@@ -186,7 +186,7 @@ def combined(args: argparse.Namespace) -> None:
 
 
 def replay(args: argparse.Namespace) -> None:
-    run_replay(
+    r = run_replay(
         args.workerclass,
         args.reducerclass,
         args.files,
@@ -196,6 +196,12 @@ def replay(args: argparse.Namespace) -> None:
         args.keep_alive,
         args.nworkers,
     )
+    next(r)
+    next(r)
+    try:
+        next(r)
+    except StopIteration:
+        pass
 
 
 def create_parser() -> argparse.ArgumentParser:
