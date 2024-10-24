@@ -116,12 +116,26 @@ def datasets(req: Request, uuid):
             extra = {
                 "shape": {"class": "H5S_SIMPLE", "dims": arr.shape},
             }
-            if arr.dtype == np.float64:
-                extra["type"] = {"base": "H5T_IEEE_F64LE", "class": "H5T_FLOAT"}
-            elif arr.dtype == np.int64:
-                extra["type"] = {"base": "H5T_STD_I64LE", "class": "H5T_INTEGER"}
+
+            canonical = arr.dtype.descr[0][1]
+            if canonical.startswith(">"):
+                order = "BE"
+            else:
+                order = "LE"
+            bytelen = int(canonical[2:])
+            if canonical[1] == "f":
+                # floating
+                htyp = {"class": "H5T_FLOAT"}
+                htyp["base"] = f"H5T_IEEE_F{8 * bytelen}{order}"
+            elif canonical[1] in ["u", "i"]:
+                htyp = {"class": "H5T_INTEGER"}
+                signed = canonical[1].upper()
+                htyp["base"] = f"H5T_STD_{signed}{8 * bytelen}{order}"
             else:
                 logger.error("numpy type %s not available", arr.dtype)
+            logging.debug("convert np dtype %s  to %s", arr.dtype, htyp)
+            extra["type"] = htyp
+
         except Exception:
             pass
 
