@@ -10,8 +10,6 @@ from starlette.responses import Response
 
 router = APIRouter()
 
-logging.basicConfig(level=logging.INFO)
-
 logger = logging.getLogger()
 
 
