@@ -153,7 +153,7 @@ async def test_reduction(
         )
 
     def work() -> None:
-        f = h5pyd.File("/", "r", endpoint="http://localhost:5001/data")
+        f = h5pyd.File("http://localhost:5001/", "r")
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))
         logging.info("version %s", f["version/commit_hash"][()])

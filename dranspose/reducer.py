@@ -218,7 +218,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(router, prefix="/data")
+app.include_router(router)
 
 
 @app.get("/api/v1/status")

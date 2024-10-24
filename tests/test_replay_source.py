@@ -38,7 +38,7 @@ async def test_replay(
     done_event.wait()
 
     def work() -> None:
-        f = h5pyd.File("/", "r", endpoint="http://localhost:5010/data")
+        f = h5pyd.File("http://localhost:5010/", "r")
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))
         assert list(f.keys()) == ["map"]

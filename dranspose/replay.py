@@ -59,7 +59,7 @@ def get_data() -> dict[str, Any]:
 
 reducer_app.state.get_data = get_data
 
-reducer_app.include_router(router, prefix="/data")
+reducer_app.include_router(router)
 
 
 @reducer_app.get("/api/v1/result/{path:path}")
