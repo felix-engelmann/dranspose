@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import pickle
+import threading
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
@@ -192,19 +193,13 @@ async def test_replay(
     with open(par_file, "w") as f:
         json.dump([{"name": "roi1", "data": "[10,20]"}], f)
 
-    rep = replay(
+    replay(
         "examples.dummy.worker:FluorescenceWorker",
         "examples.dummy.reducer:FluorescenceReducer",
         [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
         None,
         par_file,
     )
-    next(rep)
-    next(rep)
-    try:
-        next(rep)
-    except StopIteration:
-        pass
 
     bin_file = tmp_path / "binparams.pkl"
 
@@ -218,19 +213,25 @@ async def test_replay(
             f,
         )
 
-    rep = replay(
-        "examples.dummy.worker:FluorescenceWorker",
-        "examples.dummy.reducer:FluorescenceReducer",
-        [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
-        None,
-        bin_file,
-        port=5010,
-        keepalive=True,
+    stop_event = threading.Event()
+    done_event = threading.Event()
+
+    thread = threading.Thread(
+        target=replay,
+        args=(
+            "examples.dummy.worker:FluorescenceWorker",
+            "examples.dummy.reducer:FluorescenceReducer",
+            [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
+            None,
+            bin_file,
+        ),
+        kwargs={"port": 5010, "stop_event": stop_event, "done_event": done_event},
     )
-    evt = next(rep)
-    next(rep)
+    thread.start()
 
     logging.info("keep webserver alive")
+    done_event.wait()
+    logging.info("replay done")
 
     def work() -> None:
         f = h5pyd.File("/", "r", endpoint="http://localhost:5010/data")
@@ -242,13 +243,9 @@ async def test_replay(
     await loop.run_in_executor(None, work)
 
     logging.info("shut down server")
-    evt.set()
-    try:
-        next(rep)
-    except StopIteration:
-        pass
+    stop_event.set()
 
-    logging.info("joined thread")
+    thread.join()
 
     context.destroy()
 

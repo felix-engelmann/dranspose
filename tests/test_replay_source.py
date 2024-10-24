@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import threading
 from typing import Any
 
 import h5pyd
@@ -18,17 +19,23 @@ async def test_replay(
     with open(par_file, "w") as f:
         json.dump([{"name": "roi1", "data": "[10,20]"}], f)
 
-    rep = replay(
-        "examples.dummy.worker:FluorescenceWorker",
-        "examples.dummy.reducer:FluorescenceReducer",
-        None,
-        "examples.dummy.source:FluorescenceSource",
-        par_file,
-        port=5010,
-    )
+    stop_event = threading.Event()
+    done_event = threading.Event()
 
-    evt = next(rep)
-    next(rep)
+    thread = threading.Thread(
+        target=replay,
+        args=(
+            "examples.dummy.worker:FluorescenceWorker",
+            "examples.dummy.reducer:FluorescenceReducer",
+            None,
+            "examples.dummy.source:FluorescenceSource",
+            par_file,
+        ),
+        kwargs={"port": 5010, "stop_event": stop_event, "done_event": done_event},
+    )
+    thread.start()
+
+    done_event.wait()
 
     def work() -> None:
         f = h5pyd.File("/", "r", endpoint="http://localhost:5010/data")
@@ -39,8 +46,6 @@ async def test_replay(
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
 
-    evt.set()
-    try:
-        next(rep)
-    except StopIteration:
-        pass
+    stop_event.set()
+
+    thread.join()

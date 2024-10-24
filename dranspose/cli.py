@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import signal
+import threading
 from asyncio import Task
 from typing import Literal, Any, Optional
 
@@ -186,22 +187,19 @@ def combined(args: argparse.Namespace) -> None:
 
 
 def replay(args: argparse.Namespace) -> None:
-    r = run_replay(
+    keepalive = None
+    if args.keep_alive:
+        keepalive = threading.Event()
+    run_replay(
         args.workerclass,
         args.reducerclass,
         args.files,
         args.source,
         args.parameters,
         args.port,
-        args.keep_alive,
+        keepalive,
         args.nworkers,
     )
-    next(r)
-    next(r)
-    try:
-        next(r)
-    except StopIteration:
-        pass
 
 
 def create_parser() -> argparse.ArgumentParser:

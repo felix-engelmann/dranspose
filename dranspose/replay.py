@@ -7,7 +7,7 @@ import random
 import threading
 import time
 import traceback
-from typing import Iterator, Any, Optional, Generator
+from typing import Iterator, Any, Optional
 
 import cbor2
 import uvicorn
@@ -212,10 +212,11 @@ def replay(
     source: Optional[str] = None,
     parameter_file: Optional[os.PathLike[Any] | str] = None,
     port: Optional[int] = None,
-    keepalive: bool = False,
+    stop_event: threading.Event | None = None,
     nworkers: int = 2,
     broadcast_first: bool = True,
-) -> Generator[threading.Event, None, None]:
+    done_event: threading.Event | None = None,
+) -> None:
     if source is not None:
         sourcecls = utils.import_class(source)
         inst = sourcecls()
@@ -246,9 +247,6 @@ def replay(
     )
     server = Server(config)
     # server.run()
-
-    stop_evt = threading.Event()
-    yield stop_evt
 
     first = True
 
@@ -292,13 +290,16 @@ def replay(
                 logger.debug("end of replay, calling finish")
                 _finish(workers, reducer, parameters)
                 break
-        logger.info("check if webserver should stay alive %s", keepalive)
-        if not keepalive:
-            stop_evt.set()
+        if done_event is not None:
+            done_event.set()
+        logger.info("check if webserver should stay alive %s", stop_event)
+        if stop_event is None:
+            stop_event = threading.Event()
+            stop_event.set()
         else:
             print("press ctrl-C to stop")
-        yield stop_evt
         try:
-            stop_evt.wait()
+            logger.info("waiting for event")
+            stop_event.wait()
         except KeyboardInterrupt:
             pass
