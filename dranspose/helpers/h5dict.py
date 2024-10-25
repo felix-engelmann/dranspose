@@ -1,15 +1,17 @@
 import base64
 import logging
 import time
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
-from fastapi import APIRouter, FastAPI
+from fastapi import APIRouter, FastAPI, HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
 
 router = APIRouter()
 
+# only activate for running it directly, otherwise it overwrites cli.py basic config
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger()
 
 
@@ -25,68 +27,31 @@ def _path_to_uuid(path: list[str]) -> bytes:
     return b"h5dict-" + uuid
 
 
-def _uuid_to_obj(data: dict[str, Any], uuid: str):
-    logger.debug("parse %s", uuid)
-    idstr, path = uuid.split("-")
-    path = base64.b16decode(path).decode()
-    logger.debug("raw path %s", path)
-    # assert id(data) == int(idstr)
+def _get_obj_at_path(data, path):
     obj = data
     clean_path = []
-    for p in path.split("/"):
+    if isinstance(path, str):
+        path = path.split("/")
+    for p in path:
         print("path part is:", p)
         if p == "":
             continue
         print("traverse", obj)
         obj = obj[p]
         clean_path.append(p)
-    logger.debug("parser yields obj %s at path %s", obj, clean_path)
     return obj, clean_path
 
 
-@router.get("/datasets/{uuid}/value")
-def values(req: Request, uuid, select: str | None = None):
-    data = req.app.state.get_data()
-    obj, _ = _uuid_to_obj(data, uuid)
-    logger.debug("return value for obj %s", obj)
-    logger.debug("selection %s", select)
-
-    slices = []
-    if select is not None:
-        dims = select[1:-1].split(",")
-        slices = [slice(*map(int, dim.split(":"))) for dim in dims]
-
-    logger.debug("slices %s", slices)
-    ret = obj
-    if len(slices) == 1:
-        ret = ret[slices[0]]
-    elif len(slices) > 1:
-        ret = ret[*slices]
-
-    if type(ret) is np.ndarray:
-        by = ret.tobytes()
-        return Response(content=by, media_type="application/octet-stream")
-
-    logger.debug("return value %s of type %s", ret, type(ret))
-    return {"value": ret}
+def _uuid_to_obj(data: dict[str, Any], uuid: str):
+    logger.debug("parse %s", uuid)
+    idstr, path = uuid.split("-")
+    path = base64.b16decode(path).decode()
+    logger.debug("raw path %s", path)
+    # assert id(data) == int(idstr)
+    return _get_obj_at_path(data, path)
 
 
-@router.get("/datasets/{uuid}")
-def datasets(req: Request, uuid):
-    data = req.app.state.get_data()
-    obj, _ = _uuid_to_obj(data, uuid)
-    logger.debug("return dataset for obj %s", obj)
-    ret = {
-        "id": uuid,
-        "attributeCount": 0,
-        "lastModified": _get_now(),
-        "created": _get_now(),
-        "creationProperties": {
-            "allocTime": "H5D_ALLOC_TIME_LATE",
-            "fillTime": "H5D_FILL_TIME_IFSET",
-            "layout": {"class": "H5D_CONTIGUOUS"},
-        },
-    }
+def _make_shape_type(obj):
     extra = None
     if type(obj) is int:
         extra = {
@@ -138,8 +103,59 @@ def datasets(req: Request, uuid):
 
         except Exception:
             pass
+    return extra
 
-    ret.update(extra)
+
+def _dataset_from_obj(data, path, obj, uuid):
+    ret = {
+        "id": uuid,
+        "attributeCount": len(_get_obj_attrs(data, path)),
+        "lastModified": _get_now(),
+        "created": _get_now(),
+        "creationProperties": {
+            "allocTime": "H5D_ALLOC_TIME_LATE",
+            "fillTime": "H5D_FILL_TIME_IFSET",
+            "layout": {"class": "H5D_CONTIGUOUS"},
+        },
+    }
+    shape_type = _make_shape_type(obj)
+    ret.update(shape_type)
+    return ret
+
+
+@router.get("/datasets/{uuid}/value")
+def values(req: Request, uuid, select: str | None = None):
+    data = req.app.state.get_data()
+    obj, _ = _uuid_to_obj(data, uuid)
+    logger.debug("return value for obj %s", obj)
+    logger.debug("selection %s", select)
+
+    slices = []
+    if select is not None:
+        dims = select[1:-1].split(",")
+        slices = [slice(*map(int, dim.split(":"))) for dim in dims]
+
+    logger.debug("slices %s", slices)
+    ret = obj
+    if len(slices) == 1:
+        ret = ret[slices[0]]
+    elif len(slices) > 1:
+        ret = ret[*slices]
+
+    if type(ret) is np.ndarray:
+        by = ret.tobytes()
+        return Response(content=by, media_type="application/octet-stream")
+
+    logger.debug("return value %s of type %s", ret, type(ret))
+    return {"value": ret}
+
+
+@router.get("/datasets/{uuid}")
+def datasets(req: Request, uuid):
+    data = req.app.state.get_data()
+    obj, path = _uuid_to_obj(data, uuid)
+    logger.debug("return dataset for obj %s", obj)
+    ret = _dataset_from_obj(data, path, obj, uuid)
     print("return dset", ret)
     return ret
 
@@ -172,6 +188,8 @@ def _get_group_links(obj, path):
             if not isinstance(key, str):
                 logger.warning("unable to use non-string key: %s as group name", key)
                 continue
+            if key.endswith("_attrs"):
+                continue
             link = _get_group_link(val, path + [key])
             links.append(link)
         return links
@@ -199,23 +217,99 @@ def links(req: Request, uuid: str):
     return ret
 
 
+def _get_attr(aobj, name, include_values=True):
+    print("get attribute")
+    if name in aobj:
+        extra = _make_shape_type(aobj[name])
+        ret = {"name": name, "created": _get_now(), "lastModified": _get_now(), **extra}
+        if include_values:
+            val = aobj[name]
+            if isinstance(val, np.ndarray):
+                val = val.tolist()
+            ret["value"] = val
+        return ret
+
+
+def _make_attrs(aobj, include_values=False):
+    print("make attributes of ", aobj)
+    attrs = []
+    if isinstance(aobj, dict):
+        for key, value in aobj.items():
+            if not isinstance(key, str):
+                logger.warning(
+                    "unable to use non-string key: %s as attribute name", key
+                )
+                continue
+            attrs.append(_get_attr(aobj, key, include_values=include_values))
+    return attrs
+
+
+def _get_obj_attrs(data, path, include_values=False):
+    if len(path) == 0:
+        # get root attributes
+        if "_attrs" in data:
+            return _make_attrs(data["_attrs"], include_values=include_values)
+    else:
+        print("normal attr fetch")
+        parent, _ = _get_obj_at_path(data, path[:-1])
+        print("parent is", parent)
+        if f"{path[-1]}_attrs" in parent:
+            print(
+                "make attrs for",
+            )
+            return _make_attrs(
+                parent[f"{path[-1]}_attrs"], include_values=include_values
+            )
+    return []
+
+
+@router.get("/{typ}/{uuid}/attributes/{name}")
+def attribute(req: Request, typ: Literal["groups", "datasets"], uuid: str, name: str):
+    print("get attr with name", typ, uuid, name)
+    data = req.app.state.get_data()
+    obj, path = _uuid_to_obj(data, uuid)
+    logger.debug(
+        "start listing attributes typ %s id %s, obj %s, path: %s", typ, uuid, obj, path
+    )
+    allattrs = _get_obj_attrs(data, path, include_values=True)
+    for attr in allattrs:
+        if attr["name"] == name:
+            logger.info("return attribute %s", attr)
+            return attr
+    raise HTTPException(status_code=404, detail="Attribute not found")
+
+
+@router.get("/{typ}/{uuid}/attributes")
+def attributes(req: Request, typ: Literal["groups", "datasets"], uuid: str):
+    print("get attrs", typ, uuid)
+    data = req.app.state.get_data()
+    obj, path = _uuid_to_obj(data, uuid)
+    logger.debug(
+        "start listing attributes typ %s id %s, obj %s, path: %s", typ, uuid, obj, path
+    )
+    return {"attributes": _get_obj_attrs(data, path)}
+
+
 @router.get("/groups/{uuid}")
 def group(req: Request, uuid: str):
     data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     logger.debug("start listing group id %s, obj %s, path: %s", uuid, obj, path)
 
-    group = {
-        "id": uuid,
-        "root": _path_to_uuid([]),
-        "linkCount": len(obj),
-        "attributeCount": 0,
-        "lastModified": _get_now(),
-        "created": _get_now(),
-        "domain": "/",
-    }
-    logger.debug("group is %s", group)
-    return group
+    if isinstance(obj, dict):
+        group = {
+            "id": uuid,
+            "root": _path_to_uuid([]),
+            "linkCount": len(
+                list(filter(lambda x: not x.endswith("_attrs"), obj.keys()))
+            ),
+            "attributeCount": len(_get_obj_attrs(data, path)),
+            "lastModified": _get_now(),
+            "created": _get_now(),
+            "domain": "/",
+        }
+        logger.debug("group is %s", group)
+        return group
 
 
 @router.get("/")
@@ -236,11 +330,21 @@ def read_root(request: Request):
 
 app = FastAPI()
 
-app.include_router(router, prefix="/results")
+app.include_router(router)
 
 
 def get_data():
-    return {"image": {}}
+    return {
+        "live": 34,
+        "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
+        "other_attrs": {"NX_class": "NXother"},
+        "image": np.ones((1000, 1000)),
+        "image_attrs": {"listattr": [42, 43, 44, 45]},
+        "specialtyp": np.ones((10, 10), dtype=">u8"),
+        "specialtyp_attrs": {"NXdata": "NXspecial"},
+        "hello": "World",
+        "_attrs": {"NX_class": "NXentry"},
+    }
 
 
 app.state.get_data = get_data

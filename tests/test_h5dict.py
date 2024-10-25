@@ -20,9 +20,11 @@ async def test_root():
     def get_data():
         return {
             "live": 34,
-            "other": {"third": [1, 2, 3]},
+            "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
+            "other_attrs": {"NX_class": "NXother"},
             "image": np.ones((1000, 1000)),
             "specialtyp": np.ones((10, 10), dtype=">u8"),
+            "specialtyp_attrs": {"NXdata": "NXspecial"},
             "hello": "World",
             "_attrs": {"NX_class": "NXentry"},
         }
@@ -45,6 +47,9 @@ async def test_root():
         logging.info("file %s", f["live"][()])
         logging.info("typ %s", f["specialtyp"])
         assert f["specialtyp"].dtype == ">u8"
+        assert f["specialtyp"].attrs["NXdata"] == "NXspecial"
+        assert f["other"].attrs["NX_class"] == "NXother"
+        assert f.attrs["NX_class"] == "NXentry"
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
