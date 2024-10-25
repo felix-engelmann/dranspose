@@ -75,6 +75,16 @@ def _make_shape_type(obj):
             "shape": {"class": "H5S_SCALAR"},
         }
 
+    elif isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], str):
+        extra = {
+            "type": {
+                "class": "H5T_STRING",
+                "length": "H5T_VARIABLE",
+                "charSet": "H5T_CSET_UTF8",
+                "strPad": "H5T_STR_NULLTERM",
+            },
+            "shape": {"class": "H5S_SIMPLE", "dims": [len(obj)]},
+        }
     else:
         try:
             arr = np.array(obj)
@@ -200,11 +210,12 @@ def link(req: Request, uuid, name):
     data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     path.append(name)
-    obj = obj[name]
-    logger.debug("generate link for %s at %s", obj, path)
-    ret = {"link": _get_group_link(obj, path)}
-    logger.debug("link name is %s", ret)
-    return ret
+    if name in obj:
+        obj = obj[name]
+        ret = {"link": _get_group_link(obj, path)}
+        logger.debug("link name is %s", ret)
+        return ret
+    raise HTTPException(status_code=404, detail="Link not found")
 
 
 @router.get("/groups/{uuid}/links")
@@ -344,6 +355,24 @@ def get_data():
         "specialtyp_attrs": {"NXdata": "NXspecial"},
         "hello": "World",
         "_attrs": {"NX_class": "NXentry"},
+        "oned_attrs": {"NX_class": "NXdata", "axes": ["motor"], "signal": "data"},
+        "oned": {
+            "data": np.ones((42)),
+            "data_attrs": {"long_name": "photons"},
+            "motor": np.linspace(0, 1, 42),
+            "motor_attrs": {"long_name": "motor name"},
+        },
+        "twod_attrs": {
+            "NX_class": "NXdata",
+            "axes": ["motor", "."],
+            "signal": "frame",
+            "interpretation": "image",
+        },
+        "twod": {
+            "frame": np.ones((42, 42)),
+            "motor": np.linspace(0, 1, 42),
+            "motor_attrs": {"long_name": "motor name"},
+        },
     }
 
 
