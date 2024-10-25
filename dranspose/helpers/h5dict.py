@@ -312,7 +312,12 @@ def group(req: Request, uuid: str):
             "id": uuid,
             "root": _path_to_uuid([]),
             "linkCount": len(
-                list(filter(lambda x: not x.endswith("_attrs"), obj.keys()))
+                list(
+                    filter(
+                        lambda x: isinstance(x, str) and not x.endswith("_attrs"),
+                        obj.keys(),
+                    )
+                )
             ),
             "attributeCount": len(_get_obj_attrs(data, path)),
             "lastModified": _get_now(),
