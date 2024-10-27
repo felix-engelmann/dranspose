@@ -21,11 +21,12 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "numpy",
-    "requests",
+    # "requests",
     "pydantic",
     "pydantic-settings",
     "jsonpath-ng",
     "cbor2",
+    "redis-logs",
 ]
 dynamic = ["version"]
 

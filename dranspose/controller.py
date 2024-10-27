@@ -12,6 +12,7 @@ import logging
 import time
 
 from pydantic import UUID4
+from rlh import RedisStreamLogHandler
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -58,6 +59,8 @@ from dranspose.protocol import (
 )
 
 logger = logging.getLogger(__name__)
+handler = RedisStreamLogHandler(stream_name="dranspose_logs", maxlen=1000)
+logger.addHandler(handler)
 
 
 class ControllerSettings(DistributedSettings):
@@ -659,6 +662,20 @@ async def stop() -> None:
     global ctrl
     logger.info("externally stopped scan")
     ctrl.external_stop = True
+
+
+@app.get("/api/v1/logs")
+async def get_logs(level: str = "INFO") -> Any:
+    global ctrl
+    data = await ctrl.redis.xrange("dranspose_logs", "-", "+")
+    logs = []
+    levels = logging.getLevelNamesMapping()
+    minlevel = levels.get(level.upper(), "INFO")
+    for entry in data:
+        msglevel = levels.get(entry[1]["levelname"])
+        if msglevel >= minlevel:
+            logs.append(entry[1])
+    return logs
 
 
 @app.post("/api/v1/sardana_hook")
