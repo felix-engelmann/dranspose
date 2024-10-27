@@ -24,7 +24,14 @@ from dranspose.event import (
 )
 from dranspose.helpers.h5dict import router
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
-from dranspose.protocol import WorkerName, Digest, WorkParameter, ParameterName
+from dranspose.protocol import (
+    WorkerName,
+    Digest,
+    WorkParameter,
+    ParameterName,
+    ReducerState,
+    WorkerState,
+)
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
@@ -164,7 +171,7 @@ def _work_event(
         return
     rd = ResultData(
         event_number=event.event_number,
-        worker=WorkerName(f"development{index}"),
+        worker=WorkerName(f"replay-worker-{index}"),
         payload=data,
         parameters_hash=Digest(
             "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
@@ -237,8 +244,15 @@ def replay(
     logger.info("use parameters %s", parameters)
 
     global reducer
-    workers = [workercls(parameters=parameters, context={}) for _ in range(nworkers)]
-    reducer = reducercls(parameters=parameters, context={})
+    workers = []
+    for wi in range(nworkers):
+        wstate = WorkerState(name=f"replay-worker-{wi}")
+        wobj = workercls(parameters=parameters, context={}, state=wstate)
+        workers.append(wobj)
+
+    rstate = ReducerState(url="tcp://localhost:10200")
+    reducer = reducercls(parameters=parameters, context={}, state=rstate)
+
     logger.info("created workers %s", workers)
     threading.Thread(target=timer, daemon=True, args=(reducer,)).start()
 
