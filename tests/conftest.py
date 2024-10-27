@@ -131,14 +131,15 @@ class ProcessDistributed:
 class ExternalDistributed:
     instance: DistributedService
     process: asyncio.subprocess.Process
-    log_task: Task[Any]
+    log_tasks: list[Task[Any]]
 
     async def stop(self) -> None:
         logging.warning("stopping process")
         self.process.terminate()
         await self.process.wait()
         logging.warning("stopping log task")
-        self.log_task.cancel()
+        for t in self.log_tasks:
+            t.cancel()
 
 
 @pytest_asyncio.fixture
@@ -222,11 +223,13 @@ async def create_ingester(
                 output = asyncio.create_task(
                     forward_pipe(proc.stdout, inst._streaming_single_settings)
                 )
-                output = asyncio.create_task(
+                outerr = asyncio.create_task(
                     forward_pipe(proc.stderr, inst._streaming_single_settings)
                 )
                 ingesters.append(
-                    ExternalDistributed(instance=inst, process=proc, log_task=output)
+                    ExternalDistributed(
+                        instance=inst, process=proc, log_tasks=[output, outerr]
+                    )
                 )
                 return inst
         if subprocess:

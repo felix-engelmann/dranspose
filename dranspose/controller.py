@@ -96,12 +96,44 @@ class Controller:
 
     async def run(self) -> None:
         logger.debug("started controller run")
+        dist_lock = await self.redis.set(
+            RedisKeys.lock(),
+            "🔒",
+            ex=10,
+            nx=True,
+        )
+        logger.debug("result of lock acquisition %s", dist_lock)
+        while dist_lock is None:
+            logger.warning("another controller is already running, will retry ")
+            await asyncio.sleep(2)
+            dist_lock = await self.redis.set(
+                RedisKeys.lock(),
+                "🔒",
+                ex=10,
+                nx=True,
+            )
+        logger.info("controller lock acquired")
+
         self.assign_task = asyncio.create_task(self.assign_work())
         self.assign_task.add_done_callback(done_callback)
         self.default_task = asyncio.create_task(self.default_parameters())
         self.default_task.add_done_callback(done_callback)
         self.consistent_task = asyncio.create_task(self.consistent_parameters())
         self.consistent_task.add_done_callback(done_callback)
+        self.lock_task = asyncio.create_task(self.hold_lock())
+        self.lock_task.add_done_callback(done_callback)
+
+    async def hold_lock(self):
+        while True:
+            await asyncio.sleep(7)
+            dist_lock = await self.redis.set(
+                RedisKeys.lock(),
+                "🔒",
+                ex=10,
+                xx=True,
+            )
+            if dist_lock is False:
+                logger.warning("The lock was lost")
 
     async def get_configs(self) -> EnsembleState:
         if time.time() - self.config_fetch_time < 0.5:
@@ -520,6 +552,8 @@ class Controller:
         params = await self.redis.keys(RedisKeys.parameters("*", "*"))
         if len(params) > 0:
             await self.redis.delete(*params)
+        await cancel_and_wait(self.lock_task)
+        await self.redis.delete(RedisKeys.lock())
         await self.redis.aclose()
 
 
@@ -531,10 +565,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
     global ctrl
     ctrl = Controller()
-    run_task = asyncio.create_task(ctrl.run())
-    run_task.add_done_callback(done_callback)
+    # run_task = asyncio.create_task(ctrl.run())
+    await ctrl.run()
+    # run_task.add_done_callback(done_callback)
     yield
-    await cancel_and_wait(run_task)
+    # await cancel_and_wait(run_task)
     await ctrl.close()
     # Clean up the ML models and release the resources
 
@@ -654,7 +689,7 @@ async def set_sardana_hook(
 @app.post("/api/v1/parameter/{name}")
 async def post_param(request: Request, name: ParameterName) -> HashDigest:
     data = await request.body()
-    logger.warning("got %s: %s", name, data)
+    logger.info("got %s: %s", name, data)
     u = await ctrl.set_param(name, data)
     return u
 

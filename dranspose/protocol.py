@@ -94,6 +94,12 @@ class RedisKeys:
 
     @staticmethod
     @cache
+    @validate_call
+    def lock() -> str:
+        return f"{RedisKeys.PREFIX}:controller_lock"
+
+    @staticmethod
+    @cache
     def updates() -> str:
         return f"{RedisKeys.PREFIX}:controller:updates"
 
