@@ -11,6 +11,7 @@ from typing import Literal, Any, Optional
 import uvicorn
 from pydantic_core import Url
 from pydantic_settings import BaseSettings
+from rlh import RedisStreamLogHandler
 
 from dranspose.controller import app
 from dranspose.helpers import utils
@@ -37,6 +38,14 @@ settings = CliSettings()
 logging.basicConfig(level=settings.log_level.upper())
 
 logger = logging.getLogger(__name__)
+
+root_logger = logging.getLogger()
+handler = RedisStreamLogHandler(
+    stream_name="dranspose_logs",
+    maxlen=1000,
+    fields=["msg", "lineno", "name", "created", "levelname"],
+)
+root_logger.addHandler(handler)
 
 
 async def main() -> None:
@@ -214,7 +223,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser_reducer = subparsers.add_parser("reducer", help="run reducer")
     parser_reducer.set_defaults(func=reducer)
     parser_reducer.add_argument("--host", help="host to listen on")
-    parser_reducer.add_argument("-p", "--port", help="port to listen on")
+    parser_reducer.add_argument("-p", "--port", help="port to listen on", type=int)
     parser_reducer.add_argument(
         "-c",
         "--reducerclass",

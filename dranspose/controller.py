@@ -12,9 +12,8 @@ import logging
 import time
 
 from pydantic import UUID4
-from rlh import RedisStreamLogHandler
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, FileResponse
 
 from dranspose.distributed import DistributedSettings
 from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
@@ -59,8 +58,6 @@ from dranspose.protocol import (
 )
 
 logger = logging.getLogger(__name__)
-handler = RedisStreamLogHandler(stream_name="dranspose_logs", maxlen=1000)
-logger.addHandler(handler)
 
 
 class ControllerSettings(DistributedSettings):
@@ -580,6 +577,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 app = FastAPI(lifespan=lifespan)
 
 
+@app.get("/")
+async def read_index():
+    return FileResponse("frontend/index.html")
+
+
 @app.get("/api/v1/config")
 async def get_configs() -> EnsembleState:
     global ctrl
@@ -672,7 +674,7 @@ async def get_logs(level: str = "INFO") -> Any:
     levels = logging.getLevelNamesMapping()
     minlevel = levels.get(level.upper(), "INFO")
     for entry in data:
-        msglevel = levels.get(entry[1]["levelname"])
+        msglevel = levels.get(entry[1].get("levelname", "DEBUG"))
         if msglevel >= minlevel:
             logs.append(entry[1])
     return logs

@@ -1,0 +1,39 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+</head>
+<body>
+<script>
+
+// init
+
+async function update() {
+  try {
+    const resp = await fetch("/api/v1/progress");
+    const datap = await resp.json();
+    document.querySelector(`#progress`).innerHTML = JSON.stringify(datap, null, 2);
+
+    const res = await fetch("/api/v1/config");
+    const data = await res.json();
+    document.querySelector(`#config`).innerHTML = JSON.stringify(data, null, 2);
+
+    const resl = await fetch("/api/v1/logs?level=INFO");
+    const datal = (await resl.json()).reverse();
+    document.querySelector(`#logs`).innerHTML = JSON.stringify(datal, null, 2);
+  } catch (e) {
+    console.log("unable to fetch", e)
+  }
+
+  setTimeout(update, 5000); // update every 15 seconds?
+}
+
+update();
+</script>
+<h2>Progress</h2>
+<pre id="progress"></pre>
+<h2>Configuration</h2>
+<pre id="config"></pre>
+<h2>Logs</h2>
+<pre id="logs"></pre>
+</body>
+</html>
