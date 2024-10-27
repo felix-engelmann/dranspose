@@ -35,6 +35,9 @@ include = ["dranspose*"]  # package names should match these glob patterns (["*"
 exclude = ["tests*"]  # exclude packages matching these glob patterns (empty by default)
 #namespaces = false
 
+[tool.setuptools.package-data]
+dranspose = ["frontend/*.html"]
+
 [project.optional-dependencies]
 tests = [
     "pytest",

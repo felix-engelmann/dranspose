@@ -3,6 +3,7 @@ This is the central service to orchestrate all distributed components
 
 """
 import asyncio
+import os.path
 from asyncio import Task
 from collections import defaultdict
 from types import UnionType
@@ -579,7 +580,9 @@ app = FastAPI(lifespan=lifespan)
 
 @app.get("/")
 async def read_index():
-    return FileResponse("frontend/index.html")
+    return FileResponse(
+        os.path.join(os.path.dirname(__file__), "frontend", "index.html")
+    )
 
 
 @app.get("/api/v1/config")
