@@ -45,7 +45,7 @@ from dranspose.protocol import (
     ControllerUpdate,
     ReducerState,
     WorkerTimes,
-    Digest,
+    HashDigest,
     ParameterName,
     SystemLoadType,
     IntervalLoad,
@@ -122,11 +122,19 @@ class Controller:
         if reducer_json:
             reducer = ReducerState.model_validate_json(reducer_json)
         dranspose_version = version("dranspose")
+
+        parameters_version: dict[ParameterName, UUID4] = {
+            n: p.uuid for n, p in self.parameters.items()
+        }
+        redis_param_keys = await self.redis.keys(RedisKeys.parameters("*", "*"))
+        logger.debug("redis param keys are %s", redis_param_keys)
         self.config_cache = EnsembleState(
             ingesters=ingesters,
             workers=workers,
             reducer=reducer,
             controller_version=dranspose_version,
+            parameters_version=parameters_version,
+            parameters_hash=self.parameters_hash,
         )
         self.config_fetch_time = time.time()
         return self.config_cache
@@ -196,12 +204,12 @@ class Controller:
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
 
-    async def set_param(self, name: ParameterName, data: bytes) -> Digest:
+    async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
         param = WorkParameter(name=name, data=data)
         logger.debug("distributing parameter %s with uuid %s", param.name, param.uuid)
         await self.redis.set(RedisKeys.parameters(name, param.uuid), param.data)
         self.parameters[name] = param
-        logger.debug("stored parameters")
+        logger.debug("stored parameter %s locally", name)
         self.parameters_hash = parameters_hash(self.parameters)
         logger.debug("parameter hash is now %s", self.parameters_hash)
         cupd = ControllerUpdate(
@@ -256,6 +264,30 @@ class Controller:
     async def consistent_parameters(self) -> None:
         while True:
             try:
+                # make sure self.parameters is present in redis
+
+                key_names = []
+                for name, param in self.parameters.items():
+                    key_names.append(RedisKeys.parameters(name, param.uuid))
+                if len(key_names) > 0:
+                    ex_key_no = await self.redis.exists(*key_names)
+                    logger.debug(
+                        "check for param values in redis, %d exist of %d: %s",
+                        ex_key_no,
+                        len(key_names),
+                        key_names,
+                    )
+                    if ex_key_no < len(key_names):
+                        logger.warning(
+                            "the redis parameters don't match the controller parameters, rewriting"
+                        )
+                        async with self.redis.pipeline() as pipe:
+                            for name, param in self.parameters.items():
+                                await pipe.set(
+                                    RedisKeys.parameters(name, param.uuid), param.data
+                                )
+                            await pipe.execute()
+
                 consistent = []
                 cfg = await self.get_configs()
                 if cfg.reducer and cfg.reducer.parameters_hash != self.parameters_hash:
@@ -620,7 +652,7 @@ async def set_sardana_hook(
 
 
 @app.post("/api/v1/parameter/{name}")
-async def set_param(request: Request, name: ParameterName) -> Digest:
+async def post_param(request: Request, name: ParameterName) -> HashDigest:
     data = await request.body()
     logger.warning("got %s: %s", name, data)
     u = await ctrl.set_param(name, data)

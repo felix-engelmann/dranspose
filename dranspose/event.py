@@ -3,7 +3,7 @@ from typing import Any, Optional
 import zmq
 from cbor2 import CBORTag, CBOREncoder, CBORDecoder
 
-from dranspose.protocol import EventNumber, StreamName, WorkerName, Digest
+from dranspose.protocol import EventNumber, StreamName, WorkerName, HashDigest
 from pydantic import BaseModel, ConfigDict, computed_field
 
 
@@ -97,7 +97,7 @@ class ResultData(BaseModel):
 
     event_number: EventNumber
     worker: WorkerName
-    parameters_hash: Optional[Digest]
+    parameters_hash: Optional[HashDigest]
     payload: Any
 
 

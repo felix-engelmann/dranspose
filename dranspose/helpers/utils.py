@@ -8,7 +8,7 @@ import traceback
 from asyncio import Future, Task
 from typing import Any
 
-from dranspose.protocol import Digest, WorkParameter, ParameterName
+from dranspose.protocol import HashDigest, WorkParameter, ParameterName
 
 
 def import_class(path: str) -> type:
@@ -18,11 +18,11 @@ def import_class(path: str) -> type:
     return custom
 
 
-def parameters_hash(parameters: dict[ParameterName, WorkParameter]) -> Digest:
+def parameters_hash(parameters: dict[ParameterName, WorkParameter]) -> HashDigest:
     m = hashlib.sha256()
     for n in sorted(parameters):
         m.update(parameters[n].uuid.bytes)
-    return Digest(m.hexdigest())
+    return HashDigest(m.hexdigest())
 
 
 def done_callback(futr: Future[None]) -> None:

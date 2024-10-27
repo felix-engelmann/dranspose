@@ -26,7 +26,7 @@ from dranspose.helpers.h5dict import router
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.protocol import (
     WorkerName,
-    Digest,
+    HashDigest,
     WorkParameter,
     ParameterName,
     ReducerState,
@@ -173,7 +173,7 @@ def _work_event(
         event_number=event.event_number,
         worker=WorkerName(f"replay-worker-{index}"),
         payload=data,
-        parameters_hash=Digest(
+        parameters_hash=HashDigest(
             "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
         ),
     )
