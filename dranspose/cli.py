@@ -10,10 +10,11 @@ from typing import Literal, Any, Optional
 
 import uvicorn
 from pydantic_core import Url
-from pydantic_settings import BaseSettings
 from rlh import RedisStreamLogHandler
+import redis as redis
 
 from dranspose.controller import app
+from dranspose.distributed import DistributedSettings
 from dranspose.helpers import utils
 from dranspose.helpers.utils import done_callback
 from dranspose.reducer import app as reducer_app
@@ -29,7 +30,7 @@ from dranspose.worker import Worker, WorkerSettings
 from dranspose.replay import replay as run_replay
 
 
-class CliSettings(BaseSettings):
+class CliSettings(DistributedSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
@@ -39,8 +40,11 @@ logging.basicConfig(level=settings.log_level.upper())
 
 logger = logging.getLogger(__name__)
 
+logging_redis = redis.from_url(f"{settings.redis_dsn}?decode_responses=True&protocol=3")
+
 root_logger = logging.getLogger()
 handler = RedisStreamLogHandler(
+    redis_client=logging_redis,
     stream_name="dranspose_logs",
     maxlen=1000,
     fields=["msg", "lineno", "name", "created", "levelname"],
