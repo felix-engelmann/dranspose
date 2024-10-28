@@ -285,7 +285,7 @@ def attribute(req: Request, typ: Literal["groups", "datasets"], uuid: str, name:
     allattrs = _get_obj_attrs(data, path, include_values=True)
     for attr in allattrs:
         if attr["name"] == name:
-            logger.info("return attribute %s", attr)
+            logger.debug("return attribute %s", attr)
             return attr
     raise HTTPException(status_code=404, detail="Attribute not found")
 
@@ -330,7 +330,7 @@ def group(req: Request, uuid: str):
 
 @router.get("/")
 def read_root(request: Request):
-    logging.info("data %s", request.app.state.get_data())
+    logging.debug("data %s", request.app.state.get_data())
     data = request.app.state.get_data()
     if isinstance(data, dict):
         uuid = _path_to_uuid([])
