@@ -10,6 +10,7 @@ variables:
   DOCKER_REGISTRY: "harbor.maxiv.lu.se/daq"
   REDIS_URL: "redis://redis:6379/0"
   PYTEST_EXTRA_ARGS: "--log-cli-level=INFO"
+  CONDA_AUTO_PACKAGING_ENABLED: "false"
 
 .test-python:
   services:
