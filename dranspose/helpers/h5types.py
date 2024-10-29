@@ -1,5 +1,5 @@
 import time
-from typing import NewType, Any, Literal
+from typing import NewType, Any, Literal, Iterable
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -33,8 +33,7 @@ class H5StrType(BaseModel):
     strPad: Literal["H5T_STR_NULLTERM"] = "H5T_STR_NULLTERM"
 
 
-class H5NumType(BaseModel):
-    class_: Literal["H5T_INTEGER", "H5T_FLOAT"] = Field(..., alias="class")
+class H5NumBase(BaseModel):
     base: str
 
     @field_validator("base")
@@ -45,17 +44,25 @@ class H5NumType(BaseModel):
         return v
 
 
-class H5NamedType(BaseModel):
-    name: str
-    type: H5NumType
+class H5IntType(H5NumBase):
+    class_: Literal["H5T_INTEGER"] = Field("H5T_INTEGER", alias="class")
+
+
+class H5FloatType(H5NumBase):
+    class_: Literal["H5T_FLOAT"] = Field("H5T_FLOAT", alias="class")
 
 
 class H5CompType(BaseModel):
     class_: Literal["H5T_COMPOUND"] = Field("H5T_COMPOUND", alias="class")
-    fields: list[H5NamedType]
+    fields: "list[H5NamedType]"
 
 
-H5Type = H5StrType | H5NumType | H5CompType
+H5Type = H5StrType | H5FloatType | H5IntType | H5CompType
+
+
+class H5NamedType(BaseModel):
+    name: str
+    type: H5Type
 
 
 class H5ScalarShape(BaseModel):
@@ -64,7 +71,7 @@ class H5ScalarShape(BaseModel):
 
 class H5SimpleShape(BaseModel):
     class_: Literal["H5S_SIMPLE"] = Field("H5S_SIMPLE", alias="class")
-    dims: list[int]
+    dims: Iterable[int]
 
 
 H5Shape = H5SimpleShape | H5ScalarShape
