@@ -204,9 +204,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
 
-    def get_data():
-        if hasattr(reducer.reducer, "publish"):
-            return reducer.reducer.publish
+    def get_data() -> dict[str, Any]:
+        if reducer.reducer is not None:
+            if hasattr(reducer.reducer, "publish"):
+                return reducer.reducer.publish
         return {}
 
     app.state.get_data = get_data

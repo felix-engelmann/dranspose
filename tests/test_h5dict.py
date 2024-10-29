@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any
 
 import aiohttp
 import numpy as np
@@ -12,12 +13,12 @@ import h5pyd
 
 
 @pytest.mark.asyncio
-async def test_root():
+async def test_root() -> None:
     app = FastAPI()
 
     app.include_router(router, prefix="/results")
 
-    def get_data():
+    def get_data() -> dict[str, Any]:
         dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
 
         arr = np.array([(0.5, 1)], dtype=dt)
@@ -48,7 +49,7 @@ async def test_root():
         data = await st.json()
         logging.info("content %s", data)
 
-    def work():
+    def work() -> None:
         f = h5pyd.File("/", "r", endpoint="http://localhost:5000/results")
         logging.info("file %s", f["live"][()])
         logging.info("typ %s", f["specialtyp"])
@@ -72,7 +73,7 @@ async def test_root():
     await asyncio.sleep(0.5)
 
 
-def test_dtype_to_h5():
+def test_dtype_to_h5() -> None:
     numpytypes = {
         "u1",
         ">u2",

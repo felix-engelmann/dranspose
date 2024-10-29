@@ -15,7 +15,7 @@ router = APIRouter()
 logger = logging.getLogger()
 
 
-def _get_now():
+def _get_now() -> float:
     return time.time()
 
 
@@ -27,7 +27,9 @@ def _path_to_uuid(path: list[str]) -> bytes:
     return b"h5dict-" + uuid
 
 
-def _get_obj_at_path(data, path):
+def _get_obj_at_path(
+    data: dict[str, Any], path: str | list[str]
+) -> tuple[Any, list[str]]:
     obj = data
     clean_path = []
     if isinstance(path, str):
@@ -42,7 +44,7 @@ def _get_obj_at_path(data, path):
     return obj, clean_path
 
 
-def _uuid_to_obj(data: dict[str, Any], uuid: str):
+def _uuid_to_obj(data: dict[str, Any], uuid: str) -> tuple[Any, list[str]]:
     logger.debug("parse %s", uuid)
     idstr, path = uuid.split("-")
     path = base64.b16decode(path).decode()
@@ -51,7 +53,7 @@ def _uuid_to_obj(data: dict[str, Any], uuid: str):
     return _get_obj_at_path(data, path)
 
 
-def _canonical_to_h5(canonical):
+def _canonical_to_h5(canonical: str) -> dict[str, Any] | None:
     if canonical.startswith(">"):
         order = "BE"
     else:
@@ -72,7 +74,7 @@ def _canonical_to_h5(canonical):
     return htyp
 
 
-def _make_shape_type(obj):
+def _make_shape_type(obj: Any) -> tuple[str, Any]:
     extra = None
     if type(obj) is int:
         extra = {

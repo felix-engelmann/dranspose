@@ -13,6 +13,7 @@ import cbor2
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import TypeAdapter
+from pydantic_core import Url
 from starlette.responses import Response
 
 from dranspose.helpers import utils
@@ -246,11 +247,11 @@ def replay(
     global reducer
     workers = []
     for wi in range(nworkers):
-        wstate = WorkerState(name=f"replay-worker-{wi}")
+        wstate = WorkerState(name=WorkerName(f"replay-worker-{wi}"))
         wobj = workercls(parameters=parameters, context={}, state=wstate)
         workers.append(wobj)
 
-    rstate = ReducerState(url="tcp://localhost:10200")
+    rstate = ReducerState(url=Url("tcp://localhost:10200"))
     reducer = reducercls(parameters=parameters, context={}, state=rstate)
 
     logger.info("created workers %s", workers)

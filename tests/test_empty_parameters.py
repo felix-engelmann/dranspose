@@ -28,7 +28,6 @@ from dranspose.worker import Worker, WorkerSettings
 
 @pytest.mark.asyncio
 async def test_empty_params(
-    # controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
@@ -74,6 +73,9 @@ async def test_empty_params(
 
         logging.warning("ensemble state uuids are %s", state.parameters_version)
 
+        assert state.parameters_hash is not None
+        assert state.reducer is not None
+        assert state.reducer.parameters_hash is not None
         assert state.parameters_hash == state.reducer.parameters_hash
         for ing in state.ingesters:
             assert state.parameters_hash == ing.parameters_hash
@@ -119,7 +121,7 @@ async def test_empty_params(
             result = pickle.loads(content)
             logging.warning("content in reducer is %s", result["params"])
             logging.warning("content in worker is %s", result["worker_params"])
-            params = result["params"]
+            resparams = result["params"]
             for t, v in [
                 (str, ""),
                 (bytes, b""),
@@ -127,9 +129,9 @@ async def test_empty_params(
                 (float, 0.0),
                 (bool, False),
             ]:
-                logging.info("param %s", params[f"{t.__name__}_param"])
-                assert params[f"{t.__name__}_param"].value == v
-            params = result["worker_params"]
+                logging.info("param %s", resparams[f"{t.__name__}_param"])
+                assert resparams[f"{t.__name__}_param"].value == v
+            worparams = result["worker_params"]
             for t, v in [
                 (str, ""),
                 (bytes, b""),
@@ -137,8 +139,8 @@ async def test_empty_params(
                 (float, 0.0),
                 (bool, False),
             ]:
-                logging.info("work param %s", params[f"{t.__name__}_param"])
-                assert params[f"{t.__name__}_param"].value == v
+                logging.info("work param %s", worparams[f"{t.__name__}_param"])
+                assert worparams[f"{t.__name__}_param"].value == v
 
         context.destroy()
 
