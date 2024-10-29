@@ -18,6 +18,10 @@ async def test_root():
     app.include_router(router, prefix="/results")
 
     def get_data():
+        dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
+
+        arr = np.array([(0.5, 1)], dtype=dt)
+
         return {
             "live": 34,
             "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
@@ -25,6 +29,8 @@ async def test_root():
             "image": np.ones((1000, 1000)),
             "specialtyp": np.ones((10, 10), dtype=">u8"),
             "specialtyp_attrs": {"NXdata": "NXspecial"},
+            "composite": arr,
+            "composite_attrs": {"axes": ["I", "q"]},
             "hello": "World",
             "_attrs": {"NX_class": "NXentry"},
         }
@@ -46,10 +52,16 @@ async def test_root():
         f = h5pyd.File("/", "r", endpoint="http://localhost:5000/results")
         logging.info("file %s", f["live"][()])
         logging.info("typ %s", f["specialtyp"])
+        logging.info("comp %s", f["composite"])
+        logging.info("comp data %s", f["composite"][:])
         assert f["specialtyp"].dtype == ">u8"
         assert f["specialtyp"].attrs["NXdata"] == "NXspecial"
         assert f["other"].attrs["NX_class"] == "NXother"
         assert f.attrs["NX_class"] == "NXentry"
+        assert list(f["composite"].attrs["axes"]) == ["I", "q"]
+        assert f["composite"].dtype == np.dtype(
+            {"names": ["a", "b"], "formats": [float, int]}
+        )
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
