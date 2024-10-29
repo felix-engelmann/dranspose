@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import multiprocessing
+from typing import Any
 
 import aiohttp
 import pytest
@@ -18,10 +19,10 @@ class UvicornServer(multiprocessing.Process):
         self.server = uvicorn.Server(config=config)
         self.config = config
 
-    def stop(self):
+    def stop(self) -> None:
         self.terminate()
 
-    def run(self, *args, **kwargs):
+    def run(self, *args: Any, **kwargs: Any) -> None:
         self.server.run()
 
 

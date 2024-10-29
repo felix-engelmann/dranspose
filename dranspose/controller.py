@@ -57,6 +57,7 @@ from dranspose.protocol import (
     IngesterUpdate,
     WorkAssignmentList,
     WorkAssignment,
+    IngesterName,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ class Controller:
         self.lock_task = asyncio.create_task(self.hold_lock())
         self.lock_task.add_done_callback(done_callback)
 
-    async def hold_lock(self):
+    async def hold_lock(self) -> None:
         while True:
             await asyncio.sleep(7)
             dist_lock = await self.redis.set(
@@ -263,7 +264,7 @@ class Controller:
 
         params: list[ParameterType] = []
         for i in param_json:
-            val: ParameterType = Parameter.validate_json(i)  # type: ignore
+            val: ParameterType = Parameter.validate_json(i)
             params.append(val)
 
         params.append(
@@ -280,7 +281,7 @@ class Controller:
                 desc_keys = await self.redis.keys(RedisKeys.parameter_description())
                 param_json = await self.redis.mget(desc_keys)
                 for i in param_json:
-                    val: ParameterType = Parameter.validate_json(i)  # type: ignore
+                    val: ParameterType = Parameter.validate_json(i)
                     if val.name not in self.parameters:
                         logger.info(
                             "set parameter %s to default %s, (type %s)",
@@ -448,9 +449,9 @@ class Controller:
             asyncio.create_task(self._update_processing_times(update))
 
     async def completed_finish(self) -> bool:
-        fin_workers = set()
+        fin_workers: set[WorkerName] = set()
         reducer = False
-        fin_ingesters = set()
+        fin_ingesters: set[IngesterName] = set()
         for upd in self.finished_components:
             if isinstance(upd, WorkerUpdate):
                 fin_workers.add(upd.worker)
@@ -586,7 +587,7 @@ app.add_middleware(
 
 
 @app.get("/")
-async def read_index():
+async def read_index() -> FileResponse:
     return FileResponse(
         os.path.join(os.path.dirname(__file__), "frontend", "index.html")
     )
@@ -682,9 +683,9 @@ async def get_logs(level: str = "INFO") -> Any:
     data = await ctrl.redis.xrange("dranspose_logs", "-", "+")
     logs = []
     levels = logging.getLevelNamesMapping()
-    minlevel = levels.get(level.upper(), "INFO")
+    minlevel = levels.get(level.upper(), logging.INFO)
     for entry in data:
-        msglevel = levels.get(entry[1].get("levelname", "DEBUG"))
+        msglevel = levels[entry[1].get("levelname", "DEBUG")]
         if msglevel >= minlevel:
             logs.append(entry[1])
     return logs

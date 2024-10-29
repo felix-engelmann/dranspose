@@ -26,7 +26,7 @@ async def handle_client(reader: StreamReader, writer: StreamWriter) -> None:
 
 
 @pytest.mark.asyncio
-async def test_tcp(stream_pcap: Callable[[int], Coroutine[None, None, None]]):
+async def test_tcp(stream_pcap: Callable[[int], Coroutine[None, None, None]]) -> None:
     server = await asyncio.start_server(handle_client, "localhost", 8889)
     task = asyncio.create_task(server.serve_forever())
 

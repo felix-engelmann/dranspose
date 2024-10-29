@@ -178,7 +178,9 @@ class DistributedService(abc.ABC):
                                     )
                                     self._logger.debug("description is %s", desc)
                                     if desc:
-                                        param_desc: ParameterType = Parameter.validate_json(desc)  # type: ignore
+                                        param_desc: ParameterType = (
+                                            Parameter.validate_json(desc)
+                                        )
                                         self._logger.info(
                                             "set paremter has a description %s",
                                             param_desc,

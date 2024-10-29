@@ -20,7 +20,7 @@ class StreamData(BaseModel):
     typ: str
     frames: list[zmq.Frame] | list[bytes]
 
-    @computed_field  # type: ignore[misc]
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def length(self) -> int:
         """

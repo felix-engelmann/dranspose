@@ -203,23 +203,26 @@ class Ingester(DistributedService):
         ],
         swtriggen: Iterator[dict[StreamName, StreamData]] | None,
     ) -> dict[StreamName, StreamData]:
-        zmqyields: list[Awaitable[StreamData]] = []
+        zmqyields: list[Awaitable[StreamData | IsSoftwareTriggered]] = []
         streams: list[StreamName] = []
         for stream in work_assignment.assignments:
             zmqyields.append(anext(sourcegens[stream]))
             streams.append(stream)
         try:
-            zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+            zmqstreams: list[StreamData | IsSoftwareTriggered] = await asyncio.gather(
+                *zmqyields
+            )
         except StopAsyncIteration:
             self._logger.warning("stream source stopped before end")
             raise asyncio.exceptions.CancelledError()
-        zmqparts: dict[StreamName, StreamData] = {
+        zmqparts: dict[StreamName, StreamData | IsSoftwareTriggered] = {
             stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
         }
         self._logger.debug("stream triggered zmqparts %s", zmqparts)
         if swtriggen is not None:
             swparts = next(swtriggen)
             zmqparts.update(swparts)
+            # that has to overwrite all IsSoftwareTriggered instance
 
         return zmqparts
 
@@ -318,7 +321,9 @@ class Ingester(DistributedService):
                 self.dump_file.close()
                 self.dump_file = None
 
-    async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
+    async def run_source(
+        self, stream: StreamName
+    ) -> AsyncGenerator[StreamData | IsSoftwareTriggered, None]:
         """
         This generator must be implemented by the customised subclass. It should return exactly one `StreamData` object
         for every frame arriving from upstream.
