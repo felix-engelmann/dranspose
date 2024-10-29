@@ -8,6 +8,23 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
 
+from dranspose.helpers.h5types import (
+    H5Root,
+    H5Group,
+    H5Attribute,
+    H5Shape,
+    H5Type,
+    H5NumType,
+    H5StrType,
+    H5ValuedAttribute,
+    H5ScalarShape,
+    H5SimpleShape,
+    H5CompType,
+    H5NamedType,
+    H5Link,
+    H5Dataset,
+)
+
 router = APIRouter()
 
 # only activate for running it directly, otherwise it overwrites cli.py basic config
@@ -21,7 +38,7 @@ def _get_now() -> float:
 
 def _path_to_uuid(path: list[str]) -> bytes:
     abspath = "/" + "/".join(path)
-    print("abspath", abspath)
+    # print("abspath", abspath)
     uuid = base64.b16encode(abspath.encode())
     # print("uuid from function is", str(id(obj)).encode() + b"-" + uuid)
     return b"h5dict-" + uuid
@@ -35,10 +52,10 @@ def _get_obj_at_path(
     if isinstance(path, str):
         path = path.split("/")
     for p in path:
-        print("path part is:", p)
+        # print("path part is:", p)
         if p == "":
             continue
-        print("traverse", obj)
+        # print("traverse", obj)
         obj = obj[p]
         clean_path.append(p)
     return obj, clean_path
@@ -53,7 +70,7 @@ def _uuid_to_obj(data: dict[str, Any], uuid: str) -> tuple[Any, list[str]]:
     return _get_obj_at_path(data, path)
 
 
-def _canonical_to_h5(canonical: str) -> dict[str, Any] | None:
+def _canonical_to_h5(canonical: str) -> H5NumType | None:
     if canonical.startswith(">"):
         order = "BE"
     else:
@@ -62,91 +79,67 @@ def _canonical_to_h5(canonical: str) -> dict[str, Any] | None:
     htyp = None
     if canonical[1] == "f":
         # floating
-        htyp = {"class": "H5T_FLOAT"}
-        htyp["base"] = f"H5T_IEEE_F{8 * bytelen}{order}"
+        htyp = H5NumType(
+            **{"class": "H5T_FLOAT", "base": f"H5T_IEEE_F{8 * bytelen}{order}"}
+        )
     elif canonical[1] in ["u", "i"]:
-        htyp = {"class": "H5T_INTEGER"}
         signed = canonical[1].upper()
-        htyp["base"] = f"H5T_STD_{signed}{8 * bytelen}{order}"
+        htyp = H5NumType(
+            **{"class": "H5T_INTEGER", "base": f"H5T_STD_{signed}{8 * bytelen}{order}"}
+        )
     else:
         logger.error("numpy type %s not available", canonical)
 
     return htyp
 
 
-def _make_shape_type(obj: Any) -> tuple[str, Any]:
-    extra = None
+def _make_shape_type(obj: Any) -> tuple[H5Shape, H5Type]:
+    h5shape = None
+    h5type = None
     if type(obj) is int:
-        extra = {
-            "shape": {"class": "H5S_SCALAR"},
-            "type": {"base": "H5T_STD_I64LE", "class": "H5T_INTEGER"},
-        }
+        h5shape = H5ScalarShape()
+        h5type = H5NumType(**{"class": "H5T_INTEGER", "base": "H5T_STD_I64LE"})
     elif type(obj) is float:
-        extra = {
-            "shape": {"class": "H5S_SCALAR"},
-            "type": {"base": "H5T_IEEE_F64LE", "class": "H5T_FLOAT"},
-        }
+        h5shape = H5ScalarShape()
+        h5type = H5NumType(**{"class": "H5T_FLOAT", "base": "H5T_IEEE_F64LE"})
 
     elif type(obj) is str:
-        extra = {
-            "type": {
-                "class": "H5T_STRING",
-                "length": "H5T_VARIABLE",
-                "charSet": "H5T_CSET_UTF8",
-                "strPad": "H5T_STR_NULLTERM",
-            },
-            "shape": {"class": "H5S_SCALAR"},
-        }
+        h5shape = H5ScalarShape()
+        h5type = H5StrType()
 
     elif isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], str):
-        extra = {
-            "type": {
-                "class": "H5T_STRING",
-                "length": "H5T_VARIABLE",
-                "charSet": "H5T_CSET_UTF8",
-                "strPad": "H5T_STR_NULLTERM",
-            },
-            "shape": {"class": "H5S_SIMPLE", "dims": [len(obj)]},
-        }
+        h5shape = H5SimpleShape(dims=[len(obj)])
+        h5type = H5StrType()
     else:
         try:
             arr = np.array(obj)
-            extra = {
-                "shape": {"class": "H5S_SIMPLE", "dims": arr.shape},
-            }
+            h5shape = H5SimpleShape(dims=arr.shape)
 
             if len(arr.dtype.descr) > 1:
                 # compound datatype
-                htyp = {"class": "H5T_COMPOUND", "fields": []}
+                fields = []
                 for field in arr.dtype.descr:
-                    htyp["fields"].append(
-                        {"name": field[0], "type": _canonical_to_h5(field[1])}
+                    fields.append(
+                        H5NamedType(name=field[0], type=_canonical_to_h5(field[1]))
                     )
+                h5type = H5CompType(fields=fields)
             else:
                 canonical = arr.dtype.descr[0][1]
-                htyp = _canonical_to_h5(canonical)
-            logging.debug("convert np dtype %s  to %s", arr.dtype, htyp)
-            extra["type"] = htyp
+                h5type = _canonical_to_h5(canonical)
+            logging.debug("convert np dtype %s  to %s", arr.dtype, h5type)
 
-        except Exception:
-            pass
-    return extra
+        except Exception as e:
+            logger.error("esception in handling code %s", e.__repr__())
+
+    return h5shape, h5type
 
 
 def _dataset_from_obj(data, path, obj, uuid):
-    ret = {
-        "id": uuid,
-        "attributeCount": len(_get_obj_attrs(data, path)),
-        "lastModified": _get_now(),
-        "created": _get_now(),
-        "creationProperties": {
-            "allocTime": "H5D_ALLOC_TIME_LATE",
-            "fillTime": "H5D_FILL_TIME_IFSET",
-            "layout": {"class": "H5D_CONTIGUOUS"},
-        },
-    }
-    shape_type = _make_shape_type(obj)
-    ret.update(shape_type)
+    shape, typ = _make_shape_type(obj)
+    # print("shape for ds", shape, "typ for ds", typ)
+    ret = H5Dataset(
+        id=uuid, attributeCount=len(_get_obj_attrs(data, path)), shape=shape, type=typ
+    )
     return ret
 
 
@@ -183,29 +176,16 @@ def datasets(req: Request, uuid):
     obj, path = _uuid_to_obj(data, uuid)
     logger.debug("return dataset for obj %s", obj)
     ret = _dataset_from_obj(data, path, obj, uuid)
-    print("return dset", ret)
+    # print("return dset", ret)
     return ret
 
 
 def _get_group_link(obj, path):
     if isinstance(obj, dict):
-        print("path to sub is: ", path)
-        link = {
-            "class": "H5L_TYPE_HARD",
-            "collection": "groups",
-            "id": _path_to_uuid(path),
-            "title": path[-1],
-            "created": _get_now(),
-        }
+        collection = "groups"
     else:
-        link = {
-            "class": "H5L_TYPE_HARD",
-            "collection": "datasets",
-            "id": _path_to_uuid(path),
-            "title": path[-1],
-            "created": _get_now(),
-        }
-    return link
+        collection = "datasets"
+    return H5Link(collection=collection, id=_path_to_uuid(path), title=path[-1])
 
 
 def _get_group_links(obj, path):
@@ -245,21 +225,22 @@ def links(req: Request, uuid: str):
     return ret
 
 
-def _get_attr(aobj, name, include_values=True):
-    print("get attribute")
+def _get_attr(aobj, name, include_values=True) -> H5Attribute | H5ValuedAttribute:
+    # print("get attribute")
     if name in aobj:
-        extra = _make_shape_type(aobj[name])
-        ret = {"name": name, "created": _get_now(), "lastModified": _get_now(), **extra}
+        h5shape, h5type = _make_shape_type(aobj[name])
+        # print("shape and type ret", h5shape, h5type)
+        ret = H5Attribute(name=name, shape=h5shape, type=h5type)
         if include_values:
             val = aobj[name]
             if isinstance(val, np.ndarray):
                 val = val.tolist()
-            ret["value"] = val
+            ret = H5ValuedAttribute(**ret.model_dump(by_alias=True), value=val)
         return ret
 
 
 def _make_attrs(aobj, include_values=False):
-    print("make attributes of ", aobj)
+    # print("make attributes of ", aobj)
     attrs = []
     if isinstance(aobj, dict):
         for key, value in aobj.items():
@@ -278,13 +259,11 @@ def _get_obj_attrs(data, path, include_values=False):
         if "_attrs" in data:
             return _make_attrs(data["_attrs"], include_values=include_values)
     else:
-        print("normal attr fetch")
+        # print("normal attr fetch")
         parent, _ = _get_obj_at_path(data, path[:-1])
-        print("parent is", parent)
+        # print("parent is", parent)
         if f"{path[-1]}_attrs" in parent:
-            print(
-                "make attrs for",
-            )
+            # print( "make attrs for")
             return _make_attrs(
                 parent[f"{path[-1]}_attrs"], include_values=include_values
             )
@@ -293,7 +272,7 @@ def _get_obj_attrs(data, path, include_values=False):
 
 @router.get("/{typ}/{uuid}/attributes/{name}")
 def attribute(req: Request, typ: Literal["groups", "datasets"], uuid: str, name: str):
-    print("get attr with name", typ, uuid, name)
+    # print("get attr with name", typ, uuid, name)
     data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     logger.debug(
@@ -301,7 +280,7 @@ def attribute(req: Request, typ: Literal["groups", "datasets"], uuid: str, name:
     )
     allattrs = _get_obj_attrs(data, path, include_values=True)
     for attr in allattrs:
-        if attr["name"] == name:
+        if attr.name == name:
             logger.debug("return attribute %s", attr)
             return attr
     raise HTTPException(status_code=404, detail="Attribute not found")
@@ -309,7 +288,6 @@ def attribute(req: Request, typ: Literal["groups", "datasets"], uuid: str, name:
 
 @router.get("/{typ}/{uuid}/attributes")
 def attributes(req: Request, typ: Literal["groups", "datasets"], uuid: str):
-    print("get attrs", typ, uuid)
     data = req.app.state.get_data()
     obj, path = _uuid_to_obj(data, uuid)
     logger.debug(
@@ -325,22 +303,20 @@ def group(req: Request, uuid: str):
     logger.debug("start listing group id %s, obj %s, path: %s", uuid, obj, path)
 
     if isinstance(obj, dict):
-        group = {
-            "id": uuid,
-            "root": _path_to_uuid([]),
-            "linkCount": len(
-                list(
-                    filter(
-                        lambda x: isinstance(x, str) and not x.endswith("_attrs"),
-                        obj.keys(),
-                    )
+        linkCount = len(
+            list(
+                filter(
+                    lambda x: isinstance(x, str) and not x.endswith("_attrs"),
+                    obj.keys(),
                 )
-            ),
-            "attributeCount": len(_get_obj_attrs(data, path)),
-            "lastModified": _get_now(),
-            "created": _get_now(),
-            "domain": "/",
-        }
+            )
+        )
+        group = H5Group(
+            root=_path_to_uuid([]),
+            id=uuid,
+            linkCount=linkCount,
+            attributeCount=len(_get_obj_attrs(data, path)),
+        )
         logger.debug("group is %s", group)
         return group
 
@@ -351,13 +327,7 @@ def read_root(request: Request):
     data = request.app.state.get_data()
     if isinstance(data, dict):
         uuid = _path_to_uuid([])
-        ret = {
-            "root": uuid,
-            "created": time.time(),
-            "owner": "admin",
-            "class": "domain",
-            "lastModified": time.time(),
-        }
+        ret = H5Root(root=uuid)
         return ret
 
 
@@ -367,6 +337,10 @@ app.include_router(router)
 
 
 def get_data():
+    dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
+
+    arr = np.array([(0.5, 1)], dtype=dt)
+
     return {
         "live": 34,
         "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
@@ -377,6 +351,8 @@ def get_data():
         "specialtyp_attrs": {"NXdata": "NXspecial"},
         "hello": "World",
         "_attrs": {"NX_class": "NXentry"},
+        "composite": arr,
+        "composite_attrs": {"axes": ["I", "q"]},
         "oned_attrs": {"NX_class": "NXdata", "axes": ["motor"], "signal": "data"},
         "oned": {
             "data": np.ones((42)),
