@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import pickle
 import random
 import socket
@@ -470,11 +471,16 @@ class Worker(DistributedService):
 
                 if iname not in self._ingesters:
                     self._logger.info("adding new ingester %s", iname)
-                    sock = self.ctx.socket(zmq.DEALER)
-                    sock.setsockopt(zmq.IDENTITY, self.state.name.encode("ascii"))
-                    sock.connect(str(cfg.url))
-                    await sock.send(self.state.service_uuid.bytes)
-                    self._ingesters[iname] = ConnectedIngester(config=cfg, socket=sock)
+                    try:
+                        sock = self.ctx.socket(zmq.DEALER)
+                        sock.setsockopt(zmq.IDENTITY, self.state.name.encode("ascii"))
+                        sock.connect(str(cfg.url))
+                        await sock.send(self.state.service_uuid.bytes)
+                        self._ingesters[iname] = ConnectedIngester(
+                            config=cfg, socket=sock
+                        )
+                    except zmq.error.ZMQError:
+                        logging.error("cannot open dealer socket to ingester %s", iname)
 
                 await self._ingesters[iname].socket.send(self.state.service_uuid.bytes)
                 self._logger.debug("pinged %s", iname)
