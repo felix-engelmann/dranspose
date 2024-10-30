@@ -1,5 +1,6 @@
 import base64
 import logging
+import time
 from typing import Any, Literal
 
 import numpy as np
@@ -365,12 +366,14 @@ def get_data() -> dict[str, Any]:
 
     arr = np.array([(0.5, 1)], dtype=dt)
 
+    changing = np.ones((5, int(time.time()) % 10 + 5))
     return {
         "live": 34,
         "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
         "other_attrs": {"NX_class": "NXother"},
         "image": np.ones((1000, 1000)),
         "image_attrs": {"listattr": [42, 43, 44, 45]},
+        "changing_shape": changing,
         "specialtyp": np.ones((10, 10), dtype=">u8"),
         "specialtyp_attrs": {"NXdata": "NXspecial"},
         "hello": "World",
