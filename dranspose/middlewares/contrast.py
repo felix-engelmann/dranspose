@@ -17,8 +17,8 @@ def parse(data: StreamData) -> UnionType:
     Returns:
         a ContrastPacket containing a.o. the current status
     """
-    assert data.typ == "contrast"
-    assert data.length == 1
+    assert data.typ == "contrast", "wrong stream name"
+    assert data.length == 1, "multipart must be 1"
     frame = data.frames[0]
     if isinstance(frame, zmq.Frame):
         val = pickle.loads(frame.bytes)
