@@ -50,30 +50,32 @@ class ZmqSubPCAPIngester(Ingester):
             except Exception as e:
                 self._logger.error("packet not valid %s", e.__repr__())
                 continue
-            if type(packet) is PCAPData:
+            if isinstance(packet, PCAPData):
                 if len(parts) != 1:
                     self._logger.error("PCAP multipart messages are not supported")
                     continue
-                vect_keys = {
-                    k: len(parts[0][k])
-                    for k, v in parts[0].items()
-                    if isinstance(v, list)
-                }
+                self._logger.debug("received data is %s", packet)
+                vect_keys = {k: len(v) for k, v in iter(packet) if isinstance(v, list)}
+                self._logger.debug("vect_keys are %s", vect_keys)
                 lenghts = set(vect_keys.values())
                 if len(lenghts) != 1:
                     self._logger.error("All lists in msg must have the same length")
                     continue
                 for i in range(lenghts.pop()):
                     frame = {}
-                    for k, v in parts[0].items():
+                    for k, v in iter(packet):
                         if k in vect_keys.keys():
                             frame[k] = v[i]
                         elif k == "frame_number":
                             frame[k] = v + i  # Increment frame_number
                         else:
                             frame[k] = v  # Keep the original scalar value
-                    yield StreamData(typ="PCAP", frames=[frame])
-            elif type(packet) is PCAPEnd:
+                    new_packet = PCAPData(**frame)
+                    self._logger.debug("send out newly created package %s", new_packet)
+                    frame_bytes = new_packet.model_dump_json().encode()
+                    yield StreamData(typ="PCAP", frames=[frame_bytes])
+            elif isinstance(packet, PCAPEnd):
+                self._logger.info("reached end %s", packet)
                 yield StreamData(typ="PCAP", frames=parts)
                 break
         while True:

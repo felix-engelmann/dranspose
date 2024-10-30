@@ -19,14 +19,14 @@ from dranspose.protocol import (
     VirtualConstraint,
 )
 
-from dranspose.worker import Worker
+from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.asyncio
 async def test_albaem(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
-    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pkls: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
@@ -34,7 +34,14 @@ async def test_albaem(
     ],
 ) -> None:
     await reducer(None)
-    await create_worker(WorkerName("w1"))
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("w1"),
+                worker_class="examples.parser.pcap:PcapWorker",
+            ),
+        )
+    )
     await create_ingester(
         ZmqSubPCAPIngester(
             settings=ZmqSubPCAPSettings(
@@ -52,17 +59,17 @@ async def test_albaem(
             st = await session.get("http://localhost:5000/api/v1/config")
             state = EnsembleState.model_validate(await st.json())
 
-        ntrig = 5
+        ntrig = 1500
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
             json={
                 "pcap": [
                     [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
+                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
                             mode="json"
                         )
                     ]
-                    for i in range(1, ntrig)
+                    for i in range(ntrig)
                 ],
             },
         )
