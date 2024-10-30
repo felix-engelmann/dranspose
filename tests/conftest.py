@@ -26,6 +26,7 @@ import pytest_asyncio
 import uvicorn
 import zmq
 from _pytest.fixtures import FixtureRequest
+from _pytest.logging import LogCaptureFixture
 from aiohttp import ClientConnectionError
 from fastapi import FastAPI
 from pydantic import HttpUrl
@@ -66,18 +67,20 @@ def pytest_addoption(parser: Parser) -> None:
 
 
 class ErrorLoggingHandler(logging.Handler):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.error_found = False
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         # Check if the log message starts with "ERROR"
         if record.levelname == "ERROR":
+            if "Unclosed connection" in record.message:  # aiohttp benign error
+                return
             self.error_found = True
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def fail_on_error_log(caplog):
+async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
     handler = ErrorLoggingHandler()
     logging.getLogger().addHandler(handler)
 
@@ -128,14 +131,15 @@ class ProcessDistributed:
 class ExternalDistributed:
     instance: DistributedService
     process: asyncio.subprocess.Process
-    log_task: Task[Any]
+    log_tasks: list[Task[Any]]
 
     async def stop(self) -> None:
         logging.warning("stopping process")
         self.process.terminate()
         await self.process.wait()
         logging.warning("stopping log task")
-        self.log_task.cancel()
+        for t in self.log_tasks:
+            t.cancel()
 
 
 @pytest_asyncio.fixture
@@ -219,11 +223,13 @@ async def create_ingester(
                 output = asyncio.create_task(
                     forward_pipe(proc.stdout, inst._streaming_single_settings)
                 )
-                output = asyncio.create_task(
+                outerr = asyncio.create_task(
                     forward_pipe(proc.stderr, inst._streaming_single_settings)
                 )
                 ingesters.append(
-                    ExternalDistributed(instance=inst, process=proc, log_task=output)
+                    ExternalDistributed(
+                        instance=inst, process=proc, log_tasks=[output, outerr]
+                    )
                 )
                 return inst
         if subprocess:

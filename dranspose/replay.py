@@ -13,6 +13,7 @@ import cbor2
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import TypeAdapter
+from pydantic_core import Url
 from starlette.responses import Response
 
 from dranspose.helpers import utils
@@ -22,8 +23,16 @@ from dranspose.event import (
     ResultData,
     message_tag_hook,
 )
+from dranspose.helpers.h5dict import router
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
-from dranspose.protocol import WorkerName, Digest, WorkParameter, ParameterName
+from dranspose.protocol import (
+    WorkerName,
+    HashDigest,
+    WorkParameter,
+    ParameterName,
+    ReducerState,
+    WorkerState,
+)
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
@@ -46,20 +55,32 @@ ParamList = TypeAdapter(list[WorkParameter])
 
 reducer_app = FastAPI()
 
-reducer = None
+reducer: Any | None = None
+
+
+def get_data() -> dict[str, Any]:
+    global reducer
+    if reducer is not None and hasattr(reducer, "publish"):
+        return reducer.publish
+    return {}
+
+
+reducer_app.state.get_data = get_data
+
+reducer_app.include_router(router)
 
 
 @reducer_app.get("/api/v1/result/{path:path}")
 async def get_path(path: str) -> Any:
     global reducer
-    if not hasattr(reducer, "publish"):
+    if reducer is None or not hasattr(reducer, "publish"):
         raise HTTPException(status_code=404, detail="no publishable data")
     try:
         if path == "":
             path = "$"
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]  # type: ignore [attr-defined]
+        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]
         data = pickle.dumps(ret)
         return Response(data, media_type="application/x.pickle")
     except Exception as e:
@@ -151,9 +172,9 @@ def _work_event(
         return
     rd = ResultData(
         event_number=event.event_number,
-        worker=WorkerName(f"development{index}"),
+        worker=WorkerName(f"replay-worker-{index}"),
         payload=data,
-        parameters_hash=Digest(
+        parameters_hash=HashDigest(
             "688787d8ff144c502c7f5cffaafe2cc588d86079f9de88304c26b0cb99ce91c6"
         ),
     )
@@ -167,6 +188,31 @@ def _work_event(
     reducer.process_result(result, parameters=parameters)
 
 
+def _finish(
+    workers: list[Any], reducer: Any, parameters: dict[ParameterName, WorkParameter]
+) -> None:
+    for worker in workers:
+        if hasattr(worker, "finish"):
+            try:
+                worker.finish(parameters=parameters)
+            except Exception as e:
+                logger.error(
+                    "worker finished failed with %s\n%s",
+                    e.__repr__(),
+                    traceback.format_exc(),
+                )
+
+    if hasattr(reducer, "finish"):
+        try:
+            reducer.finish(parameters=parameters)
+        except Exception as e:
+            logger.error(
+                "reducer finish failed with %s\n%s",
+                e.__repr__(),
+                traceback.format_exc(),
+            )
+
+
 def replay(
     wclass: str,
     rclass: str,
@@ -174,9 +220,10 @@ def replay(
     source: Optional[str] = None,
     parameter_file: Optional[os.PathLike[Any] | str] = None,
     port: Optional[int] = None,
-    keepalive: bool = False,
+    stop_event: threading.Event | None = None,
     nworkers: int = 2,
     broadcast_first: bool = True,
+    done_event: threading.Event | None = None,
 ) -> None:
     if source is not None:
         sourcecls = utils.import_class(source)
@@ -198,8 +245,15 @@ def replay(
     logger.info("use parameters %s", parameters)
 
     global reducer
-    workers = [workercls(parameters=parameters, context={}) for _ in range(nworkers)]
-    reducer = reducercls(parameters=parameters, context={})
+    workers = []
+    for wi in range(nworkers):
+        wstate = WorkerState(name=WorkerName(f"replay-worker-{wi}"))
+        wobj = workercls(parameters=parameters, context={}, state=wstate)
+        workers.append(wobj)
+
+    rstate = ReducerState(url=Url("tcp://localhost:10200"))
+    reducer = reducercls(parameters=parameters, context={}, state=rstate)
+
     logger.info("created workers %s", workers)
     threading.Thread(target=timer, daemon=True, args=(reducer,)).start()
 
@@ -236,38 +290,31 @@ def replay(
                     first = False
 
                 for wi in dst_worker_ids:
-                    logger.warning("spread to wi %d", wi)
+                    logger.info("spread to wi %d", wi)
                     tick = False
                     if hasattr(workers[wi], "get_tick_interval"):
-                        interval_ms = workers[wi].get_tick_interval(
+                        interval_s = workers[wi].get_tick_interval(
                             parameters=parameters
                         )
-                        if last_tick + (interval_ms / 1000) < time.time():
+                        if last_tick + interval_s < time.time():
                             tick = True
                             last_tick = time.time()
                     _work_event(workers[wi], wi, reducer, event, parameters, tick)
 
             except StopIteration:
-                for worker in workers:
-                    if hasattr(worker, "finish"):
-                        try:
-                            worker.finish(parameters=parameters)
-                        except Exception as e:
-                            logger.error(
-                                "worker finished failed with %s\n%s",
-                                e.__repr__(),
-                                traceback.format_exc(),
-                            )
-
-                if hasattr(reducer, "finish"):
-                    try:
-                        reducer.finish(parameters=parameters)
-                    except Exception as e:
-                        logger.error(
-                            "reducer finish failed with %s\n%s",
-                            e.__repr__(),
-                            traceback.format_exc(),
-                        )
+                logger.debug("end of replay, calling finish")
+                _finish(workers, reducer, parameters)
                 break
-        if keepalive:
-            input("press key to stop server")
+        if done_event is not None:
+            done_event.set()
+        logger.info("check if webserver should stay alive %s", stop_event)
+        if stop_event is None:
+            stop_event = threading.Event()
+            stop_event.set()
+        else:
+            print("press ctrl-C to stop")
+        try:
+            logger.info("waiting for event")
+            stop_event.wait()
+        except KeyboardInterrupt:
+            pass

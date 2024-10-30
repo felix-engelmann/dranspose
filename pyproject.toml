@@ -21,11 +21,12 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "numpy",
-    "requests",
+    # "requests",
     "pydantic",
     "pydantic-settings",
     "jsonpath-ng",
     "cbor2",
+    "redis-logs",
 ]
 dynamic = ["version"]
 
@@ -33,6 +34,9 @@ dynamic = ["version"]
 include = ["dranspose*"]  # package names should match these glob patterns (["*"] by default)
 exclude = ["tests*"]  # exclude packages matching these glob patterns (empty by default)
 #namespaces = false
+
+[tool.setuptools.package-data]
+dranspose = ["frontend/*.html"]
 
 [project.optional-dependencies]
 tests = [
@@ -42,6 +46,7 @@ tests = [
     "psutil",
     "types-psutil",
     "pytest-plt",
+    "h5pyd"
 ]
 docs = [
     "mkdocs",

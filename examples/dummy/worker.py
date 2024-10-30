@@ -36,7 +36,7 @@ class FluorescenceWorker:
         *args: Any,
         **kwargs: Any,
     ) -> dict[str, Any] | None:
-        logger.warning("using parameters %s", parameters)
+        logger.debug("using parameters %s", parameters)
 
         if "dummy" in event.streams:
             logger.info("got dummy data %s", event.streams[StreamName("dummy")])

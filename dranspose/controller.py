@@ -3,17 +3,18 @@ This is the central service to orchestrate all distributed components
 
 """
 import asyncio
+import os.path
 from asyncio import Task
 from collections import defaultdict
 from types import UnionType
-from typing import Dict, List, Any, AsyncGenerator, Optional, Annotated, Literal
+from typing import Any, AsyncGenerator, Optional, Annotated, Literal
 
 import logging
 import time
 
 from pydantic import UUID4
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, FileResponse
 
 from dranspose.distributed import DistributedSettings
 from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
@@ -24,6 +25,7 @@ from importlib.metadata import version
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 
 from dranspose.parameters import (
     Parameter,
@@ -45,7 +47,7 @@ from dranspose.protocol import (
     ControllerUpdate,
     ReducerState,
     WorkerTimes,
-    Digest,
+    HashDigest,
     ParameterName,
     SystemLoadType,
     IntervalLoad,
@@ -55,6 +57,7 @@ from dranspose.protocol import (
     IngesterUpdate,
     WorkAssignmentList,
     WorkAssignment,
+    IngesterName,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,12 +99,44 @@ class Controller:
 
     async def run(self) -> None:
         logger.debug("started controller run")
+        dist_lock = await self.redis.set(
+            RedisKeys.lock(),
+            "🔒",
+            ex=10,
+            nx=True,
+        )
+        logger.debug("result of lock acquisition %s", dist_lock)
+        while dist_lock is None:
+            logger.warning("another controller is already running, will retry ")
+            await asyncio.sleep(2)
+            dist_lock = await self.redis.set(
+                RedisKeys.lock(),
+                "🔒",
+                ex=10,
+                nx=True,
+            )
+        logger.info("controller lock acquired")
+
         self.assign_task = asyncio.create_task(self.assign_work())
         self.assign_task.add_done_callback(done_callback)
         self.default_task = asyncio.create_task(self.default_parameters())
         self.default_task.add_done_callback(done_callback)
         self.consistent_task = asyncio.create_task(self.consistent_parameters())
         self.consistent_task.add_done_callback(done_callback)
+        self.lock_task = asyncio.create_task(self.hold_lock())
+        self.lock_task.add_done_callback(done_callback)
+
+    async def hold_lock(self) -> None:
+        while True:
+            await asyncio.sleep(7)
+            dist_lock = await self.redis.set(
+                RedisKeys.lock(),
+                "🔒",
+                ex=10,
+                xx=True,
+            )
+            if dist_lock is False:
+                logger.warning("The lock was lost")
 
     async def get_configs(self) -> EnsembleState:
         if time.time() - self.config_fetch_time < 0.5:
@@ -122,11 +157,19 @@ class Controller:
         if reducer_json:
             reducer = ReducerState.model_validate_json(reducer_json)
         dranspose_version = version("dranspose")
+
+        parameters_version: dict[ParameterName, UUID4] = {
+            n: p.uuid for n, p in self.parameters.items()
+        }
+        redis_param_keys = await self.redis.keys(RedisKeys.parameters("*", "*"))
+        logger.debug("redis param keys are %s", redis_param_keys)
         self.config_cache = EnsembleState(
             ingesters=ingesters,
             workers=workers,
             reducer=reducer,
             controller_version=dranspose_version,
+            parameters_version=parameters_version,
+            parameters_hash=self.parameters_hash,
         )
         self.config_fetch_time = time.time()
         return self.config_cache
@@ -175,6 +218,7 @@ class Controller:
             cupd = ControllerUpdate(
                 mapping_uuid=self.mapping.uuid,
                 parameters_version={n: p.uuid for n, p in self.parameters.items()},
+                active_streams=list(m.mapping.keys()),
             )
             logger.debug("send controller update %s", cupd)
             await self.redis.xadd(
@@ -195,12 +239,12 @@ class Controller:
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
 
-    async def set_param(self, name: ParameterName, data: bytes) -> Digest:
+    async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
         param = WorkParameter(name=name, data=data)
         logger.debug("distributing parameter %s with uuid %s", param.name, param.uuid)
         await self.redis.set(RedisKeys.parameters(name, param.uuid), param.data)
         self.parameters[name] = param
-        logger.debug("stored parameters")
+        logger.debug("stored parameter %s locally", name)
         self.parameters_hash = parameters_hash(self.parameters)
         logger.debug("parameter hash is now %s", self.parameters_hash)
         cupd = ControllerUpdate(
@@ -220,7 +264,7 @@ class Controller:
 
         params: list[ParameterType] = []
         for i in param_json:
-            val: ParameterType = Parameter.validate_json(i)  # type: ignore
+            val: ParameterType = Parameter.validate_json(i)
             params.append(val)
 
         params.append(
@@ -237,7 +281,7 @@ class Controller:
                 desc_keys = await self.redis.keys(RedisKeys.parameter_description())
                 param_json = await self.redis.mget(desc_keys)
                 for i in param_json:
-                    val: ParameterType = Parameter.validate_json(i)  # type: ignore
+                    val: ParameterType = Parameter.validate_json(i)
                     if val.name not in self.parameters:
                         logger.info(
                             "set parameter %s to default %s, (type %s)",
@@ -255,6 +299,30 @@ class Controller:
     async def consistent_parameters(self) -> None:
         while True:
             try:
+                # make sure self.parameters is present in redis
+
+                key_names = []
+                for name, param in self.parameters.items():
+                    key_names.append(RedisKeys.parameters(name, param.uuid))
+                if len(key_names) > 0:
+                    ex_key_no = await self.redis.exists(*key_names)
+                    logger.debug(
+                        "check for param values in redis, %d exist of %d: %s",
+                        ex_key_no,
+                        len(key_names),
+                        key_names,
+                    )
+                    if ex_key_no < len(key_names):
+                        logger.warning(
+                            "the redis parameters don't match the controller parameters, rewriting"
+                        )
+                        async with self.redis.pipeline() as pipe:
+                            for name, param in self.parameters.items():
+                                await pipe.set(
+                                    RedisKeys.parameters(name, param.uuid), param.data
+                                )
+                            await pipe.execute()
+
                 consistent = []
                 cfg = await self.get_configs()
                 if cfg.reducer and cfg.reducer.parameters_hash != self.parameters_hash:
@@ -381,9 +449,9 @@ class Controller:
             asyncio.create_task(self._update_processing_times(update))
 
     async def completed_finish(self) -> bool:
-        fin_workers = set()
+        fin_workers: set[WorkerName] = set()
         reducer = False
-        fin_ingesters = set()
+        fin_ingesters: set[IngesterName] = set()
         for upd in self.finished_components:
             if isinstance(upd, WorkerUpdate):
                 fin_workers.add(upd.worker)
@@ -487,6 +555,8 @@ class Controller:
         params = await self.redis.keys(RedisKeys.parameters("*", "*"))
         if len(params) > 0:
             await self.redis.delete(*params)
+        await cancel_and_wait(self.lock_task)
+        await self.redis.delete(RedisKeys.lock())
         await self.redis.aclose()
 
 
@@ -498,15 +568,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
     global ctrl
     ctrl = Controller()
-    run_task = asyncio.create_task(ctrl.run())
-    run_task.add_done_callback(done_callback)
+    # run_task = asyncio.create_task(ctrl.run())
+    await ctrl.run()
+    # run_task.add_done_callback(done_callback)
     yield
-    await cancel_and_wait(run_task)
+    # await cancel_and_wait(run_task)
     await ctrl.close()
     # Clean up the ML models and release the resources
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+)
+
+
+@app.get("/")
+async def read_index() -> FileResponse:
+    return FileResponse(
+        os.path.join(os.path.dirname(__file__), "frontend", "index.html")
+    )
 
 
 @app.get("/api/v1/config")
@@ -551,7 +635,7 @@ async def get_progress() -> dict[str, Any]:
 
 @app.post("/api/v1/mapping")
 async def set_mapping(
-    mapping: Dict[StreamName, List[Optional[List[VirtualWorker]]]],
+    mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]],
     all_wrap: bool = True,
 ) -> UUID4 | str:
     global ctrl
@@ -581,7 +665,7 @@ async def set_mapping(
 
 
 @app.get("/api/v1/mapping")
-async def get_mapping() -> Dict[StreamName, List[Optional[List[VirtualWorker]]]]:
+async def get_mapping() -> dict[StreamName, list[Optional[list[VirtualWorker]]]]:
     global ctrl
     return ctrl.mapping.mapping
 
@@ -593,9 +677,23 @@ async def stop() -> None:
     ctrl.external_stop = True
 
 
+@app.get("/api/v1/logs")
+async def get_logs(level: str = "INFO") -> Any:
+    global ctrl
+    data = await ctrl.redis.xrange("dranspose_logs", "-", "+")
+    logs = []
+    levels = logging.getLevelNamesMapping()
+    minlevel = levels.get(level.upper(), logging.INFO)
+    for entry in data:
+        msglevel = levels[entry[1].get("levelname", "DEBUG")]
+        if msglevel >= minlevel:
+            logs.append(entry[1])
+    return logs
+
+
 @app.post("/api/v1/sardana_hook")
 async def set_sardana_hook(
-    info: Dict[Literal["streams"] | Literal["scan"], Any]
+    info: dict[Literal["streams"] | Literal["scan"], Any]
 ) -> UUID4 | str:
     global ctrl
     config = await ctrl.get_configs()
@@ -619,9 +717,9 @@ async def set_sardana_hook(
 
 
 @app.post("/api/v1/parameter/{name}")
-async def set_param(request: Request, name: ParameterName) -> Digest:
+async def post_param(request: Request, name: ParameterName) -> HashDigest:
     data = await request.body()
-    logger.warning("got %s: %s", name, data)
+    logger.info("got %s: %s", name, data)
     u = await ctrl.set_param(name, data)
     return u
 

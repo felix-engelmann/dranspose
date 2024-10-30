@@ -21,6 +21,7 @@ from dranspose.protocol import (
     ParameterName,
     WorkParameter,
     BuildGitMeta,
+    StreamName,
 )
 import redis.exceptions as rexceptions
 import asyncio
@@ -68,6 +69,7 @@ class DistributedService(abc.ABC):
             f"{self._distributed_settings.redis_dsn}?protocol=3"
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
+        print("handlers are", self._logger.handlers)
         try:
             if self._distributed_settings.build_meta_file is not None:
                 with open(self._distributed_settings.build_meta_file) as fd:
@@ -139,9 +141,13 @@ class DistributedService(abc.ABC):
                     self._logger.debug("update type %s", update)
                     newuuid = update.mapping_uuid
                     if newuuid != self.state.mapping_uuid:
-                        self._logger.info("resetting config to %s", newuuid)
+                        self._logger.info(
+                            "resetting config to %s with streams %s",
+                            newuuid,
+                            update.active_streams,
+                        )
                         try:
-                            await self.restart_work(newuuid)
+                            await self.restart_work(newuuid, update.active_streams)
                         except Exception as e:
                             self._logger.error("restart_work failed %s", e.__repr__())
                     paramuuids = update.parameters_version
@@ -172,7 +178,9 @@ class DistributedService(abc.ABC):
                                     )
                                     self._logger.debug("description is %s", desc)
                                     if desc:
-                                        param_desc: ParameterType = Parameter.validate_json(desc)  # type: ignore
+                                        param_desc: ParameterType = (
+                                            Parameter.validate_json(desc)
+                                        )
                                         self._logger.info(
                                             "set paremter has a description %s",
                                             param_desc,
@@ -227,7 +235,7 @@ class DistributedService(abc.ABC):
     async def run(self) -> None:
         pass
 
-    async def restart_work(self, uuid: UUID4) -> None:
+    async def restart_work(self, uuid: UUID4, active_streams: list[StreamName]) -> None:
         pass
 
     async def finish_work(self) -> None:

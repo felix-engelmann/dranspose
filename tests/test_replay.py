@@ -2,9 +2,11 @@ import asyncio
 import json
 import logging
 import pickle
+import threading
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
+import h5pyd
 import numpy as np
 
 import pytest
@@ -211,13 +213,39 @@ async def test_replay(
             f,
         )
 
-    replay(
-        "examples.dummy.worker:FluorescenceWorker",
-        "examples.dummy.reducer:FluorescenceReducer",
-        [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
-        None,
-        bin_file,
+    stop_event = threading.Event()
+    done_event = threading.Event()
+
+    thread = threading.Thread(
+        target=replay,
+        args=(
+            "examples.dummy.worker:FluorescenceWorker",
+            "examples.dummy.reducer:FluorescenceReducer",
+            [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
+            None,
+            bin_file,
+        ),
+        kwargs={"port": 5010, "stop_event": stop_event, "done_event": done_event},
     )
+    thread.start()
+
+    logging.info("keep webserver alive")
+    done_event.wait()
+    logging.info("replay done")
+
+    def work() -> None:
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info("file %s", list(f.keys()))
+        logging.info("map %s", list(f["map"].keys()))
+        assert list(f.keys()) == ["map"]
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work)
+
+    logging.info("shut down server")
+    stop_event.set()
+
+    thread.join()
 
     context.destroy()
 

@@ -14,6 +14,7 @@ from starlette.responses import Response
 from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
+from dranspose.helpers.h5dict import router
 from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
@@ -22,6 +23,7 @@ from dranspose.protocol import (
     RedisKeys,
     ReducerUpdate,
     DistributedStateEnum,
+    StreamName,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,7 +147,9 @@ class Reducer(DistributedService):
                 delay = 1
             await asyncio.sleep(delay)
 
-    async def restart_work(self, new_uuid: UUID4) -> None:
+    async def restart_work(
+        self, new_uuid: UUID4, active_streams: list[StreamName]
+    ) -> None:
         self._logger.info("resetting config %s", new_uuid)
         await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)
@@ -199,6 +203,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     reducer = Reducer()
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
+
+    def get_data() -> dict[str, Any]:
+        if reducer.reducer is not None:
+            if hasattr(reducer.reducer, "publish"):
+                return reducer.reducer.publish
+        return {}
+
+    app.state.get_data = get_data
     yield
     await cancel_and_wait(run_task)
     await reducer.close()
@@ -206,6 +218,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.include_router(router)
 
 
 @app.get("/api/v1/status")

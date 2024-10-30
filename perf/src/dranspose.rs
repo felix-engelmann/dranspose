@@ -27,6 +27,7 @@ pub struct IngesterState {
 pub struct ControllerUpdate {
     pub mapping_uuid: Uuid,
     pub target_parameters_hash: Option<String>,
+    pub active_streams: Vec<String>,
     pub finished: bool,
 }
 

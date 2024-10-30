@@ -2,10 +2,12 @@ use crate::data_plane::forwarder;
 use crate::dranspose::{ConnectedWorker, ControllerUpdate, IngesterState, WorkAssignment};
 use crate::Cli;
 use async_std::task;
+use async_std::future::timeout;
+use async_std::future::TimeoutError;
 use async_zmq::SinkExt;
 use futures::channel::mpsc;
 use futures::{future::FutureExt, select, StreamExt};
-use log::{debug, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use redis::aio::MultiplexedConnection;
 use redis::streams::{StreamRangeReply, StreamReadOptions, StreamReadReply};
 use redis::{from_redis_value, AsyncCommands};
@@ -52,6 +54,8 @@ pub(crate) async fn register(
         reg_fwd_assignment_r,
     ));
     info!("started forwarder task, waiting for started message");
+
+    let mut retries = 5;
     loop {
         let start_msg = fwd_reg_connectedworker_r.next().await;
         info!("forwarder notified {:?}", start_msg);
@@ -65,6 +69,11 @@ pub(crate) async fn register(
                 task::sleep(Duration::from_micros(1000_000)).await;
             }
         };
+        retries -= 1;
+        if retries < 0 {
+            error!("forwarded did not start within timeout");
+            return Ok(());
+        }
     }
 
     info!("resume registerer");
@@ -91,8 +100,13 @@ pub(crate) async fn register(
     loop {
         if last_config_upload.elapsed().as_secs() > 6 || fast_publish {
             let config = serde_json::to_string(&state).unwrap();
-            debug!("{}", &config);
-            let _: () = con.set_ex(&configkey, &config, 10).await.unwrap();
+            debug!("publish config {}", &config);
+            let res: Result<Result<(), redis::RedisError>, TimeoutError> = timeout(Duration::from_secs(1), con.set_ex(&configkey, &config, 10)).await;
+            match res {
+                Ok(_) => debug!("successfully published config"),
+                Err(_) => warn!("could not set config in redis fast enough")
+            }
+            //let _: () = timeout(Duration::from_secs(1), con.set_ex(&configkey, &config, 10)).await.expect().expect("could not set redis config");
             last_config_upload = Instant::now();
             fast_publish = false;
         }
@@ -102,9 +116,20 @@ pub(crate) async fn register(
             "dranspose:assigned:{}",
             state.mapping_uuid.unwrap_or(Uuid::default()).to_string()
         );
+        trace!("use assigned key: {}", assignedkey);
 
         let keylist = vec!["dranspose:controller:updates", assignedkey.as_str()];
-        trace!("register select");
+        trace!("listen to redis keys {:?}", keylist);
+
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards");
+        let now = since_the_epoch.as_millis() as f64 / 1000f64;
+        state
+            .connected_workers
+            .retain(|_, v| now - v.last_seen < 3.0);
+        trace!("cleaned stale workers, register select");
         select! {
             update_msgs = con.xread_options::<&str, String, StreamReadReply>(&keylist, &ids, &opts).fuse() => {
                 trace!("raw redis message {:?}", update_msgs);
@@ -167,14 +192,7 @@ pub(crate) async fn register(
                 if let Some(cw) = cw {
                     match cw {
                         ForwarderEvent::ConnectedWorker{connected_worker} => {
-                            let start = SystemTime::now();
-                            let since_the_epoch = start
-                                .duration_since(UNIX_EPOCH)
-                                .expect("Time went backwards");
-                            let now = since_the_epoch.as_millis() as f64/1000f64;
-
                             state.connected_workers.insert(connected_worker.service_uuid, connected_worker);
-                            state.connected_workers.retain(|_, v| now-v.last_seen < 3.0);
                             fast_publish = true;
                         },
                         ForwarderEvent::Ready {mapping_uuid}  => {

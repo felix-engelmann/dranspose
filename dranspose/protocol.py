@@ -42,7 +42,7 @@ strongly typed event number (int)
 
 ParameterName = NewType("ParameterName", str)
 
-Digest = NewType("Digest", str)
+HashDigest = NewType("HashDigest", str)
 
 GENERIC_WORKER = WorkerTag("generic")
 
@@ -94,6 +94,12 @@ class RedisKeys:
 
     @staticmethod
     @cache
+    @validate_call
+    def lock() -> str:
+        return f"{RedisKeys.PREFIX}:controller_lock"
+
+    @staticmethod
+    @cache
     def updates() -> str:
         return f"{RedisKeys.PREFIX}:controller:updates"
 
@@ -122,7 +128,8 @@ class ProtocolException(Exception):
 class ControllerUpdate(BaseModel):
     mapping_uuid: UUID4
     parameters_version: dict[ParameterName, UUID4]
-    target_parameters_hash: Optional[Digest] = None
+    target_parameters_hash: Optional[HashDigest] = None
+    active_streams: list[StreamName] = []
     finished: bool = False
 
 
@@ -253,7 +260,7 @@ DistributedUpdate = TypeAdapter(WorkerUpdate | ReducerUpdate | IngesterUpdate)
 
 
 class BuildGitMeta(BaseModel):
-    commit_hash: Digest
+    commit_hash: HashDigest
     branch_name: str
     timestamp: datetime.datetime
     repository_url: Url
@@ -264,7 +271,7 @@ class DistributedState(BaseModel):
     mapping_uuid: Optional[UUID4] = None
     dranspose_version: Optional[str] = None
     mapreduce_version: Optional[BuildGitMeta] = None
-    parameters_hash: Optional[Digest] = None
+    parameters_hash: Optional[HashDigest] = None
     processed_events: int = 0
     event_rate: float = 0.0
 
@@ -300,6 +307,8 @@ class EnsembleState(BaseModel):
     workers: list[WorkerState]
     reducer: Optional[ReducerState]
     controller_version: Optional[str] = None
+    parameters_version: dict[ParameterName, UUID4] = {}
+    parameters_hash: Optional[HashDigest] = None
 
     def get_streams(self) -> list[StreamName]:
         ingester_streams = set([s for i in self.ingesters for s in i.streams])

@@ -4,14 +4,17 @@ import json
 import logging
 import os
 import signal
+import threading
 from asyncio import Task
 from typing import Literal, Any, Optional
 
 import uvicorn
 from pydantic_core import Url
-from pydantic_settings import BaseSettings
+from rlh import RedisStreamLogHandler
+import redis as redis
 
 from dranspose.controller import app
+from dranspose.distributed import DistributedSettings
 from dranspose.helpers import utils
 from dranspose.helpers.utils import done_callback
 from dranspose.reducer import app as reducer_app
@@ -27,7 +30,7 @@ from dranspose.worker import Worker, WorkerSettings
 from dranspose.replay import replay as run_replay
 
 
-class CliSettings(BaseSettings):
+class CliSettings(DistributedSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
 
@@ -36,6 +39,17 @@ settings = CliSettings()
 logging.basicConfig(level=settings.log_level.upper())
 
 logger = logging.getLogger(__name__)
+
+logging_redis = redis.from_url(f"{settings.redis_dsn}?decode_responses=True&protocol=3")
+
+root_logger = logging.getLogger()
+handler = RedisStreamLogHandler(
+    redis_client=logging_redis,
+    stream_name="dranspose_logs",
+    maxlen=1000,
+    fields=["msg", "lineno", "name", "created", "levelname"],
+)
+root_logger.addHandler(handler)
 
 
 async def main() -> None:
@@ -186,6 +200,9 @@ def combined(args: argparse.Namespace) -> None:
 
 
 def replay(args: argparse.Namespace) -> None:
+    keepalive = None
+    if args.keep_alive:
+        keepalive = threading.Event()
     run_replay(
         args.workerclass,
         args.reducerclass,
@@ -193,7 +210,7 @@ def replay(args: argparse.Namespace) -> None:
         args.source,
         args.parameters,
         args.port,
-        args.keep_alive,
+        keepalive,
         args.nworkers,
     )
 
@@ -210,7 +227,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser_reducer = subparsers.add_parser("reducer", help="run reducer")
     parser_reducer.set_defaults(func=reducer)
     parser_reducer.add_argument("--host", help="host to listen on")
-    parser_reducer.add_argument("-p", "--port", help="port to listen on")
+    parser_reducer.add_argument("-p", "--port", help="port to listen on", type=int)
     parser_reducer.add_argument(
         "-c",
         "--reducerclass",

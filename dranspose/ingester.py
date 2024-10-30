@@ -77,6 +77,7 @@ class Ingester(DistributedService):
             self._ingester_settings,
         )
         self.state: IngesterState
+        self.active_streams: list[StreamName] = []
 
         self.dump_file: Optional[BufferedWriter] = None
 
@@ -93,7 +94,12 @@ class Ingester(DistributedService):
         """
         Main function orchestrating the dependent tasks. This needs to be called from an async context once an instance is created.
         """
-        self.open_socket()
+        try:
+            self.open_socket()
+        except Exception as e:
+            self._logger.error(
+                "unable to open inward facing router socket %s", e.__repr__()
+            )
 
         self.accept_task = asyncio.create_task(self.accept_workers())
         self.accept_task.add_done_callback(done_callback)
@@ -107,7 +113,9 @@ class Ingester(DistributedService):
         self._logger.info("all subtasks running")
         await self.register()
 
-    async def restart_work(self, new_uuid: UUID4) -> None:
+    async def restart_work(
+        self, new_uuid: UUID4, active_streams: list[StreamName]
+    ) -> None:
         """
         Restarts all work related tasks to make sure no old state is present in a new scan.
 
@@ -117,6 +125,7 @@ class Ingester(DistributedService):
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.assign_task)
         self.state.mapping_uuid = new_uuid
+        self.active_streams = list(set(active_streams).intersection(self.state.streams))
         self.assignment_queue = asyncio.Queue()
         self.work_task = asyncio.create_task(self.work())
         self.work_task.add_done_callback(done_callback)
@@ -162,7 +171,7 @@ class Ingester(DistributedService):
             for assignment in assignment_evs:
                 was = WorkAssignmentList.validate_json(assignment[1]["data"])
                 for wa in was:
-                    mywa = wa.get_workers_for_streams(self.state.streams)
+                    mywa = wa.get_workers_for_streams(self.active_streams)
                     if len(mywa.assignments) > 0:
                         await self.assignment_queue.put(mywa)
                 lastev = assignment[0]
@@ -194,23 +203,26 @@ class Ingester(DistributedService):
         ],
         swtriggen: Iterator[dict[StreamName, StreamData]] | None,
     ) -> dict[StreamName, StreamData]:
-        zmqyields: list[Awaitable[StreamData]] = []
+        zmqyields: list[Awaitable[StreamData | IsSoftwareTriggered]] = []
         streams: list[StreamName] = []
         for stream in work_assignment.assignments:
             zmqyields.append(anext(sourcegens[stream]))
             streams.append(stream)
         try:
-            zmqstreams: list[StreamData] = await asyncio.gather(*zmqyields)
+            zmqstreams: list[StreamData | IsSoftwareTriggered] = await asyncio.gather(
+                *zmqyields
+            )
         except StopAsyncIteration:
             self._logger.warning("stream source stopped before end")
             raise asyncio.exceptions.CancelledError()
-        zmqparts: dict[StreamName, StreamData] = {
+        zmqparts: dict[StreamName, StreamData | IsSoftwareTriggered] = {
             stream: zmqpart for stream, zmqpart in zip(streams, zmqstreams)
         }
         self._logger.debug("stream triggered zmqparts %s", zmqparts)
         if swtriggen is not None:
             swparts = next(swtriggen)
             zmqparts.update(swparts)
+            # that has to overwrite all IsSoftwareTriggered instance
 
         return zmqparts
 
@@ -223,7 +235,10 @@ class Ingester(DistributedService):
         Optionally the worker dumps the internal messages to disk. This is useful to develop workers with actual data captured.
         """
         self._logger.info("started ingester work task")
-        sourcegens = {stream: self.run_source(stream) for stream in self.state.streams}
+        sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
+        if len(sourcegens) == 0:
+            self._logger.warning("this ingester has no active streams, stopping worker")
+            return
         swtriggen: Iterator[dict[StreamName, StreamData]] | None = None
         if hasattr(self, "software_trigger"):
             swtriggen = self.software_trigger()
@@ -297,7 +312,7 @@ class Ingester(DistributedService):
                 self.state.processed_events += 1
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
-            for stream in self.state.streams:
+            for stream in self.active_streams:
                 await self.stop_source(stream)
             if self.dump_file:
                 self._logger.info(
@@ -306,7 +321,9 @@ class Ingester(DistributedService):
                 self.dump_file.close()
                 self.dump_file = None
 
-    async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
+    async def run_source(
+        self, stream: StreamName
+    ) -> AsyncGenerator[StreamData | IsSoftwareTriggered, None]:
         """
         This generator must be implemented by the customised subclass. It should return exactly one `StreamData` object
         for every frame arriving from upstream.
@@ -331,7 +348,14 @@ class Ingester(DistributedService):
         poller = zmq.asyncio.Poller()
         poller.register(self.out_socket, zmq.POLLIN)
         while True:
-            socks = dict(await poller.poll())
+            socks = dict(await poller.poll(timeout=1))
+            # clean up old workers
+            now = time.time()
+            self.state.connected_workers = {
+                uuid: cw
+                for uuid, cw in self.state.connected_workers.items()
+                if now - cw.last_seen < 4
+            }
             for sock in socks:
                 data = await sock.recv_multipart()
                 connected_worker = ConnectedWorker(
@@ -343,12 +367,6 @@ class Ingester(DistributedService):
                 self.state.connected_workers[
                     connected_worker.service_uuid
                 ] = connected_worker
-                now = time.time()
-                self.state.connected_workers = {
-                    uuid: cw
-                    for uuid, cw in self.state.connected_workers.items()
-                    if now - cw.last_seen < 3
-                }
                 self._logger.debug("worker pinnged %s", connected_worker)
                 if fast_publish:
                     self._logger.debug("fast publish")
