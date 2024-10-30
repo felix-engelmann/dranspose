@@ -13,6 +13,72 @@ import h5pyd
 
 
 @pytest.mark.asyncio
+async def test_mapping() -> None:
+    app = FastAPI()
+
+    app.include_router(router, prefix="/results")
+
+    def get_data() -> dict[str, Any]:
+        return {
+            "map": {
+                "x": [
+                    np.float64(-14.96431272),
+                    np.float64(-14.76401095),
+                    np.float64(-14.56276384),
+                    np.float64(-14.361908),
+                    np.float64(-14.16112703),
+                ],
+                "y": [
+                    np.float64(-10.00637736),
+                    np.float64(-10.00502708),
+                    np.float64(-10.00403313),
+                    np.float64(-10.00349819),
+                    np.float64(-10.00320074),
+                ],
+                "values": [
+                    np.float32(0.6831444),
+                    np.float32(0.0),
+                    np.float32(0.039953336),
+                    np.float32(0.14946304),
+                    np.float32(0.0),
+                ],
+            },
+            "control": {},
+            "azint": {"data": []},
+        }
+
+    app.state.get_data = get_data
+
+    config = uvicorn.Config(app, port=5000, log_level="debug")
+    server = uvicorn.Server(config)
+    server_task = asyncio.create_task(server.serve())
+    while server.started is False:
+        await asyncio.sleep(0.1)
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/results")
+        data = await st.json()
+        logging.info("content %s", data)
+
+    def work() -> None:
+        f = h5pyd.File("/", "r", endpoint="http://localhost:5000/results")
+        logging.info("file %s", list(f.keys()))
+        logging.info("typ %s", f["map"])
+        logging.info("comp %s", f["map/values"])
+        logging.info("comp data %s", f["map/values"][:])
+        assert f["map/values"].dtype == np.float32
+        assert f["map/x"].dtype == np.float64
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work)
+
+    server.should_exit = True
+    await server_task
+
+    await asyncio.sleep(0.5)
+
+
+@pytest.mark.asyncio
 async def test_root() -> None:
     app = FastAPI()
 

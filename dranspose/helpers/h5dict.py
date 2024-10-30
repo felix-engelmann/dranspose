@@ -230,24 +230,26 @@ def values(
     logger.debug("return value for obj %s", obj)
     logger.debug("selection %s", select)
 
-    slices = []
-    if select is not None:
-        dims = select[1:-1].split(",")
-        slices = [slice(*map(int, dim.split(":"))) for dim in dims]
+    if type(obj) in [int, float, str]:
+        return {"value": obj}
 
-    logger.debug("slices %s", slices)
-    ret = obj
-    if len(slices) == 1:
-        ret = ret[slices[0]]
-    elif len(slices) > 1:
-        ret = ret[*slices]
+    elif isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], str):
+        return {"value": obj}
+    else:
+        ret = np.array(obj)
+        slices = []
+        if select is not None:
+            dims = select[1:-1].split(",")
+            slices = [slice(*map(int, dim.split(":"))) for dim in dims]
 
-    if type(ret) is np.ndarray:
-        by = ret.tobytes()
-        return Response(content=by, media_type="application/octet-stream")
+        logger.debug("slices %s", slices)
 
-    logger.debug("return value %s of type %s", ret, type(ret))
-    return {"value": ret}
+        if len(slices) == 1:
+            ret = ret[slices[0]]
+        elif len(slices) > 1:
+            ret = ret[*slices]
+
+        return Response(content=ret.tobytes(), media_type="application/octet-stream")
 
 
 @router.get("/datasets/{uuid}")
@@ -368,6 +370,29 @@ def get_data() -> dict[str, Any]:
 
     changing = np.ones((5, int(time.time()) % 10 + 5))
     return {
+        "map": {
+            "x": [
+                np.float64(-14.96431272),
+                np.float64(-14.76401095),
+                np.float64(-14.56276384),
+                np.float64(-14.361908),
+                np.float64(-14.16112703),
+            ],
+            "y": [
+                np.float64(-10.00637736),
+                np.float64(-10.00502708),
+                np.float64(-10.00403313),
+                np.float64(-10.00349819),
+                np.float64(-10.00320074),
+            ],
+            "values": [
+                np.float32(0.6831444),
+                np.float32(0.0),
+                np.float32(0.039953336),
+                np.float32(0.14946304),
+                np.float32(0.0),
+            ],
+        },
         "live": 34,
         "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
         "other_attrs": {"NX_class": "NXother"},
