@@ -14,6 +14,10 @@ from dranspose.ingesters.zmqpull_eiger_legacy import (  # noqa: F401
     ZmqPullEigerLegacyIngester,
     ZmqPullEigerLegacySettings,
 )
+from dranspose.ingesters.zmqsub_pcap import (  # noqa: F401
+    ZmqSubPCAPIngester,
+    ZmqSubPCAPSettings,
+)
 from dranspose.ingesters.zmqsub_contrast import (  # noqa: F401
     ZmqSubContrastIngester,
     ZmqSubContrastSettings,
