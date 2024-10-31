@@ -28,7 +28,7 @@ class PositioncapParser:
         Returns:
             a position capture
         """
-        assert data.typ == "PCAP"
+        assert data.typ == "PCAP_RAW"
         assert data.length == 1
         frame = data.frames[0]
         if isinstance(frame, zmq.Frame):

@@ -1,12 +1,19 @@
 from typing import Literal
 from datetime import datetime
 
+import zmq
 from pydantic import BaseModel, TypeAdapter, ConfigDict
+
+from dranspose.event import StreamData
 
 
 class PCAPBase(BaseModel):
     message_id: int
     version: Literal[1]
+
+    def to_stream_data(self) -> StreamData:
+        dat = self.model_dump_json()
+        return StreamData(typ="PCAP", frames=[zmq.Frame(dat)])
 
 
 class PCAPStart(PCAPBase):

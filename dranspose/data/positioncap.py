@@ -37,7 +37,7 @@ fields:
         for field in fields:
             where = field.name.split(".")[-1]
             data += f" {field.name[:-len(where)-1]} {field.type} {where}\n"
-        return StreamData(typ="PCAP", frames=[zmq.Frame(data.encode())])
+        return StreamData(typ="PCAP_RAW", frames=[zmq.Frame(data.encode())])
 
 
 class PositionCapValues(BaseModel):
@@ -45,18 +45,18 @@ class PositionCapValues(BaseModel):
 
     def to_stream_data(self) -> StreamData:
         data = " " + " ".join(map(lambda f: str(f.value), self.fields.values())) + "\n"
-        return StreamData(typ="PCAP", frames=[zmq.Frame(data.encode())])
+        return StreamData(typ="PCAP_RAW", frames=[zmq.Frame(data.encode())])
 
 
 class PositionCapEnd(BaseModel):
     def to_stream_data(self) -> StreamData:
         data = "END 0 Disarmed\n"
-        return StreamData(typ="PCAP", frames=[zmq.Frame(data.encode())])
+        return StreamData(typ="PCAP_RAW", frames=[zmq.Frame(data.encode())])
 
 
 PositionCapPacketType = PositionCapStart | PositionCapValues | PositionCapEnd
 
 PositionCapPacket = TypeAdapter(PositionCapStart | PositionCapValues | PositionCapEnd)
 """
-A union type for PCAP packets
+A union type for PCAP_RAW packets
 """

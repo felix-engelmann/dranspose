@@ -57,7 +57,7 @@ class TcpPcapIngester(Ingester):
                             break
                     self._logger.info("use header %s", header)
                     frame = zmq.Frame(b"".join(header))
-                    yield StreamData(typ="PCAP", frames=[frame])
+                    yield StreamData(typ="PCAP_RAW", frames=[frame])
                     break
             if stop:
                 break
@@ -65,7 +65,7 @@ class TcpPcapIngester(Ingester):
                 line = await reader.readline()
                 self._logger.debug("send frame %s", line)
                 frame = zmq.Frame(line)
-                yield StreamData(typ="PCAP", frames=[frame])
+                yield StreamData(typ="PCAP_RAW", frames=[frame])
                 if line.startswith(b"END"):
                     break
 
