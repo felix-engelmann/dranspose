@@ -92,6 +92,19 @@ async def test_params(
         assert resp.status == 200
         assert await resp.content.read() == b"asdasd"
 
+        large = b"asd" * 1000
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/large",
+            data=large,
+        )
+        assert resp.status == 200
+
+        resp = await session.get(
+            "http://localhost:5000/api/v1/parameter/large",
+        )
+        assert resp.status == 200
+        assert await resp.content.read() == large
+
         resp = await session.get(
             "http://localhost:5000/api/v1/parameter/nonexistant",
         )

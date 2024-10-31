@@ -719,7 +719,7 @@ async def set_sardana_hook(
 @app.post("/api/v1/parameter/{name}")
 async def post_param(request: Request, name: ParameterName) -> HashDigest:
     data = await request.body()
-    logger.info("got %s: %s", name, data)
+    logger.info("got %s: %s (len %d)", name, data[:100], len(data))
     u = await ctrl.set_param(name, data)
     return u
 

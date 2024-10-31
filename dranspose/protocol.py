@@ -4,14 +4,7 @@ import uuid
 from enum import Enum
 from typing import NewType, Literal, Annotated, Optional, TypeAlias
 
-from pydantic import (
-    UUID4,
-    BaseModel,
-    validate_call,
-    UrlConstraints,
-    Field,
-    TypeAdapter,
-)
+from pydantic import UUID4, BaseModel, validate_call, UrlConstraints, Field, TypeAdapter
 
 from uuid import uuid4
 from functools import cache, cached_property
@@ -138,6 +131,32 @@ class WorkParameter(BaseModel):
     data: bytes
     value: Optional[int | str | bytes | float | bool] = None
     uuid: UUID4 = Field(default_factory=uuid4)
+
+    def __repr_args__(self):
+        args = super().__repr_args__()
+        new_args = []
+        for name, val in args:
+            new_val = val
+            if name == "data" and len(val) > 100:
+                new_val = (
+                    val[:50]
+                    + f"... (total length {len(val)} bytes) ...".encode()
+                    + val[-50:]
+                )
+            if name == "value" and isinstance(val, str):
+                new_val = (
+                    val[:50]
+                    + f"... (total length {len(val)} characters) ..."
+                    + val[-50:]
+                )
+            if name == "value" and isinstance(val, bytes):
+                new_val = (
+                    val[:50]
+                    + f"... (total length {len(val)} bytes) ...".encode()
+                    + val[-50:]
+                )
+            new_args.append((name, new_val))
+        return new_args
 
 
 class WorkAssignment(BaseModel):
