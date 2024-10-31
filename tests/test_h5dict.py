@@ -93,6 +93,8 @@ async def test_root() -> None:
             "live": 34,
             "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
             "other_attrs": {"NX_class": "NXother"},
+            "spaced group": {"space ds": 4, "space ds_attrs": {"bla": 5}},
+            "spaced group_attrs": {"spaced attr": 3},
             "image": np.ones((1000, 1000)),
             "specialtyp": np.ones((10, 10), dtype=">u8"),
             "specialtyp_attrs": {"NXdata": "NXspecial"},
@@ -121,6 +123,11 @@ async def test_root() -> None:
         logging.info("typ %s", f["specialtyp"])
         logging.info("comp %s", f["composite"])
         logging.info("comp data %s", f["composite"][:])
+        logging.info("spaces %s", list(f["spaced group"].keys()))
+        assert list(f["spaced group"].keys()) == ["space ds"]
+        assert f["spaced group"].attrs["spaced attr"] == 3
+        assert f["spaced group/space ds"][()] == 4
+        assert f["spaced group/space ds"].attrs["bla"] == 5
         assert f["specialtyp"].dtype == ">u8"
         assert f["specialtyp"].attrs["NXdata"] == "NXspecial"
         assert f["other"].attrs["NX_class"] == "NXother"
