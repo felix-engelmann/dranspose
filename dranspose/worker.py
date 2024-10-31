@@ -441,7 +441,13 @@ class Worker(DistributedService):
             configs = await self.redis.keys(RedisKeys.config("ingester"))
             processed = []
             for key in configs:
-                cfg = IngesterState.model_validate_json(await self.redis.get(key))
+                raw_config = await self.redis.get(key)
+                if raw_config is None:
+                    logging.warning(
+                        "ingester config key %s disappeard while updating", key
+                    )
+                    continue
+                cfg = IngesterState.model_validate_json(raw_config)
                 iname = cfg.name
                 processed.append(iname)
                 if iname in self._ingesters:
