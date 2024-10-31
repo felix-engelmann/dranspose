@@ -52,7 +52,8 @@ class PositioncapParser:
         elif val.startswith("END"):
             return PositionCapEnd()
         else:
-            assert self.arm_time is not None, "pcap parser never got arm message"
+            if self.arm_time is None:
+                raise Exception("unable to parse data, never got arm message")
             parts = val.strip().split(" ")
             ret = PositionCapValues()
             for f, v in zip(self.fields, parts):
