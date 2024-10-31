@@ -14,6 +14,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import TypeAdapter
 from pydantic_core import Url
+from starlette.requests import Request
 from starlette.responses import Response
 
 from dranspose.helpers import utils
@@ -87,6 +88,27 @@ async def get_path(path: str) -> Any:
         raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
 
 
+@reducer_app.post("/api/v1/parameter/{name}")
+async def post_param(request: Request, name: ParameterName) -> HashDigest:
+    data = await request.body()
+    logger.info("got %s: %s (len %d)", name, data[:100], len(data))
+    param = WorkParameter(name=name, data=data)
+    if name in reducer_app.state.param_description:
+        param_desc = reducer_app.state.param_description[name]
+        param.value = param_desc.from_bytes(data)
+    reducer_app.state.parameters[name] = param
+    return HashDigest("")
+
+
+@reducer_app.get("/api/v1/parameter/{name}")
+async def get_param(name: ParameterName) -> Response:
+    if name not in reducer_app.state.parameters:
+        raise HTTPException(status_code=404, detail="Parameter not found")
+
+    data = reducer_app.state.parameters[name].data
+    return Response(data, media_type="application/x.bytes")
+
+
 class Server(uvicorn.Server):
     def install_signal_handlers(self) -> None:
         pass
@@ -146,6 +168,7 @@ def get_parameters(
                 data=param_description[p].to_bytes(param_description[p].default),
             )
 
+    reducer_app.state.param_description = param_description
     logger.info("final params are %s", parameters)
     return parameters
 
@@ -240,19 +263,23 @@ def replay(
     reducercls = utils.import_class(rclass)
     logger.info("custom reducer class %s", reducercls)
 
-    parameters = get_parameters(parameter_file, workercls, reducercls)
+    reducer_app.state.parameters = get_parameters(parameter_file, workercls, reducercls)
 
-    logger.info("use parameters %s", parameters)
+    logger.info("use parameters %s", reducer_app.state.parameters)
 
     global reducer
     workers = []
     for wi in range(nworkers):
         wstate = WorkerState(name=WorkerName(f"replay-worker-{wi}"))
-        wobj = workercls(parameters=parameters, context={}, state=wstate)
+        wobj = workercls(
+            parameters=reducer_app.state.parameters, context={}, state=wstate
+        )
         workers.append(wobj)
 
     rstate = ReducerState(url=Url("tcp://localhost:10200"))
-    reducer = reducercls(parameters=parameters, context={}, state=rstate)
+    reducer = reducercls(
+        parameters=reducer_app.state.parameters, context={}, state=rstate
+    )
 
     logger.info("created workers %s", workers)
     threading.Thread(target=timer, daemon=True, args=(reducer,)).start()
@@ -294,16 +321,23 @@ def replay(
                     tick = False
                     if hasattr(workers[wi], "get_tick_interval"):
                         interval_s = workers[wi].get_tick_interval(
-                            parameters=parameters
+                            parameters=reducer_app.state.parameters
                         )
                         if last_tick + interval_s < time.time():
                             tick = True
                             last_tick = time.time()
-                    _work_event(workers[wi], wi, reducer, event, parameters, tick)
+                    _work_event(
+                        workers[wi],
+                        wi,
+                        reducer,
+                        event,
+                        reducer_app.state.parameters,
+                        tick,
+                    )
 
             except StopIteration:
                 logger.debug("end of replay, calling finish")
-                _finish(workers, reducer, parameters)
+                _finish(workers, reducer, reducer_app.state.parameters)
                 break
         if done_event is not None:
             done_event.set()

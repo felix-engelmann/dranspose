@@ -143,13 +143,13 @@ class WorkParameter(BaseModel):
                     + f"... (total length {len(val)} bytes) ...".encode()
                     + val[-50:]
                 )
-            if name == "value" and isinstance(val, str):
+            if name == "value" and isinstance(val, str) and len(val) > 100:
                 new_val = (
                     val[:50]
                     + f"... (total length {len(val)} characters) ..."
                     + val[-50:]
                 )
-            if name == "value" and isinstance(val, bytes):
+            if name == "value" and isinstance(val, bytes) and len(val) > 100:
                 new_val = (
                     val[:50]
                     + f"... (total length {len(val)} bytes) ...".encode()
