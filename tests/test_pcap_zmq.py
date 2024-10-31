@@ -23,7 +23,7 @@ from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.asyncio
-async def test_albaem(
+async def test_pcap(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
