@@ -190,7 +190,7 @@ def _work_event(
     parameters: dict[ParameterName, WorkParameter],
     tick: bool,
 ) -> None:
-    data = worker.process_event(event, parameters=parameters, tick=tick)
+    data = worker.process_event(event, parameters, tick)
     if data is None:
         return
     rd = ResultData(
@@ -208,7 +208,7 @@ def _work_event(
     prelim["payload"] = pickle.loads(body)
     result = ResultData.model_validate(prelim)
 
-    reducer.process_result(result, parameters=parameters)
+    reducer.process_result(result, parameters)
 
 
 def _finish(
