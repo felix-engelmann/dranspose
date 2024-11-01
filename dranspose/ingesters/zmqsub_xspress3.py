@@ -1,3 +1,4 @@
+import logging
 from typing import AsyncGenerator, Optional
 
 import zmq
@@ -63,9 +64,13 @@ class ZmqSubXspressIngester(Ingester):
                 self._logger.error("packet parsable valid %s", e.__repr__())
                 continue
             if type(packet) is XspressImage:
-                image = await self.in_socket.recv_multipart(copy=False)
-                meta = await self.in_socket.recv_multipart(copy=False)
-                yield StreamData(typ="xspress", frames=parts + image + meta)
+                if len(parts) == 3:
+                    logging.debug("this is the new multipart format %d", len(parts))
+                    yield StreamData(typ="xspress", frames=parts)
+                else:
+                    image = await self.in_socket.recv_multipart(copy=False)
+                    meta = await self.in_socket.recv_multipart(copy=False)
+                    yield StreamData(typ="xspress", frames=parts + image + meta)
             elif type(packet) is XspressEnd:
                 yield StreamData(typ="xspress", frames=parts)
                 break
