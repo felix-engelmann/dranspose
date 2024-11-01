@@ -247,6 +247,7 @@ def replay(
     nworkers: int = 2,
     broadcast_first: bool = True,
     done_event: threading.Event | None = None,
+    latency: float | None = None,
 ) -> None:
     if source is not None:
         sourcecls = utils.import_class(source)
@@ -317,7 +318,7 @@ def replay(
                     first = False
 
                 for wi in dst_worker_ids:
-                    logger.info("spread to wi %d", wi)
+                    logger.info("ev %d spread to wi %d", event.event_number, wi)
                     tick = False
                     if hasattr(workers[wi], "get_tick_interval"):
                         interval_s = workers[wi].get_tick_interval(
@@ -334,7 +335,8 @@ def replay(
                         reducer_app.state.parameters,
                         tick,
                     )
-
+                if latency is not None:
+                    time.sleep(latency)
             except StopIteration:
                 logger.debug("end of replay, calling finish")
                 _finish(workers, reducer, reducer_app.state.parameters)
