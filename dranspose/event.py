@@ -1,10 +1,11 @@
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import zmq
 from cbor2 import CBORTag, CBOREncoder, CBORDecoder
 
 from dranspose.protocol import EventNumber, StreamName, WorkerName, HashDigest
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field, Field
 
 
 class StreamData(BaseModel):
@@ -58,6 +59,7 @@ class InternalWorkerMessage(BaseModel):
 
     event_number: EventNumber
     streams: dict[StreamName, StreamData] = {}
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def get_all_frames(self) -> list[zmq.Frame | bytes]:
         return [frame for stream in self.streams.values() for frame in stream.frames]
@@ -66,7 +68,9 @@ class InternalWorkerMessage(BaseModel):
 def message_encoder(encoder: CBOREncoder, value: Any) -> None:
     # Tag number 4000 was chosen arbitrarily
     if isinstance(value, InternalWorkerMessage):
-        encoder.encode(CBORTag(42877, (value.event_number, value.streams)))
+        encoder.encode(
+            CBORTag(42877, (value.event_number, value.streams, value.created_at))
+        )
     elif isinstance(value, StreamData):
         encoder.encode(CBORTag(42878, (value.typ, value.frames)))
     else:
@@ -77,6 +81,10 @@ def message_tag_hook(
     decoder: CBORDecoder, tag: CBORTag, shareable_index: Any = None
 ) -> Any:
     if tag.tag == 42877:
+        if len(tag.value) == 3:
+            return InternalWorkerMessage(
+                event_number=tag.value[0], streams=tag.value[1], created_at=tag.value[2]
+            )
         return InternalWorkerMessage(event_number=tag.value[0], streams=tag.value[1])
     elif tag.tag == 42878:
         return StreamData(typ=tag.value[0], frames=tag.value[1])

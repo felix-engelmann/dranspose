@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
@@ -18,14 +19,11 @@ from dranspose.ingesters.zmqpull_single import (
 )
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
-
-import redis.asyncio as redis
 
 from dranspose.worker import Worker
 
@@ -86,8 +84,6 @@ async def test_dump(
             ),
         )
     )
-
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
@@ -158,15 +154,6 @@ async def test_dump(
         assert resp.status == 200
         uuid = await resp.json()
 
-    print("uuid", uuid, type(uuid))
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:ready:{uuid}"}
-    print("presentkeys", present_keys)
-    assert present_keys - set(keys) == set()
-
     context = zmq.asyncio.Context()
 
     asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
@@ -182,6 +169,13 @@ async def test_dump(
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
+
     # read dump
     with open(p_eiger, "rb") as f:
         evs = []
@@ -190,11 +184,9 @@ async def test_dump(
                 dat = cbor2.load(f, tag_hook=message_tag_hook)
                 if isinstance(dat, InternalWorkerMessage):
                     evs.append(dat.event_number)
-                    print("loaded dump type", type(dat))
             except EOFError:
                 break
 
-    print(evs)
     assert evs == list(range(0, ntrig + 1))
 
     # read prefix dump
@@ -202,21 +194,19 @@ async def test_dump(
         evs = []
         while True:
             try:
+                before = datetime.now(timezone.utc)
                 dat = cbor2.load(f, tag_hook=message_tag_hook)
                 if isinstance(dat, InternalWorkerMessage):
                     evs.append(dat.event_number)
-                    print("loaded dump type", type(dat))
+                    assert (
+                        dat.created_at < before
+                    ), "timestamp was not created when loading the data from file but read"
             except EOFError:
                 break
 
-    print(evs)
     assert evs == list(range(0, ntrig + 1))
 
     context.destroy()
-
-    await r.aclose()
-
-    print(content)
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
@@ -290,6 +280,10 @@ async def test_dump_xrd(
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
     context.destroy()
-
-    print(content)
