@@ -2,7 +2,7 @@ import datetime
 import time
 import uuid
 from enum import Enum
-from typing import NewType, Literal, Annotated, Optional, TypeAlias
+from typing import NewType, Literal, Annotated, Optional, TypeAlias, Iterable, Any
 
 from pydantic import UUID4, BaseModel, validate_call, UrlConstraints, Field, TypeAdapter
 
@@ -134,7 +134,7 @@ class WorkParameter(BaseModel):
     value: Optional[int | str | bytes | float | bool] = None
     uuid: UUID4 = Field(default_factory=uuid4)
 
-    def __repr_args__(self):
+    def __repr_args__(self) -> Iterable[tuple[str | None, Any]]:
         args = super().__repr_args__()
         new_args = []
         for name, val in args:

@@ -22,6 +22,9 @@ class NotYetAssigned(Exception):
     pass
 
 
+logger = logging.getLogger(__name__)
+
+
 class Map(BaseModel):
     mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]]
 
@@ -40,7 +43,7 @@ class Map(BaseModel):
         else:
             return 0
 
-    def items(self):
+    def items(self) -> Iterable[tuple[StreamName, list[Optional[list[VirtualWorker]]]]]:
         return self.mapping.items()
 
     def streams(self) -> set[StreamName]:
@@ -286,22 +289,27 @@ class MappingSequence:
             virt = map.assign_next(worker, all_workers, completed, horizon)
             if len(virt) > 0:
                 self.complete_events = map.complete_events + map.start_event
-                logging.info("assigned to %s in map %s", virt, map)
+                logger.debug("assigned to %s in map %s", virt, map)
                 return virt
+        update_completed = True
         while len(virt) == 0 and len(self.active_maps) < len(self.sequence):
             last_map = self.active_maps[-1]
             next_map = ActiveMap(
-                start_event=last_map.start_event + last_map.no_events(),
+                start_event=EventNumber(last_map.start_event + last_map.no_events()),
                 mapping=self.parts[self.sequence[len(self.active_maps)]].mapping,
             )
-            logging.info("start new active map %s", next_map)
+            logger.info("start new active map %s", next_map)
             self.active_maps.append(next_map)
             virt = next_map.assign_next(worker, all_workers, completed, horizon)
+            if last_map.complete_events == last_map.no_events() and update_completed:
+                self.complete_events = next_map.complete_events + next_map.start_event
+                update_completed = False
+        logger.debug("assigned to %s", virt)
+
         return virt
 
     def get_event_workers(self, no: EventNumber) -> WorkAssignment:
         am = None
-        logging.info("get event workers for %d", no)
         if no > self.active_maps[-1].start_event + self.active_maps[-1].no_events():
             raise NotYetAssigned()
         for map in reversed(self.active_maps):
@@ -310,18 +318,21 @@ class MappingSequence:
                 break
         if am is None:
             raise NotYetAssigned()
-        wa = am.get_event_workers(no - am.start_event)
+        wa = am.get_event_workers(EventNumber(no - am.start_event))
         wa.event_number = no
+        logger.debug("got event workers for %d: %s", no, wa)
         return wa
 
-    def print(self):
+    def print(self) -> None:
         print("currently active:", len(self.active_maps))
         for am in self.active_maps:
             print("Starting at event", am.start_event)
             am.print()
 
-    def expand(self):
-        self.mapping = {s: [] for s in self.all_streams}
+    def expand(self) -> None:
+        self.mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]] = {
+            s: [] for s in self.all_streams
+        }
         for seq in self.sequence:
             part = self.parts[seq]
             padding_len = 0
@@ -331,7 +342,7 @@ class MappingSequence:
             for stream in self.all_streams - set(part.streams()):
                 self.mapping[stream] += [None] * padding_len
 
-    def min_workers(self):
+    def min_workers(self) -> int:
         return max([p.min_workers() for p in self.parts.values()])
 
 

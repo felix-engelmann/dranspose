@@ -151,7 +151,7 @@ def test_none() -> None:
                 ]
             },
         },
-        sequence=["main", "main", "end"],
+        sequence=[MappingName("main"), MappingName("main"), MappingName("end")],
         add_start_end=False,
     )
 
@@ -170,7 +170,7 @@ def test_none() -> None:
 
     logging.info("assign last one to have ev 8")
     ret = m.assign_next(all_workers[0], all_workers)
-    assert ret == [VirtualWorker(constraint=0)]
+    assert ret == [VirtualWorker(constraint=VirtualConstraint(0))]
     logging.info("assigned last worker to %s", ret)
 
     m.print()
@@ -184,7 +184,7 @@ def test_discard() -> None:
         parts={
             MappingName("main"): {StreamName("test"): [[] for i in range(ntrig // 2)]}
         },
-        sequence=["main", "main"],
+        sequence=[MappingName("main"), MappingName("main")],
         add_start_end=False,
     )
 
@@ -324,7 +324,7 @@ def test_auto() -> None:
                 ]
             },
         },
-        sequence=["main", "main", "end"],
+        sequence=[MappingName("main"), MappingName("main"), MappingName("end")],
     )
 
     m.print()
@@ -363,7 +363,7 @@ def test_all() -> None:
                 ]
             },
         },
-        sequence=["main", "main", "end"],
+        sequence=[MappingName("main"), MappingName("main"), MappingName("end")],
         add_start_end=False,
     )
 
@@ -433,7 +433,7 @@ def test_multi_all() -> None:
                 ],
             },
         },
-        sequence=["main", "main", "end"],
+        sequence=[MappingName("main"), MappingName("main"), MappingName("end")],
         add_start_end=False,
     )
 
@@ -481,7 +481,7 @@ def test_multiple() -> None:
                 ],
             }
         },
-        sequence=["main", "main"],
+        sequence=[MappingName("main"), MappingName("main")],
         add_start_end=False,
     )
     m.print()
@@ -530,7 +530,7 @@ def test_mixed_all() -> None:
                 StreamName("announcer"): [[VirtualWorker()] for i in range(1, 6)],
             }
         },
-        sequence=["main", "main"],
+        sequence=[MappingName("main"), MappingName("main")],
         add_start_end=False,
     )
     m.print()
@@ -594,7 +594,7 @@ def test_all_wrap_tags() -> None:
                 ],
             },
         },
-        sequence=["main", "main", "end"],
+        sequence=[MappingName("main"), MappingName("main"), MappingName("end")],
         add_start_end=True,
     )
     print("before assignment")

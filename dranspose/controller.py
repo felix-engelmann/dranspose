@@ -18,7 +18,7 @@ from starlette.responses import Response, FileResponse
 
 from dranspose.distributed import DistributedSettings
 from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
-from dranspose.mapping import Mapping
+from dranspose.mapping import Mapping, MappingSequence
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
 from importlib.metadata import version
@@ -58,6 +58,7 @@ from dranspose.protocol import (
     WorkAssignmentList,
     WorkAssignment,
     IngesterName,
+    MappingName,
 )
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,7 @@ class Controller:
         self.redis = redis.from_url(
             f"{self.settings.redis_dsn}?decode_responses=True&protocol=3"
         )
-        self.mapping = Mapping({})
+        self.mapping = MappingSequence(parts={}, sequence=[])
         self.mapping_update_lock = asyncio.Lock()
         self.parameters: dict[ParameterName, WorkParameter] = {}
         self.parameters_hash = parameters_hash(self.parameters)
@@ -201,7 +202,7 @@ class Controller:
             ret[wn] = WorkerLoad(last_event=last_event, intervals=itval)
         return ret
 
-    async def set_mapping(self, m: Mapping) -> None:
+    async def set_mapping(self, m: MappingSequence) -> None:
         async with self.mapping_update_lock:
             logger.debug("cancelling assign task")
             await cancel_and_wait(self.assign_task)
@@ -218,7 +219,7 @@ class Controller:
             cupd = ControllerUpdate(
                 mapping_uuid=self.mapping.uuid,
                 parameters_version={n: p.uuid for n, p in self.parameters.items()},
-                active_streams=list(m.mapping.keys()),
+                active_streams=list(m.all_streams),
             )
             logger.debug("send controller update %s", cupd)
             await self.redis.xadd(
@@ -605,7 +606,7 @@ async def get_status() -> dict[str, Any]:
     return {
         "work_completed": ctrl.completed,
         "last_assigned": ctrl.mapping.complete_events,
-        "assignment": ctrl.mapping.assignments,
+        "assignment": [am.assignments for am in ctrl.mapping.active_maps],
         "completed_events": ctrl.completed_events,
         "finished": await ctrl.completed_finish(),
         "processing_times": ctrl.worker_timing,
@@ -649,7 +650,12 @@ async def set_mapping(
             status_code=400,
             detail=f"streams {set(mapping.keys()) - set(config.get_streams())} not available",
         )
-    m = Mapping(mapping, add_start_end=all_wrap)
+    m = MappingSequence(
+        parts={MappingName("main"): mapping},
+        sequence=[MappingName("main")],
+        add_start_end=all_wrap,
+    )
+    # m = Mapping(mapping, add_start_end=all_wrap)
     if len(config.workers) < m.min_workers():
         logger.warning(
             "only %d workers available, but %d required",
@@ -711,9 +717,14 @@ async def set_sardana_hook(
         set(config.get_streams()).intersection(set(info["streams"])),
         info["scan"]["nb_points"],
     )
+    s = MappingSequence(
+        parts={MappingName("sardana"): m.mapping},
+        sequence=[MappingName("sardana")],
+        add_start_end=False,
+    )
     logger.debug("set mapping")
-    await ctrl.set_mapping(m)
-    return m.uuid
+    await ctrl.set_mapping(s)
+    return s.uuid
 
 
 @app.post("/api/v1/parameter/{name}")
