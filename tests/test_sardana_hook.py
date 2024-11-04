@@ -52,4 +52,28 @@ async def test_not_enough_workers(
         await resp.json()
 
         ma = await session.get("http://localhost:5000/api/v1/mapping")
-        print("generated mapping", await ma.json())
+        mapping = await ma.json()
+        print("generated mapping", mapping)
+        assert mapping == {
+            "parts": {
+                "sardana": {
+                    "mapping": {
+                        "orca": [
+                            [{"tags": ["generic"], "constraint": None}],
+                            [{"tags": ["generic"], "constraint": 0}],
+                            [{"tags": ["generic"], "constraint": 1}],
+                            [{"tags": ["generic"], "constraint": 2}],
+                            [{"tags": ["generic"], "constraint": 3}],
+                            [{"tags": ["generic"], "constraint": 4}],
+                            [{"tags": ["generic"], "constraint": 5}],
+                            [{"tags": ["generic"], "constraint": 6}],
+                            [{"tags": ["generic"], "constraint": 7}],
+                            [{"tags": ["generic"], "constraint": 8}],
+                            [{"tags": ["generic"], "constraint": 9}],
+                            [{"tags": ["generic"], "constraint": None}],
+                        ]
+                    }
+                }
+            },
+            "sequence": ["sardana"],
+        }

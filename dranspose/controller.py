@@ -671,9 +671,46 @@ async def set_mapping(
 
 
 @app.get("/api/v1/mapping")
-async def get_mapping() -> dict[StreamName, list[Optional[list[VirtualWorker]]]]:
+async def get_mapping() -> dict[str, Any]:
     global ctrl
-    return ctrl.mapping.mapping
+    return {"parts": ctrl.mapping.parts, "sequence": ctrl.mapping.sequence}
+
+
+@app.post("/api/v1/sequence")
+async def set_sequence(
+    parts: dict[MappingName, dict[StreamName, list[Optional[list[VirtualWorker]]]]],
+    sequence: list[MappingName],
+    all_wrap: bool = True,
+) -> UUID4 | str:
+    global ctrl
+    config = await ctrl.get_configs()
+    m = MappingSequence(
+        parts=parts,
+        sequence=sequence,
+        add_start_end=all_wrap,
+    )
+    if m.all_streams - set(config.get_streams()) != set():
+        logger.warning(
+            "bad request streams %s not available",
+            m.all_streams - set(config.get_streams()),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"streams {m.all_streams - set(config.get_streams())} not available",
+        )
+
+    if len(config.workers) < m.min_workers():
+        logger.warning(
+            "only %d workers available, but %d required",
+            len(config.workers),
+            m.min_workers(),
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"only {len(config.workers)} workers available, but {m.min_workers()} required",
+        )
+    await ctrl.set_mapping(m)
+    return m.uuid
 
 
 @app.post("/api/v1/stop")
