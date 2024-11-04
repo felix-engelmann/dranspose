@@ -100,6 +100,10 @@ async def test_simple(
                     msg.append(f"{k.name}:{k.processed_events} -- {k.event_rate}")
             logging.info("config is \n%s", "\n".join(msg))
 
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
     context.destroy()
-
-    print(content)

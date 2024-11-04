@@ -258,7 +258,6 @@ async def reducer(
         envfile = None
         if custom:
             p = tmp_path / "reducer.env"
-            print(p, type(p))
             p.write_text(
                 f"""
                 REDUCER_CLASS="{custom}"
@@ -298,7 +297,6 @@ async def http_ingester(
         envfile = None
         if env:
             p = tmp_path / "http_ingester.env"
-            print(p, type(p))
             p.write_text(
                 "\n".join(
                     [
@@ -341,7 +339,6 @@ async def debug_worker(
         envfile = None
         if tags:
             p = tmp_path / "debugworker.env"
-            print(p, type(p))
             text = f"""
                 WORKER_TAGS='{json.dumps(tags)}'
                 """
