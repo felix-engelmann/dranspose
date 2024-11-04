@@ -54,7 +54,7 @@ async def test_reduction(
         )
     )
     p_contrast = tmp_path / "contrast_ingest.pkls"
-    print(p_contrast)
+
     await create_ingester(
         ZmqSubContrastIngester(
             settings=ZmqSubContrastSettings(

@@ -110,4 +110,5 @@ async def test_slowreduce(
         content = await st.content.read()
         result = pickle.loads(content)[0]
         print("content", result)
+        assert result == {"map": {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}}
         assert len(result["map"].keys()) == ntrig + 1

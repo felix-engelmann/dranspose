@@ -22,6 +22,10 @@ class NotYetAssigned(Exception):
     pass
 
 
+class StillHasWork(Exception):
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -99,7 +103,7 @@ class ActiveMap(Map):
                 if worker.name in wa.get_all_workers():
                     still_has_work = True
         if still_has_work:
-            return assigned_to  # we will not assign the worker if it is assigned until the horizon
+            raise StillHasWork()  # we will not assign the worker if it is assigned until the horizon
         for evnint in range(self.complete_events, self.no_events()):
             evn = EventNumber(evnint)
             for stream, v in self.mapping.items():  # first fill the alls
@@ -286,11 +290,14 @@ class MappingSequence:
             if map.start_event + map.no_events() < self.complete_events:
                 # these maps are already complete
                 continue
-            virt = map.assign_next(worker, all_workers, completed, horizon)
-            if len(virt) > 0:
-                self.complete_events = map.complete_events + map.start_event
-                logger.debug("assigned to %s in map %s", virt, map)
-                return virt
+            try:
+                virt = map.assign_next(worker, all_workers, completed, horizon)
+                if len(virt) > 0:
+                    self.complete_events = map.complete_events + map.start_event
+                    logger.debug("assigned to %s in map %s", virt, map)
+                    return virt
+            except StillHasWork:
+                return []
         update_completed = True
         while len(virt) == 0 and len(self.active_maps) < len(self.sequence):
             last_map = self.active_maps[-1]
@@ -298,9 +305,16 @@ class MappingSequence:
                 start_event=EventNumber(last_map.start_event + last_map.no_events()),
                 mapping=self.parts[self.sequence[len(self.active_maps)]].mapping,
             )
-            logger.info("start new active map %s", next_map)
+            logger.info(
+                "start new active map %s starting at %d",
+                self.sequence[len(self.active_maps)],
+                next_map.start_event,
+            )
             self.active_maps.append(next_map)
-            virt = next_map.assign_next(worker, all_workers, completed, horizon)
+            try:
+                virt = next_map.assign_next(worker, all_workers, completed, horizon)
+            except StillHasWork:
+                return []
             if last_map.complete_events == last_map.no_events() and update_completed:
                 self.complete_events = next_map.complete_events + next_map.start_event
                 update_completed = False

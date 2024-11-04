@@ -89,4 +89,9 @@ async def test_albaem(
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
-    print(content)
+        assert content == {
+            "last_assigned": 6,
+            "completed_events": 6,
+            "total_events": 6,
+            "finished": True,
+        }
