@@ -19,14 +19,11 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.middlewares.stream1 import parse
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
     WorkerTag,
 )
-
-import redis.asyncio as redis
 
 from dranspose.worker import Worker
 
@@ -52,8 +49,6 @@ async def test_simple(
         )
     )
 
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
@@ -77,14 +72,6 @@ async def test_simple(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
-
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:assigned:{uuid}"}
-    print("presentkeys", present_keys)
 
     context = zmq.asyncio.Context()
 
@@ -100,8 +87,6 @@ async def test_simple(
 
     context.destroy()
 
-    await r.aclose()
-
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5002/api/v1/last_events?number=20")
         content = await st.content.read()
@@ -114,4 +99,3 @@ async def test_simple(
             if isinstance(pkt, Stream1Data):
                 got_frames.append(pkt.frame)
     assert got_frames == list(range(0, 3)) + list(range(7, 9))
-    print(content)

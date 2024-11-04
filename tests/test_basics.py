@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
@@ -76,11 +77,25 @@ async def test_simple(
         uuid = await resp.json()
 
     updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
+    assert "dranspose:controller:updates" in updates
+    assert json.loads(updates["dranspose:controller:updates"][-1][-1][1]["data"]) == {
+        "mapping_uuid": uuid,
+        "parameters_version": {},
+        "target_parameters_hash": None,
+        "active_streams": ["eiger"],
+        "finished": False,
+    }
     keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:assigned:{uuid}"}
-    print("presentkeys", present_keys)
+    present_keys = {
+        "dranspose:controller:updates",
+        "dranspose:worker:w1:config",
+        f"dranspose:assigned:{uuid}",
+        f"dranspose:ready:{uuid}",
+        "dranspose:ingester:eiger-ingester:config",
+        "dranspose:controller_lock",
+        "dranspose:reducer:reducer:config",
+    }
+    assert present_keys.issubset(keys)
 
     context = zmq.asyncio.Context()
 
@@ -94,11 +109,15 @@ async def test_simple(
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
 
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
     context.destroy()
 
     await r.aclose()
-
-    print(content)
 
 
 @pytest.mark.asyncio
