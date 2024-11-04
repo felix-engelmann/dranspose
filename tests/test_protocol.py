@@ -21,17 +21,33 @@ def test_header_serialisation() -> None:
     )  #: {"frames"}})
 
     buffers = message.get_all_frames()
-    print([b.bytes if isinstance(b, zmq.Frame) else b for b in buffers])
-    print(dump)
+    assert [b"asd", b"lam1", b"lam2", b"lam3", b"alba"] == [
+        b.bytes if isinstance(b, zmq.Frame) else b for b in buffers
+    ]
+    assert (
+        dump[:148]
+        == '{"event_number":42,"streams":{"orca":{"typ":"STINS","length":1},"lambda":{"typ":"STINS","length":3},"alba":{"typ":"STINS","length":1}},"created_at":'
+    )
     prelim = json.loads(dump)
-    print("prelim", prelim)
+    assert prelim == {
+        "event_number": 42,
+        "streams": {
+            "orca": {"typ": "STINS", "length": 1},
+            "lambda": {"typ": "STINS", "length": 3},
+            "alba": {"typ": "STINS", "length": 1},
+        },
+        "created_at": prelim["created_at"],
+    }
     pos = 0
     for stream, data in prelim["streams"].items():
         print(stream, data)
         data["frames"] = buffers[pos : pos + data["length"]]
+        assert data["typ"] == "STINS"
         pos += data["length"]
+    assert pos == len(buffers)
     msg = InternalWorkerMessage.model_validate(prelim)
-    print(msg)
+    assert msg.event_number == 42
+
     albaframe = msg.streams[StreamName("alba")].frames[0]
     if isinstance(albaframe, zmq.Frame):
         albaframe = albaframe.bytes
@@ -52,10 +68,10 @@ def test_out_of_band_frames() -> None:
 
     dump = orca.model_dump_json(exclude={"frames"})
 
-    print(dump)
+    assert dump == '{"typ":"STINS","length":1}'
 
     prelim = json.loads(dump)
-    print("prelim", prelim)
+    assert prelim == {"typ": "STINS", "length": 1}
     prelim["frames"] = buffers
     sd = StreamData.model_validate(prelim)
-    print(sd)
+    assert sd.frames == buffers

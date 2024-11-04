@@ -75,6 +75,9 @@ async def test_sardana(
 
     context.destroy()
 
-    print(content)
-    assert content["completed_events"] == ntrig + 1
-    assert content["last_assigned"] == ntrig + 1
+    assert content == {
+        "last_assigned": ntrig + 1,
+        "completed_events": ntrig + 1,
+        "total_events": ntrig + 1,
+        "finished": True,
+    }

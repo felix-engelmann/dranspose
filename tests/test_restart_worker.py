@@ -15,14 +15,11 @@ from dranspose.ingesters.zmqpull_single import (
 )
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
-
-import redis.asyncio as redis
 
 from dranspose.worker import Worker
 
@@ -45,8 +42,6 @@ async def test_restart_worker(
             ),
         )
     )
-
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
@@ -71,14 +66,6 @@ async def test_restart_worker(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
-
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:assigned:{uuid}"}
-    print("presentkeys", present_keys)
 
     context = zmq.asyncio.Context()
 
@@ -91,6 +78,13 @@ async def test_restart_worker(
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
+
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
 
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
@@ -119,7 +113,3 @@ async def test_restart_worker(
             assert conn == wset
 
     context.destroy()
-
-    await r.aclose()
-
-    print(content)

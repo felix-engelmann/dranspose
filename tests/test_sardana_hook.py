@@ -53,7 +53,6 @@ async def test_not_enough_workers(
 
         ma = await session.get("http://localhost:5000/api/v1/mapping")
         mapping = await ma.json()
-        print("generated mapping", mapping)
         assert mapping == {
             "parts": {
                 "sardana": {
