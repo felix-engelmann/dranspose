@@ -29,8 +29,8 @@ def test_expand() -> None:
         sequence=[MappingName("main")],
         add_start_end=False,
     )
-    p.expand()
-    assert p.mapping == {
+    mapping = p.expand()
+    assert mapping == {
         StreamName("test"): [
             [VirtualWorker(constraint=VirtualConstraint(i))] for i in range(ntrig)
         ]
@@ -51,8 +51,8 @@ def test_expand_double() -> None:
         sequence=[MappingName("main"), MappingName("main")],
         add_start_end=False,
     )
-    p.expand()
-    assert p.mapping == {
+    mapping = p.expand()
+    assert mapping == {
         StreamName("test"): [
             [VirtualWorker(constraint=VirtualConstraint(i))] for i in range(ntrig)
         ]
@@ -84,8 +84,8 @@ def test_expand_double_streams() -> None:
         sequence=[MappingName("two"), MappingName("main")],
         add_start_end=False,
     )
-    p.expand()
-    assert p.mapping == {
+    mapping = p.expand()
+    assert mapping == {
         StreamName("test"): [None for i in range(ntrig)]
         + [[VirtualWorker(constraint=VirtualConstraint(i))] for i in range(ntrig)],
         StreamName("two"): [

@@ -329,18 +329,19 @@ class MappingSequence:
             print("Starting at event", am.start_event)
             am.print()
 
-    def expand(self) -> None:
-        self.mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]] = {
+    def expand(self) -> dict[StreamName, list[Optional[list[VirtualWorker]]]]:
+        mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]] = {
             s: [] for s in self.all_streams
         }
         for seq in self.sequence:
             part = self.parts[seq]
             padding_len = 0
             for stream, li in part.items():
-                self.mapping[stream] += li
+                mapping[stream] += li
                 padding_len = len(li)
             for stream in self.all_streams - set(part.streams()):
-                self.mapping[stream] += [None] * padding_len
+                mapping[stream] += [None] * padding_len
+        return mapping
 
     def min_workers(self) -> int:
         return max([p.min_workers() for p in self.parts.values()])
