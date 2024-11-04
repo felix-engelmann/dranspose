@@ -102,6 +102,12 @@ async def test_timestamps(
         st = await session.get("http://localhost:5001/api/v1/result/")
         content = await st.content.read()
         result = pickle.loads(content)[0]
-        print("content", result)
         assert len(result["fast"]) == ntrig - 1
+        for t in result["fast"]:
+            assert len(t) == 2
+            assert t[0] < t[1]
+            if t[1] > 0.1:
+                logging.warning(
+                    "the pipeline end to end latency is larger then 100ms: %s", t
+                )
         logging.info("content is %s", result)

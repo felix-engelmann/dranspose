@@ -1,8 +1,10 @@
 import asyncio
 import pickle
+from datetime import datetime, timezone, timedelta
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
+import numpy as np
 
 import pytest
 import zmq.asyncio
@@ -97,5 +99,16 @@ async def test_simple(
             pkt = parse(ev.streams[StreamName("eiger")])
             print(pkt)
             if isinstance(pkt, Stream1Data):
+                assert pkt.frame == ev.event_number - 1
+                assert pkt.shape == [1475, 831]
+                assert pkt.type == "uint16"
+                assert pkt.compression == "none"
+                assert "dummy" in pkt.timestamps
+                assert (
+                    datetime.now(timezone.utc) - timedelta(seconds=60)
+                    < datetime.fromisoformat(pkt.timestamps["dummy"])
+                    < datetime.now(timezone.utc)
+                )
+                assert pkt.data.dtype == np.uint16
                 got_frames.append(pkt.frame)
     assert got_frames == list(range(0, 3)) + list(range(7, 9))

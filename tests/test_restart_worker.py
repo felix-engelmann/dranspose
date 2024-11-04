@@ -97,7 +97,6 @@ async def test_restart_worker(
         wset = set()
         for w in state.workers:
             wset.add(w.service_uuid)
-        print("should", wset)
         for i in state.ingesters:
             conn = set(i.connected_workers.keys())
             assert conn == wset
