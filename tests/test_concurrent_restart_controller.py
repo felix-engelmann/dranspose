@@ -113,6 +113,8 @@ async def test_restart() -> None:
     params = await r.keys(RedisKeys.parameters("*", "*"))
     logging.info("redis keys after old stop %s", params)
 
+    assert any([p.startswith("dranspose:parameters:testnew") for p in params])
+
     instance2.stop()
 
     await r.aclose()

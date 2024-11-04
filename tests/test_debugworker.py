@@ -27,8 +27,6 @@ from dranspose.protocol import (
     WorkerTag,
 )
 
-import redis.asyncio as redis
-
 from dranspose.worker import Worker
 
 
@@ -83,8 +81,6 @@ async def test_debug(
         )
     )
 
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
@@ -133,8 +129,6 @@ async def test_debug(
             content = await st.json()
 
     context.destroy()
-
-    await r.aclose()
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5002/api/v1/last_events?number=2")

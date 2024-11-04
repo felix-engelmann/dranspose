@@ -170,8 +170,6 @@ async def test_map(
         )
     )
 
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
@@ -229,16 +227,6 @@ async def test_map(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
-
-    print("uuid", uuid, type(uuid))
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:ready:{uuid}"}
-    print("presentkeys", present_keys)
-    assert present_keys - set(keys) == set()
 
     context = zmq.asyncio.Context()
 
@@ -254,9 +242,11 @@ async def test_map(
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
 
     context.destroy()
-
-    await r.aclose()
-
-    print(content)

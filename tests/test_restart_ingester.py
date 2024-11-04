@@ -15,14 +15,11 @@ from dranspose.ingesters.zmqpull_single import (
 )
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
-
-import redis.asyncio as redis
 
 from dranspose.worker import Worker
 
@@ -49,8 +46,6 @@ async def test_restart_ingester(
         )
     )
 
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
         state = EnsembleState.model_validate(await st.json())
@@ -74,14 +69,6 @@ async def test_restart_ingester(
             },
         )
         assert resp.status == 200
-        uuid = await resp.json()
-
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:assigned:{uuid}"}
-    print("presentkeys", present_keys)
 
     context = zmq.asyncio.Context()
 
@@ -111,7 +98,5 @@ async def test_restart_ingester(
     await asyncio.sleep(1)
 
     context.destroy()
-
-    await r.aclose()
 
     print(content)

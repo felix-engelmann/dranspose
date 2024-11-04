@@ -95,9 +95,8 @@ async def test_simple(
         res: list[EventData] = pickle.loads(content)
         got_frames = []
         for ev in res:
-            print("got event", ev.event_number, ev.streams.keys())
+            assert set(ev.streams.keys()) == {"eiger"}
             pkt = parse(ev.streams[StreamName("eiger")])
-            print(pkt)
             if isinstance(pkt, Stream1Data):
                 assert pkt.frame == ev.event_number - 1
                 assert pkt.shape == [1475, 831]

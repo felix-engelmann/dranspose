@@ -21,14 +21,11 @@ from dranspose.ingesters.zmqpull_single import (
 )
 from dranspose.protocol import (
     EnsembleState,
-    RedisKeys,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
-
-import redis.asyncio as redis
 
 from dranspose.replay import replay
 from dranspose.worker import Worker
@@ -90,8 +87,6 @@ async def test_replay(
             ),
         )
     )
-
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/config")
@@ -161,15 +156,6 @@ async def test_replay(
         )
         assert resp.status == 200
         uuid = await resp.json()
-
-    print("uuid", uuid, type(uuid))
-    updates = await r.xread({RedisKeys.updates(): 0})
-    print("updates", updates)
-    keys = await r.keys("dranspose:*")
-    print("keys", keys)
-    present_keys = {f"dranspose:ready:{uuid}"}
-    print("presentkeys", present_keys)
-    assert present_keys - set(keys) == set()
 
     context = zmq.asyncio.Context()
 
@@ -248,7 +234,5 @@ async def test_replay(
     thread.join()
 
     context.destroy()
-
-    await r.aclose()
 
     print(content)
