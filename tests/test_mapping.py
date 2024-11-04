@@ -1,3 +1,7 @@
+import logging
+import pickle
+import time
+
 import pytest
 
 from dranspose.mapping import Mapping, NotYetAssigned
@@ -15,6 +19,7 @@ from dranspose.protocol import (
 
 def test_simple_map() -> None:
     ntrig = 10
+    t = time.perf_counter()
     m = Mapping(
         {
             StreamName("test"): [
@@ -23,7 +28,10 @@ def test_simple_map() -> None:
         },
         add_start_end=False,
     )
+    logging.info("creating %d trigger map took %f", ntrig, time.perf_counter() - t)
 
+    size = len(pickle.dumps(m.mapping))
+    logging.info("map size pickled is %d", size)
     assert m.len() == ntrig
 
 

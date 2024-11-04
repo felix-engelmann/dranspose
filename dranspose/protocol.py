@@ -39,6 +39,8 @@ HashDigest = NewType("HashDigest", str)
 
 GENERIC_WORKER = WorkerTag("generic")
 
+MappingName = NewType("MappingName", str)
+
 
 class VirtualWorker(BaseModel):
     """
