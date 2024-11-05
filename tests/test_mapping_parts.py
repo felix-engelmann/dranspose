@@ -131,6 +131,62 @@ def test_huge() -> None:
     assert p.len() == ntrig * reps
 
 
+def test_useless_worker() -> None:
+    ntrig = 1000
+    reps = 20
+    m = MappingSequence(
+        parts={
+            MappingName("main"): {
+                StreamName("test"): [
+                    [VirtualWorker(constraint=VirtualConstraint(i))]
+                    for i in range(ntrig)
+                ]
+            },
+            MappingName("next"): {
+                StreamName("test"): [
+                    [VirtualWorker(constraint=VirtualConstraint(i), tags={"useless"})]
+                    for i in range(ntrig)
+                ]
+            },
+        },
+        sequence=[MappingName("main")] * reps + [MappingName("next")] * reps,
+        add_start_end=False,
+    )
+    assert m.len() == ntrig * reps * 2
+
+    all_workers = [
+        WorkerState(
+            name=WorkerName("useless"),
+            tags={WorkerTag("useless")},
+        ),
+        WorkerState(name=WorkerName("w1")),
+    ]
+
+    ret = m.assign_next(all_workers[0], all_workers)
+    assert ret == []
+
+    for i in range(20000):
+        ret = m.assign_next(all_workers[1], all_workers)
+        assert len(ret) == 1, f"failed assign {i}"
+
+    assert len(m.active_maps) == 21
+
+    for i in range(19999):
+        ret = m.assign_next(all_workers[0], all_workers)
+        assert len(ret) == 1, f"failed assign {i}"
+
+    for i in range(40000):
+        workers = m.get_event_workers(i)
+        if i < 20000:
+            assert workers == WorkAssignment(
+                event_number=i, assignments={"test": ["w1"]}
+            )
+        else:
+            assert workers == WorkAssignment(
+                event_number=i, assignments={"test": ["useless"]}
+            )
+
+
 def test_none() -> None:
     m = MappingSequence(
         parts={

@@ -267,6 +267,8 @@ class MappingSequence:
         self.uuid = uuid.uuid4()
         self.complete_events = 0
 
+        self.queued_workers = []
+
         self.current_sequence_index = 0
         first_active = ActiveMap(
             start_event=EventNumber(0),
@@ -283,6 +285,8 @@ class MappingSequence:
         all_workers: list[WorkerState],
         completed: Optional[EventNumber] = None,
         horizon: int = 0,
+        future: int = 10000,
+        fill_from_queue: bool = True,
     ) -> list[VirtualWorker]:
         virt = []
 
@@ -311,6 +315,23 @@ class MappingSequence:
                 next_map.start_event,
             )
             self.active_maps.append(next_map)
+            if fill_from_queue:
+                still_not_assigned = []
+                for w, aw, c in self.queued_workers:
+                    logger.info("trying to assign %s", w)
+                    ret = self.assign_next(w, aw, c, horizon, fill_from_queue=False)
+                    # ret = next_map.assign_next(w,aw,c,horizon)
+                    if len(ret) == 0:
+                        logger.info("worker %s is still not assignable", w)
+                        # queued worker is still not possible
+                        still_not_assigned.append((w, aw, c))
+                    else:
+                        logger.info(
+                            "finally assigned worker %s in map starting at %d",
+                            w,
+                            next_map.start_event,
+                        )
+                self.queued_workers = still_not_assigned
             try:
                 virt = next_map.assign_next(worker, all_workers, completed, horizon)
             except StillHasWork:
@@ -318,6 +339,14 @@ class MappingSequence:
             if last_map.complete_events == last_map.no_events() and update_completed:
                 self.complete_events = next_map.complete_events + next_map.start_event
                 update_completed = False
+            if next_map.start_event > self.complete_events + future and len(virt) == 0:
+                logger.info(
+                    "the worker %s is not useful in the next %d events, queuing it",
+                    worker,
+                    future,
+                )
+                self.queued_workers.append((worker, all_workers, completed))
+                break
         logger.debug("assigned to %s", virt)
 
         return virt
@@ -361,6 +390,7 @@ class MappingSequence:
         return max([p.min_workers() for p in self.parts.values()])
 
 
+# legacy code which soon can be removed
 class Mapping:
     @validate_call
     def __init__(
