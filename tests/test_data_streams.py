@@ -24,7 +24,6 @@ def test_contrast_stream() -> None:
                 assert len(frames) == 1
                 data = pickle.loads(frames[0])
                 pkg = ContrastPacket.validate_python(data)
-                print(pkg)
                 if isinstance(pkg, ContrastHeartbeat):
                     pass
                 elif isinstance(pkg, ContrastStarted):

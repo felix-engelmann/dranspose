@@ -122,7 +122,7 @@ def test_partial_discard() -> None:
     print(r)
 
     m.print()
-    print("completed", m.complete_events)
+    assert m.complete_events == 9
 
     # m.assign_next(all_workers[0], all_workers)
 
@@ -155,7 +155,7 @@ def test_discard_only_one() -> None:
     m.assign_next(all_workers[1], all_workers)
 
     m.print()
-    print("completed", m.complete_events)
+    assert m.complete_events == 2
 
     with pytest.raises(NotYetAssigned):
         m.get_event_workers(EventNumber(8))
@@ -218,7 +218,12 @@ def test_all() -> None:
 
     print("assigned 3x w1,w2")
     m.print()
-    print("assignments", m.assignments, m.all_assignments)
+    assert m.assignments == {1: "w1", 2: "w2", 3: "w1"}
+    assert m.all_assignments == {
+        (0, "test", 0): ["w1", "w2"],
+        (4, "test", 0): ["w2"],
+        (8, "test", 0): [],
+    }
 
     with pytest.raises(NotYetAssigned):
         m.get_event_workers(EventNumber(4))

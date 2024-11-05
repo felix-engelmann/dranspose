@@ -127,5 +127,3 @@ async def test_sequence(
         }
 
     context.destroy()
-
-    print(content)
