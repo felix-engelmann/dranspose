@@ -12,3 +12,4 @@ site
 build
 plots
 bench
+redis-observations

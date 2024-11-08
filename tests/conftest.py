@@ -10,6 +10,7 @@ import time
 from asyncio import StreamReader, StreamWriter, Task
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from json import JSONDecodeError
 from multiprocessing import Process
 from typing import (
     Coroutine,
@@ -44,6 +45,8 @@ from dranspose.debug_worker import app as debugworker_app
 from dranspose.workload_generator import app as generator_app
 from tests.stream1 import AcquisitionSocket
 
+import redis.asyncio as redis
+
 from pytest import Parser
 
 os.environ["BUILD_META_FILE"] = "tests/data/build_git_meta.json"
@@ -63,6 +66,13 @@ def pytest_addoption(parser: Parser) -> None:
         dest="k8s",
         default=False,
         help="enable k8s remote tests",
+    )
+    parser.addoption(
+        "--observe",
+        action="store_true",
+        dest="observe",
+        default=False,
+        help="enable sampling redis content",
     )
 
 
@@ -837,3 +847,128 @@ fields:
  33554401 0 0 1.270505096 0 592659838.7
  33554401 0 0 1.380505096 0 592659842.7
 END 11 Disarmed"""
+
+
+def sample_table_to_md(table, filename):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, "w") as f:
+        col_order = sorted(table.keys())  # , key=lambda name: name[::-1])
+        logging.info("column order is %s", col_order)
+        f.write(f'| {" | ".join(col_order)} |\n')
+        f.write(f'| {" | ".join(["---" for _ in table])} |\n')
+        last_line = [""] * len(table)
+        for line in zip(*[table[col] for col in col_order]):
+            if line == last_line:
+                continue
+            change_line = []
+            for old, new in zip(last_line, line):
+                if new is None:
+                    change_line.append("absent")
+                elif old == new:
+                    change_line.append('--"--')
+                else:
+                    change = new
+                    olddata = None
+                    if isinstance(old, str):
+                        try:
+                            olddata = json.loads(old)
+                        except JSONDecodeError:
+                            pass
+                    if isinstance(new, str):
+                        try:
+                            data = json.loads(new)
+                            diff = data
+                            change = ""
+                            if olddata is not None:
+                                diff = {}
+                                for key, item in data.items():
+                                    if key in olddata and olddata[key] == item:
+                                        continue
+                                    diff[key] = item
+                                change = "**changed**<br>"
+                            change += (
+                                json.dumps(diff, indent=2)
+                                .replace("\n", "<br>")
+                                .replace(" ", "&nbsp;")
+                            )
+                        except JSONDecodeError:
+                            pass
+                    elif isinstance(new, bytes):
+                        change = str(new[:30]) + f" ({len(new)} bytes)"
+                    elif isinstance(new, list):
+                        change = ""
+                        for entry in new:
+                            change += "**" + entry[0] + "**<br>"
+                            data = json.loads(entry[1]["data"])
+                            pretty = (
+                                json.dumps(data, indent=2)
+                                .replace("\n", "<br>")
+                                .replace(" ", "&nbsp;")
+                            )
+                            change += pretty + "<br>"
+                    change_line.append(change)
+            f.write(f'| {" | ".join(map(str, change_line))} |\n')
+            last_line = line
+    logging.info("written redis observation to %s", filename)
+
+
+async def sample_redis(filename):
+    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
+    r_raw = redis.Redis(host="localhost", port=6379, decode_responses=False, protocol=3)
+    table = {}
+    try:
+        tick = 0
+        start_ids = {}
+        while True:
+            keys = await r.keys("dranspose:*")
+            logging.debug("all redis keys %s", keys)
+            for key in keys:
+                if key.startswith("dranspose:parameters:"):
+                    data = await r_raw.get(key)
+                elif any(
+                    [
+                        match in key
+                        for match in [
+                            "dranspose:ready:",
+                            "dranspose:controller:updates",
+                            "dranspose:assigned:",
+                        ]
+                    ]
+                ):
+                    start = start_ids.get(key, "-")
+                    if start != "-":
+                        start = "(" + start
+                    data = await r.xrange(key, start, "+")
+                    if len(data) > 0:
+                        start_ids[key] = data[-1][0]
+                    logging.debug("data is %s", data)
+                else:
+                    data = await r.get(key)
+                if key not in table:
+                    table[key] = [None] * tick
+                table[key].append(data)
+                logging.debug("key %s contains %s", key, data)
+            for missing in table:
+                if missing not in keys:
+                    table[missing].append(None)
+            await asyncio.sleep(0.1)
+            tick += 1
+    except asyncio.exceptions.CancelledError:
+        sample_table_to_md(table, filename)
+        await r.aclose()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def observe_redis(request):
+    if request.config.getoption("observe"):
+        filename = (
+            "redis-observations/"
+            + request.node.nodeid.replace("/", ".").replace("::", "--")
+            + ".md"
+        )
+        t = asyncio.create_task(sample_redis(filename))
+        yield
+        t.cancel()
+        await t
+    else:
+        yield
