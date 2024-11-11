@@ -912,6 +912,95 @@ def sample_table_to_md(table, filename):
     logging.info("written redis observation to %s", filename)
 
 
+def sample_table_to_html(table, filename):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, "w") as f:
+        col_order = sorted(table.keys())  # , key=lambda name: name[::-1])
+        logging.info("column order is %s", col_order)
+        f.write(
+            """
+        <html>
+        <head>
+        <style>
+        th {
+          position: sticky;
+          top: 50px;
+          background: white;
+        }
+        </style>
+        </head>
+        <body style="padding-top:50px;">
+        <table>
+        <thead>
+          <tr>
+        """
+        )
+        for col in col_order:
+            f.write(f"<th>{col}</th>")
+        f.write(
+            """  </tr>
+        </thead>
+        <tbody>
+        """
+        )
+        last_line = [""] * len(table)
+        for line in zip(*[table[col] for col in col_order]):
+            if line == last_line:
+                continue
+            change_line = []
+            for old, new in zip(last_line, line):
+                if new is None:
+                    change_line.append("absent")
+                elif old == new:
+                    change_line.append('--"--')
+                else:
+                    change = new
+                    olddata = None
+                    if isinstance(old, str):
+                        try:
+                            olddata = json.loads(old)
+                        except JSONDecodeError:
+                            pass
+                    if isinstance(new, str):
+                        try:
+                            data = json.loads(new)
+                            diff = data
+                            change = ""
+                            if olddata is not None:
+                                diff = {}
+                                for key, item in data.items():
+                                    if key in olddata and olddata[key] == item:
+                                        continue
+                                    diff[key] = item
+                                change = "<b>changed</b><br>"
+                            change += "<pre>"
+                            change += json.dumps(diff, indent=2)
+                            change += "</pre>"
+                        except JSONDecodeError:
+                            pass
+                    elif isinstance(new, bytes):
+                        change = str(new[:30]) + f" ({len(new)} bytes)"
+                    elif isinstance(new, list):
+                        change = ""
+                        for entry in new:
+                            change += "<b>" + entry[0] + "</b><br><pre>"
+                            data = json.loads(entry[1]["data"])
+                            pretty = json.dumps(data, indent=2)
+                            change += pretty + "</pre><br>"
+                    change_line.append(change)
+            f.write("<tr>")
+            for el in change_line:
+                f.write(f"<td>{str(el)}</td>")
+            f.write("<tr>")
+            last_line = line
+        f.write(
+            """
+        </tbody>
+        </table></body></html>"""
+        )
+    logging.info("written redis observation to %s", filename)
+
+
 async def sample_redis(filename):
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
     r_raw = redis.Redis(host="localhost", port=6379, decode_responses=False, protocol=3)
@@ -954,7 +1043,8 @@ async def sample_redis(filename):
             await asyncio.sleep(0.1)
             tick += 1
     except asyncio.exceptions.CancelledError:
-        sample_table_to_md(table, filename)
+        # sample_table_to_md(table, filename)
+        sample_table_to_html(table, filename)
         await r.aclose()
 
 
@@ -964,7 +1054,7 @@ async def observe_redis(request):
         filename = (
             "redis-observations/"
             + request.node.nodeid.replace("/", ".").replace("::", "--")
-            + ".md"
+            + ".html"
         )
         t = asyncio.create_task(sample_redis(filename))
         yield
