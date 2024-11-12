@@ -69,7 +69,7 @@ class DistributedService(abc.ABC):
             f"{self._distributed_settings.redis_dsn}?protocol=3"
         )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
-        print("handlers are", self._logger.handlers)
+        self._logger.info("log handlers are %s", self._logger.handlers)
         try:
             if self._distributed_settings.build_meta_file is not None:
                 with open(self._distributed_settings.build_meta_file) as fd:

@@ -40,17 +40,6 @@ logging.basicConfig(level=settings.log_level.upper())
 
 logger = logging.getLogger(__name__)
 
-logging_redis = redis.from_url(f"{settings.redis_dsn}?decode_responses=True&protocol=3")
-
-root_logger = logging.getLogger()
-handler = RedisStreamLogHandler(
-    redis_client=logging_redis,
-    stream_name="dranspose_logs",
-    maxlen=1000,
-    fields=["msg", "lineno", "name", "created", "levelname"],
-)
-root_logger.addHandler(handler)
-
 
 async def main() -> None:
     ins = []
@@ -329,6 +318,19 @@ def run() -> None:
     if not getattr(args, "subcommand", None):
         parser.print_help()
     else:
+        if args.subcommand != "replay":
+            logging_redis = redis.from_url(
+                f"{settings.redis_dsn}?decode_responses=True&protocol=3"
+            )
+
+            root_logger = logging.getLogger()
+            handler = RedisStreamLogHandler(
+                redis_client=logging_redis,
+                stream_name="dranspose_logs",
+                maxlen=1000,
+                fields=["msg", "lineno", "name", "created", "levelname"],
+            )
+            root_logger.addHandler(handler)
         args.func(args)
 
 

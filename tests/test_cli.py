@@ -1,3 +1,5 @@
+import logging
+import os
 import subprocess
 import time
 
@@ -58,3 +60,19 @@ def test_component(cmd: list[str], output: str) -> None:
     p.terminate()
     text = b"".join(p.communicate())
     assert output in text.decode()
+
+
+def test_replay_no_redis() -> None:
+    my_env = os.environ.copy()
+    my_env["REDIS_URL"] = "redis://nonexist-host:6379/0"
+    p = subprocess.Popen(
+        ["dranspose", "replay"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=my_env,
+    )
+    time.sleep(4)
+    p.terminate()
+    text = (b"".join(p.communicate())).decode()
+    logging.info("got out+err: %s", text)
+    assert "usage: dranspose" in text
