@@ -1,4 +1,5 @@
 import contextlib
+import gzip
 import json
 import logging
 import os
@@ -37,17 +38,23 @@ from dranspose.protocol import (
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
-    with open(filename, "rb") as f:
-        while True:
-            try:
-                if str(filename).endswith(".pkls"):
-                    frames = pickle.load(f)
-                else:
-                    frames = cbor2.load(f, tag_hook=message_tag_hook)
-                assert isinstance(frames, InternalWorkerMessage)
-                yield frames
-            except EOFError:
-                break
+    if str(filename).endswith(".gz"):
+        f = gzip.open(filename, "rb")
+        filename = str(filename)[:-3]
+    else:
+        f = open(filename, "rb")
+
+    while True:
+        try:
+            if str(filename).endswith(".pkls"):
+                frames = pickle.load(f)
+            else:
+                frames = cbor2.load(f, tag_hook=message_tag_hook)
+            assert isinstance(frames, InternalWorkerMessage)
+            yield frames
+        except EOFError:
+            break
+    f.close()
 
 
 logger = logging.getLogger(__name__)
@@ -247,6 +254,7 @@ def replay(
     nworkers: int = 2,
     broadcast_first: bool = True,
     done_event: threading.Event | None = None,
+    start_event: threading.Event | None = None,
     latency: float | None = None,
 ) -> None:
     if source is not None:
@@ -296,6 +304,8 @@ def replay(
     with server.run_in_thread(port):
         cache = [None for _ in gens]
         last_tick = 0.0
+        if start_event is not None:
+            start_event.wait()
         while True:
             try:
                 internals = [

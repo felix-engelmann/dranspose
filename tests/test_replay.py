@@ -1,7 +1,9 @@
 import asyncio
+import gzip
 import json
 import logging
 import pickle
+import shutil
 import threading
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
@@ -14,6 +16,7 @@ import zmq.asyncio
 import zmq
 from pydantic_core import Url
 
+from dranspose.event import EventData
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
@@ -186,6 +189,61 @@ async def test_replay(
         None,
         par_file,
     )
+
+    with open(f"{p_prefix}orca-ingester-{uuid}.cbors", "rb") as f_in:
+        with gzip.open(f"{p_prefix}orca-ingester-{uuid}.cbors.gz", "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+    stop_event = threading.Event()
+    done_event = threading.Event()
+
+    thread = threading.Thread(
+        target=replay,
+        args=(
+            "examples.test.worker:TestWorker",
+            "examples.test.reducer:TestReducer",
+            [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors.gz"],
+            None,
+            par_file,
+        ),
+        kwargs={"port": 5010, "stop_event": stop_event, "done_event": done_event},
+    )
+    thread.start()
+
+    logging.info("keep webserver alive")
+    done_event.wait()
+    logging.info("replay done")
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5010/api/v1/result/")
+        content = await st.content.read()
+        result = pickle.loads(content)[0]
+        assert list(result["results"].keys()) == list(range(ntrig + 1))
+        logging.warning("params in reducer is %s", result["results"][5][0])
+        ev5: EventData = result["results"][5][0]
+        assert ev5.event_number == 5
+        assert ev5.streams["eiger"].typ == "STINS"
+        assert (
+            ev5.streams["eiger"]
+            .frames[0]
+            .startswith(
+                b'{"htype": "image", "frame": 4, "shape": [1475, 831], "type": "uint16", "compression": "none", "msg_number": 5, "timestamps": {"dummy": "'
+            )
+        )
+        assert len(ev5.streams["eiger"].frames[1]) > 4500
+        assert ev5.streams["orca"].typ == "STINS"
+        assert (
+            ev5.streams["orca"]
+            .frames[0]
+            .startswith(
+                b'{"htype": "image", "frame": 4, "shape": [2000, 4000], "type": "uint16", "compression": "none", "msg_number": 5}'
+            )
+        )
+        assert len(ev5.streams["orca"].frames[1]) > 4500
+    logging.info("shut down server")
+    stop_event.set()
+
+    thread.join()
 
     bin_file = tmp_path / "binparams.pkl"
 
