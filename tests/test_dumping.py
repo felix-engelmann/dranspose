@@ -252,6 +252,9 @@ async def test_dump_xrd(
         )
         assert resp.status == 200
 
+        contents = tmp_path.iterdir()
+        logging.warn(f"Content of temp folder {[i for i in contents]}")
+
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
