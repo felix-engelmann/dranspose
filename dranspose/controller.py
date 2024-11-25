@@ -3,9 +3,12 @@ This is the central service to orchestrate all distributed components
 
 """
 import asyncio
+import json
 import os.path
 from asyncio import Task
 from collections import defaultdict
+from pathlib import Path
+import pickle
 from types import UnionType
 from typing import Any, AsyncGenerator, Optional, Annotated, Literal
 
@@ -240,7 +243,37 @@ class Controller:
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
 
+    async def dump_parameters(self) -> None:
+        """Saves all current parameters to a JSON/bin file if dump_prefix is defined."""
+        if ParameterName("dump_prefix") in self.parameters:
+            dump_prefix = Path(
+                self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+            )
+            if len(dump_prefix) > 0:
+                filename = f"parameters-{self.parameters_hash}-{self.mapping.uuid}"
+                bin_file = False
+                pars = []
+                for name, par in self.parameters.items():
+                    try:
+                        pars.append({"name": name, "data": par.data.encode()})
+                    except Exception:
+                        bin_file = True
+                        pars.append({"name": name, "data": par.data})
+                if bin_file:
+                    filename = dump_prefix / f"{filename}.pkl"
+                    with open(filename, "wb") as f:
+                        pickle.dump(pars, f)
+                else:
+                    filename = dump_prefix / f"{filename}.json"
+                    with open(filename, "w") as f:
+                        json.dump(pars, f)
+                logger.info(f"Parameters saved to {filename}")
+
     async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
+        """Writes a parameter in the controller's store, updates the controller's
+        hash, and updating the parameter hash. It also sends a controller update
+        to the Redis stream to notify other components of the new parameter."""
+
         param = WorkParameter(name=name, data=data)
         logger.debug("distributing parameter %s with uuid %s", param.name, param.uuid)
         await self.redis.set(RedisKeys.parameters(name, param.uuid), param.data)
@@ -257,6 +290,7 @@ class Controller:
             RedisKeys.updates(),
             {"data": cupd.model_dump_json()},
         )
+        await self.dump_parameters()
         return self.parameters_hash
 
     async def describe_parameters(self) -> list[ParameterType]:
@@ -277,6 +311,10 @@ class Controller:
         return sorted(params, key=lambda x: x.name)
 
     async def default_parameters(self) -> None:
+        """The descriptions (and default values) for the parameters are defined
+        in the worker's payload and published to redis. default_parameters
+        retieves the description and adds it to the list of parameters if
+        they are missing."""
         while True:
             try:
                 desc_keys = await self.redis.keys(RedisKeys.parameter_description())
