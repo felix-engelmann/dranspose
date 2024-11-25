@@ -205,6 +205,25 @@ class Controller:
             ret[wn] = WorkerLoad(last_event=last_event, intervals=itval)
         return ret
 
+    async def dump_mapping(self) -> None:
+        """Saves trigermap JSON file if dump_prefix is defined."""
+        if ParameterName("dump_prefix") in self.parameters:
+            dump_prefix = Path(
+                self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+            )
+            if len(dump_prefix) > 0:
+                mapping_json = {
+                    "parts": self.mapping.parts,
+                    "sequence": self.mapping.sequence,
+                }
+                filename = dump_prefix / f"mapping-{self.mapping.uuid}.json"
+                try:
+                    with open(filename, "w") as f:
+                        json.dump(mapping_json, f)
+                    logger.info(f"Mapping saved to {filename}")
+                except Exception as e:
+                    logger.error(f"Could not write mapping dump {e}")
+
     async def set_mapping(self, m: MappingSequence) -> None:
         async with self.mapping_update_lock:
             logger.debug("cancelling assign task")
@@ -240,6 +259,7 @@ class Controller:
                 cfgs = await self.get_configs()
                 logger.debug("updated configs %s", cfgs)
             logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
+            await self.dump_mapping()
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
 
@@ -255,19 +275,22 @@ class Controller:
                 pars = []
                 for name, par in self.parameters.items():
                     try:
-                        pars.append({"name": name, "data": par.data.encode()})
+                        pars.append({"name": name, "data": par.data.encode("utf8")})
                     except Exception:
                         bin_file = True
                         pars.append({"name": name, "data": par.data})
-                if bin_file:
-                    filename = dump_prefix / f"{filename}.pkl"
-                    with open(filename, "wb") as f:
-                        pickle.dump(pars, f)
-                else:
-                    filename = dump_prefix / f"{filename}.json"
-                    with open(filename, "w") as f:
-                        json.dump(pars, f)
-                logger.info(f"Parameters saved to {filename}")
+                try:
+                    if bin_file:
+                        filename = dump_prefix / f"{filename}.pkl"
+                        with open(filename, "wb") as f:
+                            pickle.dump(pars, f)
+                    else:
+                        filename = dump_prefix / f"{filename}.json"
+                        with open(filename, "w") as f:
+                            json.dump(pars, f)
+                    logger.info(f"Parameters saved to {filename}")
+                except Exception as e:
+                    logger.error(f"Could not write parameters dump {e}")
 
     async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
         """Writes a parameter in the controller's store, updates the controller's
