@@ -7,7 +7,6 @@ import json
 import os.path
 from asyncio import Task
 from collections import defaultdict
-from pathlib import Path
 import pickle
 from types import UnionType
 from typing import Any, AsyncGenerator, Optional, Annotated, Literal
@@ -205,24 +204,49 @@ class Controller:
             ret[wn] = WorkerLoad(last_event=last_event, intervals=itval)
         return ret
 
-    async def dump_mapping(self) -> None:
-        """Saves trigermap JSON file if dump_prefix is defined."""
-        if ParameterName("dump_prefix") in self.parameters:
-            dump_prefix = Path(
-                self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
-            )
-            if len(dump_prefix) > 0:
-                mapping_json = {
-                    "parts": self.mapping.parts,
-                    "sequence": self.mapping.sequence,
-                }
-                filename = dump_prefix / f"mapping-{self.mapping.uuid}.json"
+    async def dump_map_and_parameters(self) -> None:
+        """Saves all current parameters to a JSON/bin file if dump_prefix is defined."""
+        dump_prefix = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+        if len(dump_prefix) > 0:
+            parts = {
+                str(n): m.model_dump(mode="json") for n, m in self.mapping.parts.items()
+            }
+            mapping_json = {
+                "parts": parts,
+                "sequence": self.mapping.sequence,
+            }
+            filename = f"{dump_prefix}mapping-{self.mapping.uuid}.json"
+            try:
+                with open(filename, "w") as f:
+                    json.dump(mapping_json, f)
+                logger.info(f"Mapping saved to {filename}")
+            except Exception as e:
+                logger.error(f"Could not write mapping dump {e}")
+            filename = f"parameters-{self.mapping.uuid}"
+            bin_file = False
+            pars = []
+            for name, par in self.parameters.items():
                 try:
+                    pars.append({"name": name, "data": par.data.decode("utf8")})
+                except Exception:
+                    bin_file = True
+                    pars.append({"name": name, "data": par.data})
+                    import traceback
+
+                    msg = traceback.format_exc()
+                    logger.error(msg)
+            try:
+                if bin_file:
+                    filename = f"{dump_prefix}{filename}.pkl"
+                    with open(filename, "wb") as f:
+                        pickle.dump(pars, f)
+                else:
+                    filename = f"{dump_prefix}{filename}.json"
                     with open(filename, "w") as f:
-                        json.dump(mapping_json, f)
-                    logger.info(f"Mapping saved to {filename}")
-                except Exception as e:
-                    logger.error(f"Could not write mapping dump {e}")
+                        json.dump(pars, f)
+                logger.info(f"Parameters saved to {filename}")
+            except Exception as e:
+                logger.error(f"Could not write parameters dump {e}")
 
     async def set_mapping(self, m: MappingSequence) -> None:
         async with self.mapping_update_lock:
@@ -259,38 +283,10 @@ class Controller:
                 cfgs = await self.get_configs()
                 logger.debug("updated configs %s", cfgs)
             logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
-            await self.dump_mapping()
+            if ParameterName("dump_prefix") in self.parameters:
+                await self.dump_map_and_parameters()
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
-
-    async def dump_parameters(self) -> None:
-        """Saves all current parameters to a JSON/bin file if dump_prefix is defined."""
-        if ParameterName("dump_prefix") in self.parameters:
-            dump_prefix = Path(
-                self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
-            )
-            if len(dump_prefix) > 0:
-                filename = f"parameters-{self.parameters_hash}-{self.mapping.uuid}"
-                bin_file = False
-                pars = []
-                for name, par in self.parameters.items():
-                    try:
-                        pars.append({"name": name, "data": par.data.encode("utf8")})
-                    except Exception:
-                        bin_file = True
-                        pars.append({"name": name, "data": par.data})
-                try:
-                    if bin_file:
-                        filename = dump_prefix / f"{filename}.pkl"
-                        with open(filename, "wb") as f:
-                            pickle.dump(pars, f)
-                    else:
-                        filename = dump_prefix / f"{filename}.json"
-                        with open(filename, "w") as f:
-                            json.dump(pars, f)
-                    logger.info(f"Parameters saved to {filename}")
-                except Exception as e:
-                    logger.error(f"Could not write parameters dump {e}")
 
     async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
         """Writes a parameter in the controller's store, updates the controller's
@@ -313,7 +309,6 @@ class Controller:
             RedisKeys.updates(),
             {"data": cupd.model_dump_json()},
         )
-        await self.dump_parameters()
         return self.parameters_hash
 
     async def describe_parameters(self) -> list[ParameterType]:
