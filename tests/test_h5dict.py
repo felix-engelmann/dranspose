@@ -117,6 +117,26 @@ async def test_root() -> None:
         data = await st.json()
         logging.info("content %s", data)
 
+        comr_data = await session.get(
+            "http://localhost:5000/results/datasets/h5dict-2F696D616765/value"
+        )
+        data_len = comr_data.content_length
+        logging.info("data len %d", data_len)
+        logging.info("headers are %s", comr_data.headers.items())
+        assert comr_data.headers["Content-Encoding"] == "gzip"
+        assert data_len == 11683
+
+    async with aiohttp.ClientSession() as session:
+        comr_data = await session.get(
+            "http://localhost:5000/results/datasets/h5dict-2F696D616765/value",
+            headers={"Accept-Encoding": "deflate"},
+        )
+        data_len = comr_data.content_length
+        logging.info("data len %d", data_len)
+        logging.info("headers are %s", comr_data.headers.items())
+        assert "Content-Encoding" not in comr_data.headers
+        assert data_len == 8e6
+
     def work() -> None:
         f = h5pyd.File("/", "r", endpoint="http://localhost:5000/results")
         logging.info("file %s", f["live"][()])
@@ -136,6 +156,7 @@ async def test_root() -> None:
         assert f["composite"].dtype == np.dtype(
             {"names": ["a", "b"], "formats": [float, int]}
         )
+        assert np.array_equal(f["image"], np.ones((1000, 1000)))
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)

@@ -1,4 +1,5 @@
 import base64
+import gzip
 import logging
 import time
 from typing import Any, Literal
@@ -249,7 +250,17 @@ def values(
         elif len(slices) > 1:
             ret = ret[*slices]
 
-        return Response(content=ret.tobytes(), media_type="application/octet-stream")
+        ret_bytes = ret.tobytes()
+        if "gzip" in req.headers.get("Accept-Encoding", ""):
+            if len(ret_bytes) > 1000:
+                compressed_data = gzip.compress(ret_bytes, compresslevel=7)
+
+                return Response(
+                    content=compressed_data,
+                    media_type="application/octet-stream",
+                    headers={"Content-Encoding": "gzip"},
+                )
+        return Response(content=ret_bytes, media_type="application/octet-stream")
 
 
 @router.get("/datasets/{uuid}")
