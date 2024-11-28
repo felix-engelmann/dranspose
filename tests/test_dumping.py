@@ -2,11 +2,13 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+import pickle
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
 import cbor2
 
+import numpy as np
 import pytest
 import zmq.asyncio
 import zmq
@@ -100,14 +102,11 @@ async def test_dump(
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
-        pars = [{"name": "dump_prefix", "data": str(p_prefix).encode("utf8")}]
-
-        for p in pars:
-            resp = await session.post(
-                f"http://localhost:5000/api/v1/parameter/{p['name']}",
-                data=p["data"],
-            )
-            assert resp.status == 200
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/dump_prefix",
+            data=str(p_prefix).encode("utf8"),
+        )
+        assert resp.status == 200
 
         ntrig = 10
         resp = await session.post(
@@ -250,7 +249,90 @@ async def test_dump_xrd(
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
-        pars = {"dump_prefix": str(p_prefix).encode("utf8")}
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/dump_prefix",
+            data=str(p_prefix).encode("utf8"),
+        )
+        assert resp.status == 200
+
+        ntrig = 10
+        resp = await session.post(
+            "http://localhost:5000/api/v1/mapping",
+            json={
+                "xrd": [
+                    [
+                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
+                            mode="json"
+                        )
+                    ]
+                    for i in range(1, ntrig)
+                ],
+            },
+        )
+        assert resp.status == 200
+
+    context = zmq.asyncio.Context()
+
+    asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/progress")
+        content = await st.json()
+        while not content["finished"]:
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/progress")
+            content = await st.json()
+
+        assert content == {
+            "last_assigned": ntrig + 1,
+            "completed_events": ntrig + 1,
+            "total_events": ntrig + 1,
+            "finished": True,
+        }
+    context.destroy()
+
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_dump_map_and_parameters(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    tmp_path: Any,
+) -> None:
+    await reducer(None)
+    await create_worker(WorkerName("w1"))
+
+    await create_ingester(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
+                ingester_streams=[StreamName("xrd")],
+                upstream_url=Url("tcp://localhost:9999"),
+                ingester_url=Url("tcp://localhost:10010"),
+            ),
+        )
+    )
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/config")
+        state = EnsembleState.model_validate(await st.json())
+        logging.debug("content %s", state)
+        while {"xrd"} - set(state.get_streams()) != set():
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/config")
+            state = EnsembleState.model_validate(await st.json())
+
+        logging.info("startup done")
+
+        p_prefix = tmp_path / "dump_"
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
+
+        pars = {
+            "dump_prefix": str(p_prefix).encode("utf8"),
+            "test_string": "spam".encode("utf8"),
+            "test_int": "42".encode("utf8"),
+        }
         for name, data in pars.items():
             resp = await session.post(
                 f"http://localhost:5000/api/v1/parameter/{name}",
@@ -277,39 +359,114 @@ async def test_dump_xrd(
 
     context = zmq.asyncio.Context()
 
-    asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
-
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
-
-        assert content == {
-            "last_assigned": ntrig + 1,
-            "completed_events": ntrig + 1,
-            "total_events": ntrig + 1,
-            "finished": True,
-        }
-
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/mapping")
         mapping = await st.json()
-        logging.info("mapping %s", mapping)
+        logging.debug("mapping %s", mapping)
 
         with open(f"{p_prefix}mapping-{uuid}.json", "rb") as f:
             # logging.info(f"Content of mapping {f.read()}")
             dumped_mapping = json.load(f)
-            logging.info("mapping %s", dumped_mapping)
+            logging.debug("dumped_mapping %s", dumped_mapping)
         assert mapping == dumped_mapping
 
     with open(f"{p_prefix}parameters-{uuid}.json", "rb") as f:
-        dumped_pars = {}
-        for p in json.load(f):
-            dumped_pars[p["name"]] = p["data"]
+        pars_dict = {}
+        dumped_pars = json.load(f)
+        logging.info("dumped_pars %s", dumped_pars)
+        for p in dumped_pars:
+            pars_dict[p["name"]] = p["data"]
+        logging.info("pars_dict %s", pars_dict)
         for k, v in pars.items():
-            assert dumped_pars[k].encode("utf8") == v
+            assert pars_dict[k].encode("utf8") == v
+
+    context.destroy()
+
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_dump_bin_parameters(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    tmp_path: Any,
+) -> None:
+    await reducer(None)
+    await create_worker(WorkerName("w1"))
+
+    await create_ingester(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
+                ingester_streams=[StreamName("xrd")],
+                upstream_url=Url("tcp://localhost:9999"),
+                ingester_url=Url("tcp://localhost:10010"),
+            ),
+        )
+    )
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/config")
+        state = EnsembleState.model_validate(await st.json())
+        logging.debug("content %s", state)
+        while {"xrd"} - set(state.get_streams()) != set():
+            await asyncio.sleep(0.3)
+            st = await session.get("http://localhost:5000/api/v1/config")
+            state = EnsembleState.model_validate(await st.json())
+
+        logging.info("startup done")
+
+        p_prefix = tmp_path / "dump_"
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
+
+        pars = {
+            "dump_prefix": str(p_prefix).encode("utf8"),
+            "test_null": np.zeros((2, 2)).tobytes(),
+        }
+        for name, data in pars.items():
+            resp = await session.post(
+                f"http://localhost:5000/api/v1/parameter/{name}",
+                data=data,
+            )
+            assert resp.status == 200
+
+        ntrig = 10
+        resp = await session.post(
+            "http://localhost:5000/api/v1/mapping",
+            json={
+                "xrd": [
+                    [
+                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
+                            mode="json"
+                        )
+                    ]
+                    for i in range(1, ntrig)
+                ],
+            },
+        )
+        assert resp.status == 200
+        uuid = await resp.json()
+
+    context = zmq.asyncio.Context()
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/mapping")
+        mapping = await st.json()
+        logging.debug("mapping %s", mapping)
+
+        with open(f"{p_prefix}mapping-{uuid}.json", "rb") as f:
+            # logging.info(f"Content of mapping {f.read()}")
+            dumped_mapping = json.load(f)
+            logging.debug("dumped_mapping %s", dumped_mapping)
+        assert mapping == dumped_mapping
+
+    with open(f"{p_prefix}parameters-{uuid}.pkl", "rb") as f:
+        pars_dict = {}
+        dumped_pars = pickle.load(f)
+        logging.debug("dumped_pars %s", dumped_pars)
+        for p in dumped_pars:
+            pars_dict[p["name"]] = p["data"]
+        assert pars_dict["dump_prefix"].encode("utf8") == pars["dump_prefix"]
+        assert pars_dict["test_null"] == pars["test_null"]
 
     context.destroy()

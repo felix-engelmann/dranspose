@@ -226,15 +226,11 @@ class Controller:
             bin_file = False
             pars = []
             for name, par in self.parameters.items():
-                try:
-                    pars.append({"name": name, "data": par.data.decode("utf8")})
-                except Exception:
+                if b"\x00" in par.data:
                     bin_file = True
                     pars.append({"name": name, "data": par.data})
-                    import traceback
-
-                    msg = traceback.format_exc()
-                    logger.error(msg)
+                else:
+                    pars.append({"name": name, "data": par.data.decode("utf8")})
             try:
                 if bin_file:
                     filename = f"{dump_prefix}{filename}.pkl"
