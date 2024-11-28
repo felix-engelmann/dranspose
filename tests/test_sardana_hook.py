@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from typing import Callable, Awaitable, Optional
 
 import aiohttp
@@ -53,12 +54,13 @@ async def test_not_enough_workers(
 
         ma = await session.get("http://localhost:5000/api/v1/mapping")
         mapping = await ma.json()
+        logging.info("map in %s", mapping)
+
         assert mapping == {
             "parts": {
                 "sardana": {
                     "mapping": {
                         "orca": [
-                            [{"tags": ["generic"], "constraint": None}],
                             [{"tags": ["generic"], "constraint": 0}],
                             [{"tags": ["generic"], "constraint": 1}],
                             [{"tags": ["generic"], "constraint": 2}],
@@ -69,10 +71,12 @@ async def test_not_enough_workers(
                             [{"tags": ["generic"], "constraint": 7}],
                             [{"tags": ["generic"], "constraint": 8}],
                             [{"tags": ["generic"], "constraint": 9}],
-                            [{"tags": ["generic"], "constraint": None}],
                         ]
                     }
-                }
+                },
+                "reserved_start_end": {
+                    "mapping": {"orca": [[{"tags": ["generic"], "constraint": None}]]}
+                },
             },
-            "sequence": ["sardana"],
+            "sequence": ["reserved_start_end", "sardana", "reserved_start_end"],
         }
