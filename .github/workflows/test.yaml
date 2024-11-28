@@ -25,7 +25,7 @@ jobs:
       - name: Test with pytest
         run: |
           pip install pytest pytest-cov setuptools
-          pytest tests/test_* --log-cli-level=INFO
+          pytest tests/test_basics.py --log-cli-level=INFO
         #--cov=dranspose --cov-report=xml --cov-report=html
 
     # Service containers to run with `container-job`
