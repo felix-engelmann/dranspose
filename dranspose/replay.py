@@ -148,6 +148,12 @@ def get_parameters(
                 }
         except UnicodeDecodeError:
             with open(parameter_file, "rb") as fb:
+                plist = cbor2.load(fb)
+                parameters = {
+                    ParameterName(p.name): p for p in ParamList.validate_python(plist)
+                }
+        except Exception:
+            with open(parameter_file, "rb") as fb:
                 plist = pickle.load(fb)
                 parameters = {
                     ParameterName(p.name): p for p in ParamList.validate_python(plist)

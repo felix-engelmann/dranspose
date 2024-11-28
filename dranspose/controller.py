@@ -3,6 +3,7 @@ This is the central service to orchestrate all distributed components
 
 """
 import asyncio
+import json
 import os.path
 from asyncio import Task
 from collections import defaultdict
@@ -12,6 +13,7 @@ from typing import Any, AsyncGenerator, Optional, Annotated, Literal
 import logging
 import time
 
+import cbor2
 from pydantic import UUID4
 from starlette.requests import Request
 from starlette.responses import Response, FileResponse
@@ -202,6 +204,46 @@ class Controller:
             ret[wn] = WorkerLoad(last_event=last_event, intervals=itval)
         return ret
 
+    async def dump_map_and_parameters(self) -> None:
+        """Saves all current parameters to a JSON/bin file if dump_prefix is defined."""
+        dump_prefix = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+        if len(dump_prefix) > 0:
+            parts = {
+                str(n): m.model_dump(mode="json") for n, m in self.mapping.parts.items()
+            }
+            mapping_json = {
+                "parts": parts,
+                "sequence": self.mapping.sequence,
+            }
+            filename = f"{dump_prefix}mapping-{self.mapping.uuid}.json"
+            try:
+                with open(filename, "w") as f:
+                    json.dump(mapping_json, f)
+                logger.info(f"Mapping saved to {filename}")
+            except Exception as e:
+                logger.error(f"Could not write mapping dump {e}")
+            filename = f"parameters-{self.mapping.uuid}"
+            bin_file = False
+            pars = []
+            for name, par in self.parameters.items():
+                if b"\x00" in par.data:
+                    bin_file = True
+                    pars.append({"name": name, "data": par.data})
+                else:
+                    pars.append({"name": name, "data": par.data.decode("utf8")})
+            try:
+                if bin_file:
+                    filename = f"{dump_prefix}{filename}.cbor"
+                    with open(filename, "wb") as f:
+                        cbor2.dump(pars, f)
+                else:
+                    filename = f"{dump_prefix}{filename}.json"
+                    with open(filename, "w") as f:
+                        json.dump(pars, f)
+                logger.info(f"Parameters saved to {filename}")
+            except Exception as e:
+                logger.error(f"Could not write parameters dump {e}")
+
     async def set_mapping(self, m: MappingSequence) -> None:
         async with self.mapping_update_lock:
             logger.debug("cancelling assign task")
@@ -237,10 +279,16 @@ class Controller:
                 cfgs = await self.get_configs()
                 logger.debug("updated configs %s", cfgs)
             logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
+            if ParameterName("dump_prefix") in self.parameters:
+                await self.dump_map_and_parameters()
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
 
     async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
+        """Writes a parameter in the controller's store, updates the controller's
+        hash, and updating the parameter hash. It also sends a controller update
+        to the Redis stream to notify other components of the new parameter."""
+
         param = WorkParameter(name=name, data=data)
         logger.debug("distributing parameter %s with uuid %s", param.name, param.uuid)
         await self.redis.set(RedisKeys.parameters(name, param.uuid), param.data)
@@ -277,6 +325,10 @@ class Controller:
         return sorted(params, key=lambda x: x.name)
 
     async def default_parameters(self) -> None:
+        """The descriptions (and default values) for the parameters are defined
+        in the worker's payload and published to redis. default_parameters
+        retieves the description and adds it to the list of parameters if
+        they are missing."""
         while True:
             try:
                 desc_keys = await self.redis.keys(RedisKeys.parameter_description())
