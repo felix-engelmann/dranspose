@@ -756,7 +756,7 @@ async def set_sardana_hook(
     s = MappingSequence(
         parts={MappingName("sardana"): m.mapping},
         sequence=[MappingName("sardana")],
-        add_start_end=False,
+        add_start_end=True,
     )
     logger.debug("set mapping")
     await ctrl.set_mapping(s)

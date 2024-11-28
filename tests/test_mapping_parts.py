@@ -676,7 +676,14 @@ def test_all_wrap_tags() -> None:
 
 def test_uniform() -> None:
     m = Map.from_uniform({StreamName("orca"), StreamName("panda")}, 10)
-    b = m.mapping[StreamName("orca")][10]
+    s = MappingSequence(
+        parts={MappingName("sardana"): m.mapping},
+        sequence=[MappingName("sardana")],
+        add_start_end=True,
+    )
+    assert s.len() == 12
+    logging.info("map %s", m)
+    b = m.mapping[StreamName("orca")][9]
     assert b is not None
     a = b[0]
     assert isinstance(a, VirtualWorker)
