@@ -13,3 +13,4 @@ build
 plots
 bench
 redis-observations
+.vscode
