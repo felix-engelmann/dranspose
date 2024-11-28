@@ -12,8 +12,14 @@ jobs:
         # ["pypy3.10", "3.11", "3.12", "3.13"]
     env:
       REDIS_URL: "redis://redis:6379/0"
+
     steps:
       - uses: actions/checkout@v4
+      - name: Install Redis client
+        run: sudo apt-get update && sudo apt-get install -y redis-tools
+      - name: Test Redis connection
+        run: |
+          redis-cli -h redis -p 6379 ping
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
