@@ -371,14 +371,10 @@ async def test_dump_map_and_parameters(
         assert mapping == dumped_mapping
 
     with open(f"{p_prefix}parameters-{uuid}.json", "rb") as f:
-        pars_dict = {}
         dumped_pars = json.load(f)
-        logging.info("dumped_pars %s", dumped_pars)
+        logging.debug("dumped_pars %s", dumped_pars)
         for p in dumped_pars:
-            pars_dict[p["name"]] = p["data"]
-        logging.info("pars_dict %s", pars_dict)
-        for k, v in pars.items():
-            assert pars_dict[k].encode("utf8") == v
+            assert p["data"].encode("utf8") == pars[p["name"]]
 
     context.destroy()
 
