@@ -14,7 +14,7 @@ import logging
 import time
 
 import cbor2
-from pydantic import UUID4
+from pydantic import UUID4, ValidationError
 from starlette.requests import Request
 from starlette.responses import Response, FileResponse
 
@@ -92,7 +92,7 @@ class Controller:
         self.external_stop = False
         self.assign_task: Task[None]
         self.config_fetch_time: float = 0
-        self.config_cache: EnsembleState
+        self.config_cache: EnsembleState | None = None
         self.default_task: Task[None]
         self.consistent_task: Task[None]
         self.worker_timing: dict[
@@ -142,7 +142,7 @@ class Controller:
                 logger.warning("The lock was lost")
 
     async def get_configs(self) -> EnsembleState:
-        if time.time() - self.config_fetch_time < 0.5:
+        if time.time() - self.config_fetch_time < 0.5 and self.config_cache is not None:
             return self.config_cache
         async with self.redis.pipeline() as pipe:
             await pipe.keys(RedisKeys.config("ingester"))
@@ -154,8 +154,20 @@ class Controller:
             await pipe.get(RedisKeys.config("reducer"))
             ingester_json, worker_json, reducer_json = await pipe.execute()
 
-        ingesters = [IngesterState.model_validate_json(i) for i in ingester_json]
-        workers = [WorkerState.model_validate_json(w) for w in worker_json]
+        ingesters = []
+        for i in ingester_json:
+            try:
+                ingester = IngesterState.model_validate_json(i)
+                ingesters.append(ingester)
+            except ValidationError:
+                pass
+        workers = []
+        for w in worker_json:
+            try:
+                worker = WorkerState.model_validate_json(w)
+                workers.append(worker)
+            except ValidationError:
+                pass
         reducer = None
         if reducer_json:
             reducer = ReducerState.model_validate_json(reducer_json)
