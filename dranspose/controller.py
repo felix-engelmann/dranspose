@@ -18,7 +18,7 @@ from starlette.responses import Response, FileResponse
 
 from dranspose.distributed import DistributedSettings
 from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
-from dranspose.mapping import Mapping, MappingSequence
+from dranspose.mapping import MappingSequence, Map
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
 from importlib.metadata import version
@@ -655,7 +655,6 @@ async def set_mapping(
         sequence=[MappingName("main")],
         add_start_end=all_wrap,
     )
-    # m = Mapping(mapping, add_start_end=all_wrap)
     if len(config.workers) < m.min_workers():
         logger.warning(
             "only %d workers available, but %d required",
@@ -750,7 +749,7 @@ async def set_sardana_hook(
     for st in set(config.get_streams()).intersection(set(info["streams"])):
         print("use stream", st)
     logger.debug("create new mapping")
-    m = Mapping.from_uniform(
+    m = Map.from_uniform(
         set(config.get_streams()).intersection(set(info["streams"])),
         info["scan"]["nb_points"],
     )

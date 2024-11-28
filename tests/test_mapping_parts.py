@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from dranspose.mapping import Mapping, NotYetAssigned, MappingSequence
+from dranspose.mapping import NotYetAssigned, MappingSequence, Map
 from dranspose.protocol import (
     VirtualWorker,
     StreamName,
@@ -265,21 +265,6 @@ def test_discard() -> None:
 
 
 def test_partial_discard() -> None:
-    ntrig = 10
-    direct = Mapping(
-        {
-            StreamName("test"): [
-                [VirtualWorker(constraint=VirtualConstraint(i))]
-                if i < 2 or i > 7
-                else []
-                if i < 5
-                else None
-                for i in range(ntrig)
-            ]
-        },
-        add_start_end=False,
-    )
-    direct.print()
     m = MappingSequence(
         parts={
             MappingName("use"): {
@@ -687,6 +672,15 @@ def test_all_wrap_tags() -> None:
     should = {"test": {"w2", "w1"}, "test2": {"w2", "w1"}}
     for st, wn in evworkers.assignments.items():
         assert set(wn) == should[st]
+
+
+def test_uniform() -> None:
+    m = Map.from_uniform({StreamName("orca"), StreamName("panda")}, 10)
+    b = m.mapping[StreamName("orca")][10]
+    assert b is not None
+    a = b[0]
+    assert isinstance(a, VirtualWorker)
+    assert a.constraint == 9
 
 
 def test_huge_map() -> None:
