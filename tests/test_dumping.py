@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
-import pickle
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
@@ -456,9 +455,9 @@ async def test_dump_bin_parameters(
             logging.debug("dumped_mapping %s", dumped_mapping)
         assert mapping == dumped_mapping
 
-    with open(f"{p_prefix}parameters-{uuid}.pkl", "rb") as f:
+    with open(f"{p_prefix}parameters-{uuid}.cbor", "rb") as f:
         pars_dict = {}
-        dumped_pars = pickle.load(f)
+        dumped_pars = cbor2.load(f)
         logging.debug("dumped_pars %s", dumped_pars)
         for p in dumped_pars:
             pars_dict[p["name"]] = p["data"]

@@ -7,13 +7,13 @@ import json
 import os.path
 from asyncio import Task
 from collections import defaultdict
-import pickle
 from types import UnionType
 from typing import Any, AsyncGenerator, Optional, Annotated, Literal
 
 import logging
 import time
 
+import cbor2
 from pydantic import UUID4
 from starlette.requests import Request
 from starlette.responses import Response, FileResponse
@@ -233,9 +233,9 @@ class Controller:
                     pars.append({"name": name, "data": par.data.decode("utf8")})
             try:
                 if bin_file:
-                    filename = f"{dump_prefix}{filename}.pkl"
+                    filename = f"{dump_prefix}{filename}.cbor"
                     with open(filename, "wb") as f:
-                        pickle.dump(pars, f)
+                        cbor2.dump(pars, f)
                 else:
                     filename = f"{dump_prefix}{filename}.json"
                     with open(filename, "w") as f:
