@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Any, Coroutine, Optional
@@ -99,11 +100,14 @@ async def test_dump(
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
-        resp = await session.post(
-            "http://localhost:5000/api/v1/parameter/dump_prefix",
-            data=str(p_prefix).encode("utf8"),
-        )
-        assert resp.status == 200
+        pars = [{"name": "dump_prefix", "data": str(p_prefix).encode("utf8")}]
+
+        for p in pars:
+            resp = await session.post(
+                f"http://localhost:5000/api/v1/parameter/{p['name']}",
+                data=p["data"],
+            )
+            assert resp.status == 200
 
         ntrig = 10
         resp = await session.post(
@@ -246,14 +250,13 @@ async def test_dump_xrd(
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
-        resp = await session.post(
-            "http://localhost:5000/api/v1/parameter/dump_prefix",
-            data=str(p_prefix).encode("utf8"),
-        )
-        assert resp.status == 200
-
-        contents = tmp_path.iterdir()
-        logging.warn(f"Content of temp folder {[i for i in contents]}")
+        pars = {"dump_prefix": str(p_prefix).encode("utf8")}
+        for name, data in pars.items():
+            resp = await session.post(
+                f"http://localhost:5000/api/v1/parameter/{name}",
+                data=data,
+            )
+            assert resp.status == 200
 
         ntrig = 10
         resp = await session.post(
@@ -270,6 +273,7 @@ async def test_dump_xrd(
             },
         )
         assert resp.status == 200
+        uuid = await resp.json()
 
     context = zmq.asyncio.Context()
 
@@ -289,4 +293,23 @@ async def test_dump_xrd(
             "total_events": ntrig + 1,
             "finished": True,
         }
+
+    async with aiohttp.ClientSession() as session:
+        st = await session.get("http://localhost:5000/api/v1/mapping")
+        mapping = await st.json()
+        logging.info("mapping %s", mapping)
+
+        with open(f"{p_prefix}mapping-{uuid}.json", "rb") as f:
+            # logging.info(f"Content of mapping {f.read()}")
+            dumped_mapping = json.load(f)
+            logging.info("mapping %s", dumped_mapping)
+        assert mapping == dumped_mapping
+
+    with open(f"{p_prefix}parameters-{uuid}.json", "rb") as f:
+        dumped_pars = {}
+        for p in json.load(f):
+            dumped_pars[p["name"]] = p["data"]
+        for k, v in pars.items():
+            assert dumped_pars[k].encode("utf8") == v
+
     context.destroy()
