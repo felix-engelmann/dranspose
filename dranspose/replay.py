@@ -140,6 +140,7 @@ def get_parameters(
     parameter_file: Optional[os.PathLike[Any] | str], workercls: type, reducercls: type
 ) -> dict[ParameterName, WorkParameter]:
     parameters = {}
+    logger.info("loading parameters from file %s", parameter_file)
     if parameter_file is not None:
         try:
             with open(parameter_file) as f:
@@ -147,17 +148,24 @@ def get_parameters(
                     ParameterName(p.name): p for p in ParamList.validate_json(f.read())
                 }
         except UnicodeDecodeError:
-            with open(parameter_file, "rb") as fb:
-                plist = cbor2.load(fb)
-                parameters = {
-                    ParameterName(p.name): p for p in ParamList.validate_python(plist)
-                }
-        except Exception:
-            with open(parameter_file, "rb") as fb:
-                plist = pickle.load(fb)
-                parameters = {
-                    ParameterName(p.name): p for p in ParamList.validate_python(plist)
-                }
+            logger.info("parameter file is not a json, try pickle")
+            try:
+                with open(parameter_file, "rb") as fb:
+                    plist = pickle.load(fb)
+                    parameters = {
+                        ParameterName(p.name): p
+                        for p in ParamList.validate_python(plist)
+                    }
+            except Exception as e:
+                logger.warning(
+                    "parameter file is not a pickle: %s, try cbor", e.__repr__()
+                )
+                with open(parameter_file, "rb") as fb:
+                    plist = cbor2.load(fb)
+                    parameters = {
+                        ParameterName(p.name): p
+                        for p in ParamList.validate_python(plist)
+                    }
 
     logger.info("params from file %s", parameters)
 
