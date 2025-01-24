@@ -1,0 +1,71 @@
+
+services:
+
+  redis:
+    image: "redis:7"
+    command:
+      - "--save"
+      - ""
+      - "--appendonly"
+      - "no"
+
+  controller:
+    build: .
+    command:
+      - "dranspose"
+      - "controller"
+      - "--host"
+      - "0.0.0.0"
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+    ports:
+      - "5000:5000"
+
+  ingester1:
+    build: .
+    command:
+      - "dranspose"
+      - "ingester"
+      - "--name"
+      - "ing1"
+      - "-c"
+      -  "ZmqPullSingleIngester"
+      - "-u"
+      - "tcp://localhost:1234"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      INGESTER_URL: "tcp://ingester1:10010"
+
+  worker1:
+    build: .
+    command:
+      - "dranspose"
+      - "worker"
+      - "-c"
+      - "examples.dummy.worker.FluorescenceWorker"
+      - "-n"
+      - "worker1"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      INGESTER_URL: "tcp://ingester1:10010"
+      WORKER_TAGS: "[\"generic\"]"
+
+
+  reducer:
+    build: .
+    command:
+      - "dranspose"
+      - "reducer"
+      - "--host"
+      - "0.0.0.0"
+      - "-c"
+      - "examples.dummy.reducer.FluorescenceReducer"
+
+    environment:
+      REDIS_URL: "redis://redis:6379/0"
+      REDUCER_URL: "tcp://reducer:10010"
+
+    ports:
+      - "5010:5000"
