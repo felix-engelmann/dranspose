@@ -226,8 +226,9 @@ def _get_obj_attrs(
 def values(
     req: Request, uuid: H5UUID, select: str | None = None
 ) -> dict[str, Any] | Response:
-    data = req.app.state.get_data()
-    obj, _ = _uuid_to_obj(data, uuid)
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, _ = _uuid_to_obj(data, uuid)
     logger.debug("return value for obj %s", obj)
     logger.debug("selection %s", select)
 
@@ -265,38 +266,41 @@ def values(
 
 @router.get("/datasets/{uuid}")
 def datasets(req: Request, uuid: H5UUID) -> H5Dataset:
-    data = req.app.state.get_data()
-    obj, path = _uuid_to_obj(data, uuid)
-    logger.debug("return dataset for obj %s", obj)
-    ret = _dataset_from_obj(data, path, obj, uuid)
-    # print("return dset", ret)
-    if ret is None:
-        raise HTTPException(status_code=404, detail="Dataset not found")
-    return ret
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, path = _uuid_to_obj(data, uuid)
+        logger.debug("return dataset for obj %s", obj)
+        ret = _dataset_from_obj(data, path, obj, uuid)
+        # print("return dset", ret)
+        if ret is None:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+        return ret
 
 
 @router.get("/groups/{uuid}/links/{name}")
 def link(req: Request, uuid: H5UUID, name: str) -> dict[Literal["link"], H5Link]:
-    data = req.app.state.get_data()
-    obj, path = _uuid_to_obj(data, uuid)
-    path.append(name)
-    if name in obj:
-        obj = obj[name]
-        key: Literal["link"] = "link"
-        ret = {key: _get_group_link(obj, path)}
-        logger.debug("link name is %s", ret)
-        return ret
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, path = _uuid_to_obj(data, uuid)
+        path.append(name)
+        if name in obj:
+            obj = obj[name]
+            key: Literal["link"] = "link"
+            ret = {key: _get_group_link(obj, path)}
+            logger.debug("link name is %s", ret)
+            return ret
     raise HTTPException(status_code=404, detail="Link not found")
 
 
 @router.get("/groups/{uuid}/links")
 def links(req: Request, uuid: H5UUID) -> dict[Literal["links"], list[H5Link]]:
-    data = req.app.state.get_data()
-    obj, path = _uuid_to_obj(data, uuid)
-    key: Literal["links"] = "links"
-    ret = {key: _get_group_links(obj, path)}
-    logger.debug("group links %s", ret)
-    return ret
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, path = _uuid_to_obj(data, uuid)
+        key: Literal["links"] = "links"
+        ret = {key: _get_group_links(obj, path)}
+        logger.debug("group links %s", ret)
+        return ret
 
 
 @router.get("/{typ}/{uuid}/attributes/{name}")
@@ -304,17 +308,22 @@ def attribute(
     req: Request, typ: Literal["groups", "datasets"], uuid: H5UUID, name: str
 ) -> H5ValuedAttribute:
     # print("get attr with name", typ, uuid, name)
-    data = req.app.state.get_data()
-    obj, path = _uuid_to_obj(data, uuid)
-    logger.debug(
-        "start listing attributes typ %s id %s, obj %s, path: %s", typ, uuid, obj, path
-    )
-    allattrs = _get_obj_attrs(data, path, include_values=True)
-    for attr in allattrs:
-        if attr.name == name:
-            logger.debug("return attribute %s", attr)
-            if isinstance(attr, H5ValuedAttribute):
-                return attr
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, path = _uuid_to_obj(data, uuid)
+        logger.debug(
+            "start listing attributes typ %s id %s, obj %s, path: %s",
+            typ,
+            uuid,
+            obj,
+            path,
+        )
+        allattrs = _get_obj_attrs(data, path, include_values=True)
+        for attr in allattrs:
+            if attr.name == name:
+                logger.debug("return attribute %s", attr)
+                if isinstance(attr, H5ValuedAttribute):
+                    return attr
     raise HTTPException(status_code=404, detail="Attribute not found")
 
 
@@ -322,46 +331,52 @@ def attribute(
 def attributes(
     req: Request, typ: Literal["groups", "datasets"], uuid: H5UUID
 ) -> dict[Literal["attributes"], list[H5Attribute]]:
-    data = req.app.state.get_data()
-    obj, path = _uuid_to_obj(data, uuid)
-    logger.debug(
-        "start listing attributes typ %s id %s, obj %s, path: %s", typ, uuid, obj, path
-    )
-    # by calling _get_obj_attrs with False, it should never return H5ValuedAttribute
-    attrs: list[H5Attribute] = _get_obj_attrs(data, path, include_values=False)  # type: ignore[assignment]
-    return {"attributes": attrs}
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, path = _uuid_to_obj(data, uuid)
+        logger.debug(
+            "start listing attributes typ %s id %s, obj %s, path: %s",
+            typ,
+            uuid,
+            obj,
+            path,
+        )
+        # by calling _get_obj_attrs with False, it should never return H5ValuedAttribute
+        attrs: list[H5Attribute] = _get_obj_attrs(data, path, include_values=False)  # type: ignore[assignment]
+        return {"attributes": attrs}
 
 
 @router.get("/groups/{uuid}")
 def group(req: Request, uuid: H5UUID) -> H5Group:
-    data = req.app.state.get_data()
-    obj, path = _uuid_to_obj(data, uuid)
-    logger.debug("start listing group id %s, obj %s, path: %s", uuid, obj, path)
+    data, lock = req.app.state.get_data()
+    with lock:
+        obj, path = _uuid_to_obj(data, uuid)
+        logger.debug("start listing group id %s, obj %s, path: %s", uuid, obj, path)
 
-    if isinstance(obj, dict):
-        linkCount = len(
-            list(
-                filter(
-                    lambda x: isinstance(x, str) and not x.endswith("_attrs"),
-                    obj.keys(),
+        if isinstance(obj, dict):
+            linkCount = len(
+                list(
+                    filter(
+                        lambda x: isinstance(x, str) and not x.endswith("_attrs"),
+                        obj.keys(),
+                    )
                 )
             )
-        )
-        group = H5Group(
-            root=_path_to_uuid([]),
-            id=uuid,
-            linkCount=linkCount,
-            attributeCount=len(_get_obj_attrs(data, path)),
-        )
-        logger.debug("group is %s", group)
-        return group
+            group = H5Group(
+                root=_path_to_uuid([]),
+                id=uuid,
+                linkCount=linkCount,
+                attributeCount=len(_get_obj_attrs(data, path)),
+            )
+            logger.debug("group is %s", group)
+            return group
     raise HTTPException(status_code=404, detail="Group not found")
 
 
 @router.get("/")
-def read_root(request: Request) -> H5Root:
-    logging.debug("data %s", request.app.state.get_data())
-    data = request.app.state.get_data()
+def read_root(req: Request) -> H5Root:
+    logging.debug("data %s", req.app.state.get_data()[0])
+    data, _ = req.app.state.get_data()
     if isinstance(data, dict):
         uuid = _path_to_uuid([])
         ret = H5Root(root=uuid)

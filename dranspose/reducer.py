@@ -1,15 +1,17 @@
 import asyncio
+import contextlib
 import json
 import logging
 import pickle
 import traceback
-from contextlib import asynccontextmanager
-from typing import Optional, AsyncGenerator, Any
+from contextlib import asynccontextmanager, nullcontext
+from typing import Optional, AsyncGenerator, Any, Tuple, Union
 
 import zmq.asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import UUID4
 from starlette.responses import Response
+from readerwriterlock import rwlock
 
 from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
@@ -204,11 +206,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
 
-    def get_data() -> dict[str, Any]:
+    def get_data() -> Tuple[dict[str, Any], Union[rwlock.Lockable, nullcontext[None]]]:
+        data = {}
+        lock = contextlib.nullcontext()
         if reducer.reducer is not None:
             if hasattr(reducer.reducer, "publish"):
-                return reducer.reducer.publish
-        return {}
+                data = reducer.reducer.publish
+            if hasattr(reducer.reducer, "publish_reader_lock"):
+                lock = reducer.reducer.publish_reader_lock
+        return data, lock
 
     app.state.get_data = get_data
     yield
