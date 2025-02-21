@@ -1,4 +1,4 @@
-import contextlib
+from contextlib import nullcontext, contextmanager
 import gzip
 import json
 import logging
@@ -8,7 +8,7 @@ import random
 import threading
 import time
 import traceback
-from typing import Iterator, Any, Optional
+from typing import Iterator, Any, Optional, Tuple, Union
 
 import cbor2
 import uvicorn
@@ -17,6 +17,7 @@ from pydantic import TypeAdapter
 from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import Response
+from readerwriterlock import rwlock
 
 from dranspose.helpers import utils
 from dranspose.event import (
@@ -66,11 +67,16 @@ reducer_app = FastAPI()
 reducer: Any | None = None
 
 
-def get_data() -> dict[str, Any]:
+def get_data() -> Tuple[dict[str, Any], Union[rwlock.Lockable, nullcontext[None]]]:
     global reducer
-    if reducer is not None and hasattr(reducer, "publish"):
-        return reducer.publish
-    return {}
+    data = {}
+    lock = nullcontext()
+    if reducer is not None:
+        if hasattr(reducer, "publish"):
+            data = reducer.publish
+        if hasattr(reducer, "publish_reader_lock"):
+            lock = reducer.publish_reader_lock
+    return data, lock
 
 
 reducer_app.state.get_data = get_data
@@ -120,7 +126,7 @@ class Server(uvicorn.Server):
     def install_signal_handlers(self) -> None:
         pass
 
-    @contextlib.contextmanager
+    @contextmanager
     def run_in_thread(self, port: Optional[int]) -> Iterator[None]:
         if port is None:
             yield
