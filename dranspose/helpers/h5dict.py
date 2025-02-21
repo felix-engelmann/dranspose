@@ -1,8 +1,9 @@
 import base64
+from contextlib import nullcontext
 import gzip
 import logging
 import time
-from typing import Any, Literal
+from typing import Any, Literal, Tuple
 
 import numpy as np
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -389,13 +390,13 @@ app = FastAPI()
 app.include_router(router)
 
 
-def get_data() -> dict[str, Any]:
+def get_data() -> Tuple[dict[str, Any], nullcontext[None]]:
     dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
 
     arr = np.array([(0.5, 1)], dtype=dt)
 
     changing = np.ones((5, int(time.time()) % 10 + 5))
-    return {
+    data = {
         "map": {
             "x": [
                 np.float64(-14.96431272),
@@ -450,6 +451,7 @@ def get_data() -> dict[str, Any]:
             "motor_attrs": {"long_name": "motor name"},
         },
     }
+    return data, nullcontext()
 
 
 app.state.get_data = get_data

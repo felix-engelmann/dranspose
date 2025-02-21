@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import json
 import logging
 import pickle
@@ -208,7 +207,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     def get_data() -> Tuple[dict[str, Any], Union[rwlock.Lockable, nullcontext[None]]]:
         data = {}
-        lock = contextlib.nullcontext()
+        lock = nullcontext()
         if reducer.reducer is not None:
             if hasattr(reducer.reducer, "publish"):
                 data = reducer.reducer.publish
