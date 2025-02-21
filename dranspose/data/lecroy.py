@@ -76,7 +76,7 @@ class LecroyEnd(LecroyBase):
     message_type: Literal["series-end"]
 
 
-LecroyPacket = TypeAdapter(LecroyStart | LecroyData | LecroyEnd)
+LecroyPacket: TypeAdapter = TypeAdapter(LecroyStart | LecroyData | LecroyEnd)  # type: ignore [type-arg]
 """
 Union type for Lecroy packets
 """
