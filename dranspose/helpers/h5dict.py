@@ -4,7 +4,7 @@ import copy
 import gzip
 import logging
 import time
-from typing import Any, Literal, Tuple
+from typing import Any, ContextManager, Literal, Tuple
 
 import numpy as np
 from fastapi import APIRouter, FastAPI, HTTPException
@@ -391,7 +391,7 @@ app = FastAPI()
 app.include_router(router)
 
 
-def get_data() -> Tuple[dict[str, Any], nullcontext[None]]:
+def get_data() -> Tuple[dict[str, Any], ContextManager]:
     dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
 
     arr = np.array([(0.5, 1)], dtype=dt)

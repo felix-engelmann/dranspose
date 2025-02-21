@@ -8,7 +8,7 @@ import random
 import threading
 import time
 import traceback
-from typing import Iterator, Any, Optional, Tuple, Union
+from typing import ContextManager, Iterator, Any, Optional, Tuple
 
 import cbor2
 import uvicorn
@@ -17,7 +17,6 @@ from pydantic import TypeAdapter
 from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import Response
-from readerwriterlock import rwlock
 
 from dranspose.helpers import utils
 from dranspose.event import (
@@ -67,7 +66,7 @@ reducer_app = FastAPI()
 reducer: Any | None = None
 
 
-def get_data() -> Tuple[dict[str, Any], Union[rwlock.Lockable, nullcontext[None]]]:
+def get_data() -> Tuple[dict[str, Any], ContextManager]:
     global reducer
     data = {}
     lock = nullcontext()
