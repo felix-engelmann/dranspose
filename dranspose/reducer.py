@@ -4,13 +4,12 @@ import logging
 import pickle
 import traceback
 from contextlib import asynccontextmanager, nullcontext
-from typing import Optional, AsyncGenerator, Any, Tuple, Union
+from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple
 
 import zmq.asyncio
 from fastapi import FastAPI, HTTPException
 from pydantic import UUID4
 from starlette.responses import Response
-from readerwriterlock import rwlock
 
 from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
@@ -205,7 +204,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
 
-    def get_data() -> Tuple[dict[str, Any], Union[rwlock.Lockable, nullcontext[None]]]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         data = {}
         lock = nullcontext()
         if reducer.reducer is not None:
@@ -237,8 +236,12 @@ async def get_result() -> Any | bytes:
     global reducer
     data = b""
     try:
-        if hasattr(reducer.reducer, "publish"):
-            data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
+        lock: ContextManager[None] = getattr(
+            reducer.reducer, "publish_reader_lock", nullcontext()
+        )
+        with lock:
+            if hasattr(reducer.reducer, "publish"):
+                data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
     except pickle.PicklingError:
         logging.warning("publishable data cannot be pickled")
     return Response(data, media_type="application/x.pickle")
@@ -254,8 +257,12 @@ async def get_path(path: str) -> Any:
             path = "$"
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
-        data = pickle.dumps(ret)
+        lock: ContextManager[None] = getattr(
+            reducer.reducer, "publish_reader_lock", nullcontext()
+        )
+        with lock:
+            ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
+            data = pickle.dumps(ret)
         return Response(data, media_type="application/x.pickle")
     except Exception as e:
         raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
