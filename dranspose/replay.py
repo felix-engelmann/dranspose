@@ -74,8 +74,8 @@ def get_data() -> Tuple[dict[str, Any], Union[rwlock.Lockable, nullcontext[None]
     if reducer is not None:
         if hasattr(reducer, "publish"):
             data = reducer.publish
-        if hasattr(reducer, "publish_reader_lock"):
-            lock = reducer.publish_reader_lock
+        if hasattr(reducer, "publish_rlock"):
+            lock = reducer.publish_rlock
     return data, lock
 
 

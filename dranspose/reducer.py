@@ -210,8 +210,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if reducer.reducer is not None:
             if hasattr(reducer.reducer, "publish"):
                 data = reducer.reducer.publish
-            if hasattr(reducer.reducer, "publish_reader_lock"):
-                lock = reducer.reducer.publish_reader_lock
+            if hasattr(reducer.reducer, "publish_rlock"):
+                lock = reducer.reducer.publish_rlock
         return data, lock
 
     app.state.get_data = get_data
@@ -237,7 +237,7 @@ async def get_result() -> Any | bytes:
     data = b""
     try:
         lock: ContextManager[None] = getattr(
-            reducer.reducer, "publish_reader_lock", nullcontext()
+            reducer.reducer, "publish_rlock", nullcontext()
         )
         with lock:
             if hasattr(reducer.reducer, "publish"):
@@ -258,7 +258,7 @@ async def get_path(path: str) -> Any:
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
         lock: ContextManager[None] = getattr(
-            reducer.reducer, "publish_reader_lock", nullcontext()
+            reducer.reducer, "publish_rlock", nullcontext()
         )
         with lock:
             ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
