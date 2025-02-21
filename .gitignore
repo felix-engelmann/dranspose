@@ -14,3 +14,4 @@ plots
 bench
 redis-observations
 .vscode
+*.code-workspace
