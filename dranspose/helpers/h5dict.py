@@ -1,5 +1,6 @@
 import base64
 from contextlib import nullcontext
+import copy
 import gzip
 import logging
 import time
@@ -230,39 +231,39 @@ def values(
     data, lock = req.app.state.get_data()
     with lock:
         obj, _ = _uuid_to_obj(data, uuid)
-    logger.debug("return value for obj %s", obj)
-    logger.debug("selection %s", select)
+        logger.debug("return value for obj %s", obj)
+        logger.debug("selection %s", select)
 
-    if type(obj) in [int, float, str]:
-        return {"value": obj}
+        if type(obj) in [int, float, str]:
+            return {"value": obj}
 
-    elif isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], str):
-        return {"value": obj}
-    else:
-        ret = np.array(obj)
-        slices = []
-        if select is not None:
-            dims = select[1:-1].split(",")
-            slices = [slice(*map(int, dim.split(":"))) for dim in dims]
+        elif isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], str):
+            return {"value": copy.copy(obj)}
+        else:
+            ret = np.array(obj)
+            slices = []
+            if select is not None:
+                dims = select[1:-1].split(",")
+                slices = [slice(*map(int, dim.split(":"))) for dim in dims]
 
-        logger.debug("slices %s", slices)
+            logger.debug("slices %s", slices)
 
-        if len(slices) == 1:
-            ret = ret[slices[0]]
-        elif len(slices) > 1:
-            ret = ret[*slices]
+            if len(slices) == 1:
+                ret = ret[slices[0]]
+            elif len(slices) > 1:
+                ret = ret[*slices]
 
-        ret_bytes = ret.tobytes()
-        if "gzip" in req.headers.get("Accept-Encoding", ""):
-            if len(ret_bytes) > 1000:
-                compressed_data = gzip.compress(ret_bytes, compresslevel=7)
+            ret_bytes = ret.tobytes()
+            if "gzip" in req.headers.get("Accept-Encoding", ""):
+                if len(ret_bytes) > 1000:
+                    compressed_data = gzip.compress(ret_bytes, compresslevel=7)
 
-                return Response(
-                    content=compressed_data,
-                    media_type="application/octet-stream",
-                    headers={"Content-Encoding": "gzip"},
-                )
-        return Response(content=ret_bytes, media_type="application/octet-stream")
+                    return Response(
+                        content=compressed_data,
+                        media_type="application/octet-stream",
+                        headers={"Content-Encoding": "gzip"},
+                    )
+            return Response(content=ret_bytes, media_type="application/octet-stream")
 
 
 @router.get("/datasets/{uuid}")
