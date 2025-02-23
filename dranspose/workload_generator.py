@@ -38,6 +38,7 @@ class WorkloadSpec(BaseModel):
     number: int = 1
     time: float = 0.1
     shape: Tuple[int, int] = (10, 10)
+    filename: str = ""
 
 
 class Statistics(BaseModel):
@@ -131,7 +132,7 @@ class WorkloadGenerator:
             raise Exception("must open socket before sending packets")
         if not isinstance(self.socket, AcquisitionSocket):
             raise Exception("must be AcquisitionSocket to send, is %s", self.socket)
-        acq = await self.socket.start(filename="")
+        acq = await self.socket.start(filename=spec.filename)
         logger.info("sending packets %s", spec)
         self.stat.packets += 1
         width = spec.shape[0]
