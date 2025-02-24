@@ -12,6 +12,10 @@ variables:
   PYTEST_EXTRA_ARGS: "--log-cli-level=INFO"
   CONDA_AUTO_PACKAGING_ENABLED: "false"
 
+test-python311:
+  allow_failure: true
+  # pytango 9.3.6 is not compatible with numpy 2
+
 .test-python:
   services:
     - redis:latest
