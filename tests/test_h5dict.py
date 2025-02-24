@@ -118,7 +118,7 @@ async def test_root() -> None:
         logging.info("content %s", data)
 
         comr_data = await session.get(
-            "http://localhost:5000/results/datasets/h5dict-2F696D616765/value"
+            "http://localhost:5000/results/datasets/d-h5dict-2F696D616765/value"
         )
         data_len = comr_data.content_length
         logging.info("data len %d", data_len)
@@ -128,7 +128,7 @@ async def test_root() -> None:
 
     async with aiohttp.ClientSession() as session:
         comr_data = await session.get(
-            "http://localhost:5000/results/datasets/h5dict-2F696D616765/value",
+            "http://localhost:5000/results/datasets/d-h5dict-2F696D616765/value",
             headers={"Accept-Encoding": "deflate"},
         )
         data_len = comr_data.content_length
