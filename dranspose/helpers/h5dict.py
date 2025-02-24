@@ -152,8 +152,11 @@ def _get_group_link(obj: Any, path: list[str]) -> H5Link:
     else:
         collection = "datasets"
         collection_type = "d-"
-    return H5Link(collection=collection, id=_path_to_uuid(path, collection_type=collection_type), title=path[-1])
-
+    return H5Link(
+        collection=collection,
+        id=_path_to_uuid(path, collection_type=collection_type),
+        title=path[-1],
+    )
 
 
 def _get_group_links(obj: Any, path: list[str]) -> list[H5Link]:
