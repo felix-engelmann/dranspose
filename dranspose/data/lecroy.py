@@ -36,6 +36,47 @@ class LecroyMessage(LecroyBase):
     frame: int
 
 
+class LecroyStart(LecroyMessage):
+    # len(parts) parts[0]
+    # 1 b'{"htype": "msg", "what": 1, "frame": 0, "ntriggers": -1, "seqno": 0, "channels": [2, 4]}'
+    """
+    Example:
+        ``` py
+        LecroyStart(
+            htype='msg'
+            what=1,
+            frame=0,
+            ntriggers=-1
+            seqno=0
+            channels=[2, 4]
+        )
+        ```
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    what: Literal[1]  # START = 1
+
+
+class LecroyEnd(LecroyMessage):
+    # len(parts) parts[0]
+    """
+    Example:
+        ``` py
+        LecroyStart(
+            htype='msg'
+            what=3,
+            frame=66,
+            frames=66,
+        )
+        ```
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    what: Literal[3]  # STOP = 3
+
+
 class LecroyData(LecroyBase):
     # len(parts) parts[0]
     # 3 b'{"htype": "traces", "ch": 2, "ts": 1740563614.969933, "frame": 0, "shape": [1, 8002], "horiz_offset": -1.0000505879544622e-07, "horiz_interval": 1.25000001668929e-11, "dtype": "float64"}'
