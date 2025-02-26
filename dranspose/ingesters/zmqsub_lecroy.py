@@ -51,29 +51,7 @@ class ZmqSubLecroyIngester(Ingester):
                 self._logger.error("packet not valid %s", e.__repr__())
                 continue
             if isinstance(packet, LecroyData):
-                if len(parts) != 1:
-                    self._logger.error("Lecroy multipart messages are not supported")
-                    continue
-                self._logger.debug("received data is %s", packet)
-                vect_keys = {k: len(v) for k, v in iter(packet) if isinstance(v, list)}
-                self._logger.debug("vect_keys are %s", vect_keys)
-                lenghts = set(vect_keys.values())
-                if len(lenghts) != 1:
-                    self._logger.error("All lists in msg must have the same length")
-                    continue
-                for i in range(lenghts.pop()):
-                    frame = {}
-                    for k, v in iter(packet):
-                        if k in vect_keys.keys():
-                            frame[k] = v[i]
-                        elif k == "frame_number":
-                            frame[k] = v + i  # Increment frame_number
-                        else:
-                            frame[k] = v  # Keep the original scalar value
-                    new_packet = LecroyData(**frame)
-                    self._logger.debug("send out newly created package %s", new_packet)
-                    frame_bytes = new_packet.model_dump_json().encode()
-                    yield StreamData(typ="Lecroy", frames=[frame_bytes])
+                yield StreamData(typ="Lecroy", frames=parts)
             elif isinstance(packet, LecroyEnd):
                 self._logger.info("reached end %s", packet)
                 yield StreamData(typ="Lecroy", frames=parts)
