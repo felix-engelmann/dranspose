@@ -63,7 +63,7 @@ class LecroySequence(LecroyMessage):
     """
     Example:
         ``` py
-        LecroyStart(
+        LecroySequence(
             htype='msg'
             what=2,
             frame=2,
@@ -81,7 +81,7 @@ class LecroyEnd(LecroyMessage):
     """
     Example:
         ``` py
-        LecroyStart(
+        LecroyEnd(
             htype='msg'
             what=3,
             frame=66,
@@ -103,7 +103,7 @@ class LecroyData(LecroyBase):
 
     Example:
         ``` py
-        LecroyImage(
+        LecroyData(
             htype='traces',
             ch: 2,
             ts: 1740563614.969933,
