@@ -33,7 +33,6 @@ class LecroyMessage(LecroyBase):
 
     htype: Literal["msg"]
     what: Literal[0, 1, 2, 3]  # PREPARE = 0 START = 1 SEQEND = 2 STOP = 3
-    frame: int
 
 
 class LecroyStart(LecroyMessage):
@@ -56,6 +55,25 @@ class LecroyStart(LecroyMessage):
     model_config = ConfigDict(extra="allow")
 
     what: Literal[1]  # START = 1
+
+
+class LecroySequence(LecroyMessage):
+    # len(parts) parts[0]
+    # 1 b'{"htype": "msg", "what": 2, "frame": 2}'
+    """
+    Example:
+        ``` py
+        LecroyStart(
+            htype='msg'
+            what=2,
+            frame=2,
+        )
+        ```
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    what: Literal[2]  # SEQEND = 2
 
 
 class LecroyEnd(LecroyMessage):
