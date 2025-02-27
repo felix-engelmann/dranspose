@@ -2,7 +2,13 @@ from typing import AsyncGenerator, Optional
 
 import zmq
 
-from dranspose.data.lecroy import LecroyPacket, LecroyStart, LecroyData, LecroyEnd
+from dranspose.data.lecroy import (
+    LecroyPacket,
+    LecroySequence,
+    LecroyStart,
+    LecroyData,
+    LecroyEnd,
+)
 from dranspose.event import StreamData
 from dranspose.ingester import Ingester, IngesterSettings
 from dranspose.protocol import StreamName, ZmqUrl
@@ -51,6 +57,8 @@ class ZmqSubLecroyIngester(Ingester):
                 self._logger.error("packet not valid %s", e.__repr__())
                 continue
             if isinstance(packet, LecroyData):
+                yield StreamData(typ="Lecroy", frames=parts)
+            if isinstance(packet, LecroySequence):
                 yield StreamData(typ="Lecroy", frames=parts)
             elif isinstance(packet, LecroyEnd):
                 self._logger.info("reached end %s", packet)
