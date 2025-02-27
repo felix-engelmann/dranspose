@@ -4,7 +4,7 @@ import zmq
 
 from dranspose.data.lecroy import (
     LecroyPacket,
-    LecroySequence,
+    # LecroySequence,
     LecroyStart,
     LecroyData,
     LecroyEnd,
@@ -44,7 +44,9 @@ class ZmqSubLecroyIngester(Ingester):
             except Exception as e:
                 self._logger.warning("packet not valid %s", e.__repr__())
                 continue
-            self._logger.debug("received frame with header %s", packet)
+            self._logger.debug(
+                f"received frame of type {type(packet)} with header {packet}"
+            )
             if type(packet) is LecroyStart:
                 self._logger.info("start of new sequence %s", packet)
                 yield StreamData(typ="Lecroy", frames=parts)
@@ -56,10 +58,13 @@ class ZmqSubLecroyIngester(Ingester):
             except Exception as e:
                 self._logger.error("packet not valid %s", e.__repr__())
                 continue
+            self._logger.debug(
+                f"received frame of type {type(packet)} with header {packet}"
+            )
             if isinstance(packet, LecroyData):
                 yield StreamData(typ="Lecroy", frames=parts)
-            if isinstance(packet, LecroySequence):
-                yield StreamData(typ="Lecroy", frames=parts)
+            # if isinstance(packet, LecroySequence):
+            #     yield StreamData(typ="Lecroy", frames=parts)
             elif isinstance(packet, LecroyEnd):
                 self._logger.info("reached end %s", packet)
                 yield StreamData(typ="Lecroy", frames=parts)
