@@ -126,7 +126,7 @@ class LecroyData(LecroyBase):
     dtype: str
 
 
-LecroyPacket: TypeAdapter = TypeAdapter(LecroyMessage | LecroyData)  # type: ignore [type-arg]
+LecroyPacket: TypeAdapter = TypeAdapter(LecroyStart | LecroyEnd | LecroySequence | LecroyData)  # type: ignore [type-arg]
 """
 Union type for Lecroy packets
 """
