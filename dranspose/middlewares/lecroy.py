@@ -1,10 +1,13 @@
 import json
+import logging
 from types import UnionType
 
 import zmq
 
 from dranspose.data.lecroy import LecroyPacket
 from dranspose.event import StreamData
+
+logger = logging.getLogger(__name__)
 
 
 def parse(data: StreamData) -> UnionType:
@@ -18,7 +21,6 @@ def parse(data: StreamData) -> UnionType:
         a LecroyPacket
     """
     assert data.typ == "Lecroy"
-    assert data.length == 1
     frame = data.frames[0]
     if isinstance(frame, zmq.Frame):
         val = json.loads(frame.bytes)
