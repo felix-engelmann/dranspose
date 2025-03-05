@@ -40,7 +40,10 @@ class PositioncapParser:
             # header
             for line in val.split("\n"):
                 if line.startswith("arm_time: "):
-                    self.arm_time = datetime.fromisoformat(line[len("arm_time: ") :])
+                    # TODO: removing the Z at the end of the isoformat is required for python 3.10, remove once support is dropped
+                    self.arm_time = datetime.fromisoformat(
+                        line[len("arm_time: ") :].replace("Z", "")
+                    )
                 if line.startswith(" "):
                     parts = line.strip().split(" ")
                     self.fields.append(
