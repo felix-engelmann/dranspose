@@ -35,12 +35,12 @@ router = APIRouter()
 logger = logging.getLogger()
 
 
-def _path_to_uuid(path: list[str]) -> H5UUID:
+def _path_to_uuid(path: list[str], collection_type) -> H5UUID:
     abspath = "/" + "/".join(path)
     # print("abspath", abspath)
     uuid = base64.b16encode(abspath.encode()).decode()
     # print("uuid from function is", str(id(obj)).encode() + b"-" + uuid)
-    return H5UUID("h5dict-" + uuid)
+    return H5UUID(collection_type + "h5dict-" + uuid)
 
 
 def _get_obj_at_path(
@@ -62,7 +62,7 @@ def _get_obj_at_path(
 
 def _uuid_to_obj(data: dict[str, Any], uuid: str) -> tuple[Any, list[str]]:
     logger.debug("parse %s", uuid)
-    idstr, path = uuid.split("-")
+    col_type, idstr, path = uuid.split("-")
     path = base64.b16decode(path).decode()
     logger.debug("raw path %s", path)
     # assert id(data) == int(idstr)
@@ -148,9 +148,15 @@ def _get_group_link(obj: Any, path: list[str]) -> H5Link:
     collection: Literal["datasets", "groups"]
     if isinstance(obj, dict):
         collection = "groups"
+        collection_type = "g-"
     else:
         collection = "datasets"
-    return H5Link(collection=collection, id=_path_to_uuid(path), title=path[-1])
+        collection_type = "d-"
+    return H5Link(
+        collection=collection,
+        id=_path_to_uuid(path, collection_type=collection_type),
+        title=path[-1],
+    )
 
 
 def _get_group_links(obj: Any, path: list[str]) -> list[H5Link]:
@@ -348,7 +354,7 @@ def group(req: Request, uuid: H5UUID) -> H5Group:
             )
         )
         group = H5Group(
-            root=_path_to_uuid([]),
+            root=_path_to_uuid([], collection_type="g-"),
             id=uuid,
             linkCount=linkCount,
             attributeCount=len(_get_obj_attrs(data, path)),
@@ -363,7 +369,7 @@ def read_root(request: Request) -> H5Root:
     logging.debug("data %s", request.app.state.get_data())
     data = request.app.state.get_data()
     if isinstance(data, dict):
-        uuid = _path_to_uuid([])
+        uuid = _path_to_uuid([], collection_type="g-")
         ret = H5Root(root=uuid)
         return ret
     raise Exception("data object is not a dict")
