@@ -788,7 +788,13 @@ async def get_logs(level: str = "INFO") -> Any:
     global ctrl
     data = await ctrl.redis.xrange("dranspose_logs", "-", "+")
     logs = []
-    levels = logging.getLevelNamesMapping()
+    # TODO: once python 3.10 support is dropped, use
+    # levels = logging.getLevelNamesMapping()
+    levels = {
+        level: logging.__getattribute__(level)
+        for level in dir(logging)
+        if level.isupper() and isinstance(logging.__getattribute__(level), int)
+    }
     minlevel = levels.get(level.upper(), logging.INFO)
     for entry in data:
         msglevel = levels[entry[1].get("levelname", "DEBUG")]

@@ -235,6 +235,43 @@ async def test_root() -> None:
     await asyncio.sleep(0.5)
 
 
+@pytest.mark.asyncio
+async def test_slice() -> None:
+    app = FastAPI()
+
+    app.include_router(router, prefix="/results")
+
+    def get_data() -> dict[str, Any]:
+        return {
+            "image": [[r * 100 + c for c in range(10)] for r in range(10)],
+        }
+
+    app.state.get_data = get_data
+
+    config = uvicorn.Config(app, port=5000, log_level="debug")
+    server = uvicorn.Server(config)
+    server_task = asyncio.create_task(server.serve())
+    while server.started is False:
+        await asyncio.sleep(0.1)
+
+    async with aiohttp.ClientSession() as session:
+        comr_data = await session.get(
+            "http://localhost:5000/results/datasets/d-h5dict-2F696D616765/value?select=[2:5,7:20]",
+            headers={"Accept-Encoding": "deflate"},
+        )
+        orig = np.array([[r * 100 + c for c in range(10)] for r in range(10)])
+        logging.info("original %s", orig.dtype)
+        raw = await comr_data.content.read()
+        arr = np.frombuffer(raw, dtype=np.int64)
+        assert np.array_equal(orig[2:5, 7:20].reshape(-1), arr)
+        logging.info("got data %s", arr)
+
+    server.should_exit = True
+    await server_task
+
+    await asyncio.sleep(0.5)
+
+
 def test_dtype_to_h5() -> None:
     numpytypes = {
         "u1",

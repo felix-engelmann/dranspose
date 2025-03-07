@@ -257,7 +257,9 @@ def values(
             if len(slices) == 1:
                 ret = ret[slices[0]]
             elif len(slices) > 1:
-                ret = ret[*slices]
+                # TODO: from python 3.11, this can be written as
+                # ret = ret[*slices]
+                ret = ret[tuple(slices)]
 
             ret_bytes = ret.tobytes()
             if "gzip" in req.headers.get("Accept-Encoding", ""):
