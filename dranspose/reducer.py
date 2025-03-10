@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import json
 import logging
 import pickle
@@ -122,6 +123,7 @@ class Reducer(DistributedService):
             )
             self._logger.debug("processed result %s", result)
             self.state.processed_events += 1
+            self.state.timestamp = datetime.now()
 
     async def timer(self) -> None:
         self._logger.info("started timer task")
@@ -159,6 +161,7 @@ class Reducer(DistributedService):
         self.timer_task = asyncio.create_task(self.timer())
         self.timer_task.add_done_callback(done_callback)
         self.state.processed_events = 0
+        self.state.timestamp = datetime.now()
 
     async def finish_work(self) -> None:
         self._logger.info("finishing reducer work")

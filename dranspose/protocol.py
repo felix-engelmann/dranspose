@@ -294,6 +294,7 @@ class DistributedState(BaseModel):
     mapreduce_version: Optional[BuildGitMeta] = None
     parameters_hash: Optional[HashDigest] = None
     processed_events: int = 0
+    timestamp: datetime.datetime = Field(default_factory=datetime.datetime.now)
     event_rate: float = 0.0
 
     # write a h5 dump function for metadata

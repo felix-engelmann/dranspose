@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import json
 import logging
 import pickle
@@ -323,6 +324,7 @@ class Worker(DistributedService):
                 perf_sent_result = time.perf_counter()
                 proced += 1
                 self.state.processed_events += 1
+                self.state.timestamp = datetime.now()
                 if proced % 500 == 0:
                     self._logger.info("processed %d events", proced)
                 completed.append(event.event_number)
@@ -411,6 +413,7 @@ class Worker(DistributedService):
         self.assign_task = asyncio.create_task(self.manage_assignments())
         self.assign_task.add_done_callback(done_callback)
         self.state.processed_events = 0
+        self.state.timestamp = datetime.now()
 
     async def manage_receiver(self) -> None:
         "Periodically check that the push socket to the receiver is connected to the correct url, which the reducer publishes in redis"

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import time
 import os
 from io import BufferedWriter
@@ -132,6 +133,7 @@ class Ingester(DistributedService):
         self.assign_task = asyncio.create_task(self.manage_assignments())
         self.assign_task.add_done_callback(done_callback)
         self.state.processed_events = 0
+        self.state.timestamp = datetime.now()
 
     async def finish_work(self) -> None:
         """
@@ -311,6 +313,7 @@ class Ingester(DistributedService):
                     took = []
                     empties = []
                 self.state.processed_events += 1
+                self.state.timestamp = datetime.now()
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
             for stream in self.active_streams:
