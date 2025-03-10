@@ -158,6 +158,7 @@ class Reducer(DistributedService):
         self.work_task.add_done_callback(done_callback)
         self.timer_task = asyncio.create_task(self.timer())
         self.timer_task.add_done_callback(done_callback)
+        self.state.processed_events = 0
 
     async def finish_work(self) -> None:
         self._logger.info("finishing reducer work")

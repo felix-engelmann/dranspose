@@ -410,6 +410,7 @@ class Worker(DistributedService):
         self.work_task.add_done_callback(done_callback)
         self.assign_task = asyncio.create_task(self.manage_assignments())
         self.assign_task.add_done_callback(done_callback)
+        self.state.processed_events = 0
 
     async def manage_receiver(self) -> None:
         "Periodically check that the push socket to the receiver is connected to the correct url, which the reducer publishes in redis"
