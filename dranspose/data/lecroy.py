@@ -119,10 +119,9 @@ class LecroyEnd(LecroyMessage):
 class LecroyData(LecroyBase):
     # len(parts) parts[0]
     # 3 b'{"htype": "traces", "ch": 2, "ts": 1740563614.969933, "frame": 0, "shape": [1, 8002], "horiz_offset": -1.0000505879544622e-07, "horiz_interval": 1.25000001668929e-11, "dtype": "float64"}'
-    # "traces" messages have 3 zmq parts:
-    # metadata (json), waveforms (np.array), timestamps (list)
     """
-    While the original stream sends 3 separate zmq frames (no multipart), this returns a single packet.
+    Each "traces" message has 3 zmq parts:
+    metadata (json), waveforms (np.array), timestamps (list)
 
     Example:
         ``` py
