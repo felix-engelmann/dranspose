@@ -35,6 +35,25 @@ class LecroyMessage(LecroyBase):
     what: Literal[0, 1, 2, 3]  # PREPARE = 0 START = 1 SEQEND = 2 STOP = 3
 
 
+class LecroyPrepare(LecroyMessage):
+    # len(parts) parts[0]
+    # 1 b'{"htype": "msg", "what": 0, "frame": 0}'
+    """
+    Example:
+        ``` py
+        LecroyStart(
+            htype='msg'
+            what=0,
+            frame=0,
+        )
+        ```
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    what: Literal[0]  # PREPARE = 0
+
+
 class LecroyStart(LecroyMessage):
     # len(parts) parts[0]
     # 1 b'{"htype": "msg", "what": 1, "frame": 0, "ntriggers": -1, "seqno": 0, "channels": [2, 4]}'
@@ -55,15 +74,17 @@ class LecroyStart(LecroyMessage):
     model_config = ConfigDict(extra="allow")
 
     what: Literal[1]  # START = 1
+    ntriggers: int
+    channels: List[int]
 
 
-class LecroySequence(LecroyMessage):
+class LecroySeqEnd(LecroyMessage):
     # len(parts) parts[0]
     # 1 b'{"htype": "msg", "what": 2, "frame": 2}'
     """
     Example:
         ``` py
-        LecroySequence(
+        LecroySeqEnd(
             htype='msg'
             what=2,
             frame=2,
@@ -98,6 +119,8 @@ class LecroyEnd(LecroyMessage):
 class LecroyData(LecroyBase):
     # len(parts) parts[0]
     # 3 b'{"htype": "traces", "ch": 2, "ts": 1740563614.969933, "frame": 0, "shape": [1, 8002], "horiz_offset": -1.0000505879544622e-07, "horiz_interval": 1.25000001668929e-11, "dtype": "float64"}'
+    # "traces" messages have 3 zmq parts:
+    # metadata (json), waveforms (np.array), timestamps (list)
     """
     While the original stream sends 3 separate zmq frames (no multipart), this returns a single packet.
 
@@ -126,7 +149,7 @@ class LecroyData(LecroyBase):
     dtype: str
 
 
-LecroyPacket: TypeAdapter = TypeAdapter(LecroyStart | LecroyEnd | LecroySequence | LecroyData)  # type: ignore [type-arg]
+LecroyPacket: TypeAdapter = TypeAdapter(LecroyPrepare | LecroyStart | LecroyEnd | LecroySeqEnd | LecroyData)  # type: ignore [type-arg]
 """
 Union type for Lecroy packets
 """
