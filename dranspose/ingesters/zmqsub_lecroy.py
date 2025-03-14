@@ -1,5 +1,7 @@
+import pickle
 from typing import AsyncGenerator, Optional
 
+import numpy as np
 import zmq
 
 from dranspose.data.lecroy import (
@@ -26,7 +28,7 @@ class ZmqSubLecroyIngester(Ingester):
     There are 2 moddes
 
     Continuous mode
-    m0, m1, tt..., m2, tt..., m2, tt..., m2, m3
+    m0, m1, tt..., m2, tt..., m2, tt..., m2, [...], m3
     that is
         LecroyPrepare - LecroyStart
     followed by a lot of
@@ -35,13 +37,13 @@ class ZmqSubLecroyIngester(Ingester):
         LecroyEnd
 
     Sequential mode
-    m0, m1, tt..., m2, m1, tt..., m2, m1, tt..., m2, [...],m2, m1, tt...,  m3
+    m0, m1, tt..., m2, m1, tt..., m2, m1, tt..., m2, [...], m1, tt..., m2,  m3
     that is
         LecroyPrepare
     followed by a lot of
         LecroyStart - LecroyData - LecroyData... - LecroySeqEnd
     and ended by a
-        LecroyStart - LecroyData - LecroyData... - LecroyEnd
+        LecroyEnd
 
     Notes: I decided to cache the first LecroyStart received and to send it
     over and over at the beginning of each StreamData in continuos_mode
@@ -62,7 +64,9 @@ class ZmqSubLecroyIngester(Ingester):
         super().__init__(settings=self._streaming_Lecroy_settings)
         self.in_socket: Optional[zmq._future._AsyncSocket] = None
 
-    async def run_source(self, stream: StreamName) -> AsyncGenerator[StreamData, None]:
+    async def run_source(  # noqa: C901
+        self, stream: StreamName
+    ) -> AsyncGenerator[StreamData, None]:
         self.in_socket = self.ctx.socket(zmq.SUB)
         self.in_socket.connect(str(self._streaming_Lecroy_settings.upstream_url))
         self.in_socket.setsockopt(zmq.SUBSCRIBE, b"")
@@ -94,7 +98,7 @@ class ZmqSubLecroyIngester(Ingester):
                     yield StreamData(typ="Lecroy", frames=parts)
                     break
         continuos_mode = packet.ntriggers == -1
-        frames = parts  # LecroyStart0
+        messages = [parts]  # LecroyStart0
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
             try:
@@ -110,17 +114,19 @@ class ZmqSubLecroyIngester(Ingester):
                 # receive LecroyData - LecroyData... - LecroySeqEnd
                 # then send LecroyStart0 - LecroyData... - LecroySeqEnd
                 if isinstance(packet, LecroyData):
-                    frames += parts
+                    messages.append(parts)
                 elif isinstance(packet, LecroySeqEnd):
-                    frames += parts
-                    yield StreamData(typ="Lecroy", frames=frames)
-                    frames = [frames[0]]  # keep LecroyStart0
+                    messages.append(parts)
+                    yield StreamData(
+                        typ="Lecroy", frames=[part for msg in messages for part in msg]
+                    )
+                    messages = [messages[0]]  # keep LecroyStart0
                 elif isinstance(packet, LecroyEnd):
                     self._logger.info("reached end %s", packet)
-                    if len(frames) != 1:
+                    if len(messages) != 1:
                         self._logger.error(
                             "Untrasmitted frames left in the buffer %s",
-                            frames.__repr__(),
+                            messages.__repr__(),
                         )
                     yield StreamData(typ="Lecroy", frames=parts)
                     break
@@ -129,16 +135,38 @@ class ZmqSubLecroyIngester(Ingester):
                 # then send LecroyStart - LecroyData - LecroyData... - LecroySeqEnd
                 # receive LecroyStart
                 if isinstance(packet, LecroyStart) or isinstance(packet, LecroyData):
-                    frames += parts
+                    messages.append(parts)
                 elif isinstance(packet, LecroySeqEnd):
-                    frames += parts
-                    yield StreamData(typ="Lecroy", frames=frames)
-                    frames = []  # empty buffer
+                    messages.append(parts)
+                    for parts in messages[1:-1]:  # exclude LecroyStart and LecroySeqEnd
+                        meta = LecroyPacket.validate_json(parts[0].bytes)
+                        if isinstance(meta, LecroyData):
+                            bufframe = parts[1]
+                            if isinstance(bufframe, zmq.Frame):
+                                bufframe = bufframe.bytes  # type: ignore[assignment]
+                            buf = np.frombuffer(bufframe, dtype=meta.dtype)  # type: ignore[call-overload]
+                            traces = buf.reshape(meta.shape)
+                            tsframe = parts[2]
+                            if isinstance(tsframe, zmq.Frame):
+                                tsframe = tsframe.bytes  # type: ignore[assignment]
+                            timestamps = pickle.loads(tsframe)  # type: ignore[arg-type]
+                            for trace, ts in zip(traces, timestamps):
+                                frames = (
+                                    messages[0]
+                                    # + json.dumps(meta)
+                                    # + Frame(trace.bytes)
+                                    # + pickle(list(ts))
+                                    + messages[-1]
+                                )
+                                yield StreamData(typ="Lecroy", frames=frames)
+                    messages = []  # empty buffer
                 elif isinstance(packet, LecroyEnd):
                     self._logger.info("reached end %s", packet)
-                    frames += parts
-                    yield StreamData(typ="Lecroy", frames=frames)
-                    # send end-message separately
+                    if len(frames) > 0:
+                        self._logger.error(
+                            "Untrasmitted frames left in the buffer %s",
+                            frames.__repr__(),
+                        )
                     yield StreamData(typ="Lecroy", frames=parts)
                     break
 
