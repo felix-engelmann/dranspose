@@ -26,7 +26,7 @@ class ZmqSubLecroyIngester(Ingester):
     There are 2 moddes
 
     Continuous mode
-    m0, m1, tt..., m2, tt..., m2, tt..., m2, m3
+    m0, m1, tt..., m2, tt..., m2, tt..., m2, [...], m3
     that is
         LecroyPrepare - LecroyStart
     followed by a lot of
@@ -35,13 +35,13 @@ class ZmqSubLecroyIngester(Ingester):
         LecroyEnd
 
     Sequential mode
-    m0, m1, tt..., m2, m1, tt..., m2, m1, tt..., m2, [...],m2, m1, tt...,  m3
+    m0, m1, tt..., m2, m1, tt..., m2, m1, tt..., m2, [...],  m3
     that is
         LecroyPrepare
     followed by a lot of
         LecroyStart - LecroyData - LecroyData... - LecroySeqEnd
     and ended by a
-        LecroyStart - LecroyData - LecroyData... - LecroyEnd
+        LecroyEnd
 
     Notes: I decided to cache the first LecroyStart received and to send it
     over and over at the beginning of each StreamData in continuos_mode
@@ -136,9 +136,11 @@ class ZmqSubLecroyIngester(Ingester):
                     frames = []  # empty buffer
                 elif isinstance(packet, LecroyEnd):
                     self._logger.info("reached end %s", packet)
-                    frames += parts
-                    yield StreamData(typ="Lecroy", frames=frames)
-                    # send end-message separately
+                    if len(frames) > 0:
+                        self._logger.error(
+                            "Untrasmitted frames left in the buffer %s",
+                            frames.__repr__(),
+                        )
                     yield StreamData(typ="Lecroy", frames=parts)
                     break
 
