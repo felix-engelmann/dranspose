@@ -6,9 +6,11 @@ import logging
 import zmq
 
 from dranspose.data.lecroy import (
+    LecroyBase,
     LecroyData,
+    LecroyEnd,
     LecroyPacket,
-    LecroyParsed,
+    LecroyPrepare,
     LecroySeqStart,
     seqstart_to_parsed,
 )
@@ -17,7 +19,7 @@ from dranspose.event import StreamData
 logger = logging.getLogger(__name__)
 
 
-def parse(data: StreamData) -> LecroyParsed:
+def parse(data: StreamData) -> LecroyBase:
     """
     Parses a lecroy packet
 
@@ -35,6 +37,9 @@ def parse(data: StreamData) -> LecroyParsed:
         start = start.bytes
     start_pkt = LecroyPacket.validate_json(start)
     logger.debug("lecroy packet", start_pkt)
+
+    if isinstance(start_pkt, LecroyPrepare) or isinstance(start_pkt, LecroyEnd):
+        return start_pkt
 
     assert isinstance(
         start_pkt, LecroySeqStart
