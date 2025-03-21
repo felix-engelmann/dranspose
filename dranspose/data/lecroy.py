@@ -1,6 +1,6 @@
-from typing import List, Literal
+from typing import Any, List, Literal
 
-import numpy as np
+from numpy.typing import NDArray
 import zmq
 from pydantic import BaseModel, TypeAdapter, ConfigDict
 
@@ -150,8 +150,12 @@ class LecroyData(LecroyBase):
 
 
 class LecroyParsed(LecroySeqStart):
+    # tells Pydantic to allow arbitrary Python types (like NumPy arrays)
+    # without trying to validate them strictly
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
     meta: List[LecroyData]
-    data: List[np.typing.ArrayLike]
+    data: List[NDArray[Any]]
     timestamps: List[List[int | float]]
 
 
@@ -164,7 +168,7 @@ def seqstart_to_parsed(start: LecroySeqStart) -> LecroyParsed:
     )
 
 
-LecroyPacket: TypeAdapter = TypeAdapter(LecroyPrepare | LecroySeqStart | LecroyEnd | LecroySeqEnd | LecroyData)  # type: ignore [type-arg]
+LecroyPacket: TypeAdapter = TypeAdapter(LecroyPrepare | LecroySeqStart | LecroyEnd | LecroySeqEnd | LecroyData | LecroyParsed)  # type: ignore [type-arg]
 """
 Union type for Lecroy packets
 """
