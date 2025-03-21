@@ -6,7 +6,7 @@ from dranspose.data.lecroy import (
     LecroyPacket,
     LecroyPrepare,
     LecroySeqEnd,
-    LecroyStart,
+    LecroySeqStart,
     LecroyData,
     LecroyEnd,
 )
@@ -48,9 +48,6 @@ class ZmqSubLecroyIngester(Ingester):
     so that the message structure would always be:
     LecroyStart - LecroyData... - LecroySeqEnd
     for both modes.
-    Small ecception: the last StreamData in  Sequential mode will be
-    LecroyStart - LecroyData... - LecroyEnd
-    the LecroyEnd packet is then repeated on its own.
     """
 
     def __init__(self, settings: Optional[ZmqSubLecroySettings] = None) -> None:
@@ -89,9 +86,9 @@ class ZmqSubLecroyIngester(Ingester):
                 except Exception as e:
                     self._logger.warning("packet not valid %s", e.__repr__())
                     continue
-                if type(packet) is LecroyStart:
+                if type(packet) is LecroySeqStart:
                     self._logger.info("start of new sequence %s", packet)
-                    yield StreamData(typ="Lecroy", frames=parts)
+                    yield StreamData(typ="lecroy", frames=parts)
                     break
         continuos_mode = packet.ntriggers == -1
         frames = parts  # LecroyStart0
@@ -113,7 +110,7 @@ class ZmqSubLecroyIngester(Ingester):
                     frames += parts
                 elif isinstance(packet, LecroySeqEnd):
                     frames += parts
-                    yield StreamData(typ="Lecroy", frames=frames)
+                    yield StreamData(typ="lecroy", frames=frames)
                     frames = [frames[0]]  # keep LecroyStart0
                 elif isinstance(packet, LecroyEnd):
                     self._logger.info("reached end %s", packet)
@@ -122,17 +119,18 @@ class ZmqSubLecroyIngester(Ingester):
                             "Untrasmitted frames left in the buffer %s",
                             frames.__repr__(),
                         )
-                    yield StreamData(typ="Lecroy", frames=parts)
+                    yield StreamData(typ="lecroy", frames=parts)
                     break
             else:
+                # LecroyStart has been already received
                 # receive LecroyData - LecroyData... - LecroySeqEnd
                 # then send LecroyStart - LecroyData - LecroyData... - LecroySeqEnd
                 # receive LecroyStart
-                if isinstance(packet, LecroyStart) or isinstance(packet, LecroyData):
+                if isinstance(packet, LecroySeqStart) or isinstance(packet, LecroyData):
                     frames += parts
                 elif isinstance(packet, LecroySeqEnd):
                     frames += parts
-                    yield StreamData(typ="Lecroy", frames=frames)
+                    yield StreamData(typ="lecroy", frames=frames)
                     frames = []  # empty buffer
                 elif isinstance(packet, LecroyEnd):
                     self._logger.info("reached end %s", packet)
@@ -141,7 +139,7 @@ class ZmqSubLecroyIngester(Ingester):
                             "Untrasmitted frames left in the buffer %s",
                             frames.__repr__(),
                         )
-                    yield StreamData(typ="Lecroy", frames=parts)
+                    yield StreamData(typ="lecroy", frames=parts)
                     break
 
         while True:

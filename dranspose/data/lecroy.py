@@ -1,5 +1,6 @@
 from typing import List, Literal
 
+import numpy as np
 import zmq
 from pydantic import BaseModel, TypeAdapter, ConfigDict
 
@@ -12,7 +13,7 @@ class LecroyBase(BaseModel):
 
     def to_stream_data(self) -> StreamData:
         dat = self.model_dump_json()
-        return StreamData(typ="Lecroy", frames=[zmq.Frame(dat)])
+        return StreamData(typ="lecroy", frames=[zmq.Frame(dat)])
 
 
 class LecroyMessage(LecroyBase):
@@ -54,7 +55,7 @@ class LecroyPrepare(LecroyMessage):
     what: Literal[0]  # PREPARE = 0
 
 
-class LecroyStart(LecroyMessage):
+class LecroySeqStart(LecroyMessage):
     # len(parts) parts[0]
     # 1 b'{"htype": "msg", "what": 1, "frame": 0, "ntriggers": -1, "seqno": 0, "channels": [2, 4]}'
     """
@@ -148,7 +149,22 @@ class LecroyData(LecroyBase):
     dtype: str
 
 
-LecroyPacket: TypeAdapter = TypeAdapter(LecroyPrepare | LecroyStart | LecroyEnd | LecroySeqEnd | LecroyData)  # type: ignore [type-arg]
+class LecroyParsed(LecroySeqStart):
+    meta: List[LecroyData]
+    data: List[np.typing.ArrayLike]
+    timestamps: List[List[int | float]]
+
+
+def seqstart_to_parsed(start: LecroySeqStart) -> LecroyParsed:
+    return LecroyParsed(
+        **start.model_dump(),
+        meta=[],
+        data=[],
+        timestamps=[],
+    )
+
+
+LecroyPacket: TypeAdapter = TypeAdapter(LecroyPrepare | LecroySeqStart | LecroyEnd | LecroySeqEnd | LecroyData)  # type: ignore [type-arg]
 """
 Union type for Lecroy packets
 """
