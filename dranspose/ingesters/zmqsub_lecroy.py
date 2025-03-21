@@ -71,26 +71,27 @@ class ZmqSubLecroyIngester(Ingester):
             self._logger.debug("clear up insocket")
             parts = await self.in_socket.recv_multipart(copy=False)
             try:
-                packet = LecroyPacket.validate_json(parts[0].bytes)
+                prepare_pkt = LecroyPacket.validate_json(parts[0].bytes)
             except Exception as e:
                 self._logger.warning("packet not valid %s", e.__repr__())
                 continue
             self._logger.debug(
-                f"received frame of type {type(packet)} with header {packet}"
+                f"received frame of type {type(prepare_pkt)} with header {prepare_pkt}"
             )
-            if type(packet) is LecroyPrepare:
-                self._logger.info("start of new sequence %s", packet)
+            if type(prepare_pkt) is LecroyPrepare:
+                self._logger.info("prepare new run %s", prepare_pkt)
+                frames = parts
                 parts = await self.in_socket.recv_multipart(copy=False)
                 try:
-                    packet = LecroyPacket.validate_json(parts[0].bytes)
+                    seqstart_pkt = LecroyPacket.validate_json(parts[0].bytes)
                 except Exception as e:
                     self._logger.warning("packet not valid %s", e.__repr__())
                     continue
-                if type(packet) is LecroySeqStart:
-                    self._logger.info("start of new sequence %s", packet)
-                    yield StreamData(typ="lecroy", frames=parts)
+                if type(seqstart_pkt) is LecroySeqStart:
+                    self._logger.info("start of new sequence %s", seqstart_pkt)
+                    yield StreamData(typ="lecroy", frames=frames)
                     break
-        continuos_mode = packet.ntriggers == -1
+        continuos_mode = seqstart_pkt.ntriggers == -1
         frames = parts  # LecroyStart0
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
