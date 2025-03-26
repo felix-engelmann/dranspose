@@ -23,8 +23,21 @@ from dranspose.protocol import (
 from dranspose.worker import Worker, WorkerSettings
 
 
+@pytest.mark.parametrize(
+    "filename, ntrig",
+    [
+        ("tests/data/maui-02-continuous-3.cbor", 3),
+        # ("tests/data/maui-02-continuous.pkls", 34),
+        # ("tests/data/maui-02-continuous.cbor", 94),
+        ("tests/data/maui-02-sequential-3.cbor", 3),
+        # ("tests/data/maui-02-sequential-new.cbor", 2000),
+        # ("tests/data/maui-02-sequential.cbor", 2000),
+    ],
+)
 @pytest.mark.asyncio
 async def test_lecroy(
+    filename: str,
+    ntrig: int,
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -61,8 +74,6 @@ async def test_lecroy(
             state = EnsembleState.model_validate(await st.json())
             logging.debug(f"Waiting for lecroy ingester {state.get_streams()=}")
 
-        filename, ntrig = "tests/data/maui-02-continuous.pkls", 34
-
         map = {
             "lecroy": [
                 [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
@@ -93,7 +104,11 @@ async def test_lecroy(
         st = await session.get("http://localhost:5000/api/v1/progress")
         content = await st.json()
         logging.debug(f"Progress {content=}")
+        i = 0
         while not content["finished"]:
+            if i > 20:
+                break
+            i += 1
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
@@ -105,87 +120,3 @@ async def test_lecroy(
             "total_events": ntrig + 1,
             "finished": True,
         }
-
-
-# async def test_lecroy_sequential(
-#     controller: None,
-#     reducer: Callable[[Optional[str]], Awaitable[None]],
-#     create_worker: Callable[[Worker], Awaitable[Worker]],
-#     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-#     stream_pkls: Callable[
-#         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
-#         Coroutine[Any, Any, None],
-#     ],
-# ) -> None:
-#     await reducer(None)
-#     await create_worker(
-#         Worker(
-#             settings=WorkerSettings(
-#                 worker_name=WorkerName("w1"),
-#                 worker_class="examples.parser.lecroy:LecroyWorker",
-#             ),
-#         )
-#     )
-#     await create_ingester(
-#         ZmqSubLecroyIngester(
-#             settings=ZmqSubLecroySettings(
-#                 ingester_streams=[StreamName("lecroy")],
-#                 upstream_url=Url("tcp://localhost:22004"),
-#             ),
-#         )
-#     )
-
-#     async with aiohttp.ClientSession() as session:
-#         st = await session.get("http://localhost:5000/api/v1/config")
-#         state = EnsembleState.model_validate(await st.json())
-#         while {"lecroy"} - set(state.get_streams()) != set():
-#             await asyncio.sleep(0.3)
-#             st = await session.get("http://localhost:5000/api/v1/config")
-#             state = EnsembleState.model_validate(await st.json())
-#             logging.debug(f"Waiting for lecroy ingester {state.get_streams()=}")
-
-#         ntrig = 66
-#         resp = await session.post(
-#             "http://localhost:5000/api/v1/mapping",
-#             json={
-#                 "lecroy": [
-#                     [
-#                         VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-#                             mode="json"
-#                         )
-#                     ]
-#                     for i in range(1, ntrig)
-#                 ],
-#             },
-#         )
-#         assert resp.status == 200
-#         await resp.json()
-
-#     context = zmq.asyncio.Context()
-
-#     asyncio.create_task(
-#         stream_pkls(
-#             context,
-#             22004,
-#             PosixPath("tests/data/maui-02-sequential.cbor"),
-#             0.001,
-#             zmq.PUB,
-#         )
-#     )
-
-#     async with aiohttp.ClientSession() as session:
-#         st = await session.get("http://localhost:5000/api/v1/progress")
-#         content = await st.json()
-#         logging.debug(f"Progress {content=}")
-#         while not content["finished"]:
-#             await asyncio.sleep(0.3)
-#             st = await session.get("http://localhost:5000/api/v1/progress")
-#             content = await st.json()
-#             logging.debug(f"Progress {content=}")
-
-#         assert content == {
-#             "last_assigned": ntrig + 1,
-#             "completed_events": ntrig + 1,
-#             "total_events": ntrig + 1,
-#             "finished": True,
-#         }
