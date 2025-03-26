@@ -36,7 +36,7 @@ def parse(data: StreamData) -> LecroyBase:
     if isinstance(start, zmq.Frame):
         start = start.bytes
     start_pkt = LecroyPacket.validate_json(start)
-    logger.debug("lecroy packet", start_pkt)
+    logger.debug(f"lecroy packet {start_pkt=}")
 
     if isinstance(start_pkt, LecroyPrepare) or isinstance(start_pkt, LecroyEnd):
         return start_pkt
@@ -56,7 +56,7 @@ def parse(data: StreamData) -> LecroyBase:
         if isinstance(metaframe, zmq.Frame):
             metaframe = metaframe.bytes
         meta_pkt = LecroyPacket.validate_json(metaframe)
-        logger.debug("lecroy packet", meta_pkt)
+        logger.debug(f"lecroy packet {meta_pkt=}")
         assert isinstance(
             meta_pkt, LecroyData
         ), f"Cannot identify trace metadata frame: {meta_pkt}"
