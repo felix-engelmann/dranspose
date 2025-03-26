@@ -21,6 +21,7 @@ from typing import (
 )
 
 import aiohttp
+import cbor2
 import numpy as np
 import pytest
 import pytest_asyncio
@@ -480,11 +481,15 @@ async def stream_pkls() -> Callable[
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
                 await asyncio.sleep(0.1)
+        _, ext = os.path.splitext(filename)
         with open(filename, "rb") as f:
             i = 0
             while True:
                 try:
-                    frames = pickle.load(f)
+                    if "cbor" in ext:
+                        frames = cbor2.load(f)
+                    else:
+                        frames = pickle.load(f)
                     send = True
                     if i < (begin or 0):
                         send = False
