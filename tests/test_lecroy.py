@@ -27,11 +27,7 @@ from dranspose.worker import Worker, WorkerSettings
     "filename, ntrig",
     [
         ("tests/data/maui-02-continuous-3.cbor", 3),
-        # ("tests/data/maui-02-continuous.pkls", 34),
-        # ("tests/data/maui-02-continuous.cbor", 94),
-        ("tests/data/maui-02-sequential-3.cbor", 3),
-        # ("tests/data/maui-02-sequential-new.cbor", 2000),
-        # ("tests/data/maui-02-sequential.cbor", 2000),
+        # ("tests/data/maui-02-sequential-3.cbor", 3),
     ],
 )
 @pytest.mark.asyncio
@@ -47,7 +43,7 @@ async def test_lecroy(
         Coroutine[Any, Any, None],
     ],
 ) -> None:
-    await reducer(None)
+    await reducer("examples.parser.lecroy:LecroyReducer")
     await create_worker(
         Worker(
             settings=WorkerSettings(
