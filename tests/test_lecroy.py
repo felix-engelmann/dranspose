@@ -27,8 +27,8 @@ from dranspose.worker import Worker, WorkerSettings
 @pytest.mark.parametrize(
     "filename, ntrig, nburst",
     [
-        ("tests/data/maui-02-continuous-3.cbor", 3, 1),
-        ("tests/data/maui-02-sequential-3.cbor", 3, 20),
+        ("tests/data/maui-02-continuous-3.cbor.gz", 3, 1),
+        ("tests/data/maui-02-sequential-3.cbor.gz", 3, 20),
     ],
 )
 @pytest.mark.asyncio

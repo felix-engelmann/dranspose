@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 import logging
 import multiprocessing
@@ -483,27 +484,31 @@ async def stream_pkls() -> Callable[
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
                 await asyncio.sleep(0.1)
-        _, ext = os.path.splitext(filename)
-        with open(filename, "rb") as f:
-            i = 0
-            while True:
-                try:
-                    if "cbor" in ext:
-                        frames = cbor2.load(f)
-                    else:
-                        frames = pickle.load(f)
-                    send = True
-                    if i < (begin or 0):
+        base, ext = os.path.splitext(filename)
+        if ext == ".gz":
+            f = gzip.open(filename, "rb")
+            _, ext = os.path.splitext(base)
+        else:
+            f = open(filename, "rb")
+        i = 0
+        while True:
+            try:
+                if "cbor" in ext:
+                    frames = cbor2.load(f)
+                else:
+                    frames = pickle.load(f)
+                send = True
+                if i < (begin or 0):
+                    send = False
+                if end:
+                    if i >= end:
                         send = False
-                    if end:
-                        if i >= end:
-                            send = False
-                    if send:
-                        await socket.send_multipart(frames)
-                        await asyncio.sleep(frame_time)
-                except EOFError:
-                    break
-
+                if send:
+                    await socket.send_multipart(frames)
+                    await asyncio.sleep(frame_time)
+            except EOFError:
+                break
+        f.close()
         socket.close()
 
     return _make_pkls
