@@ -156,7 +156,7 @@ class LecroyParsed(LecroySeqStart):
 
     meta: List[LecroyData]
     data: List[NDArray[Any]]
-    timestamps: List[List[int | float]]
+    timestamps: List[List[float]]
 
 
 def seqstart_to_parsed(start: LecroySeqStart) -> LecroyParsed:
