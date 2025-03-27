@@ -24,10 +24,10 @@ def parse(data: StreamData) -> LecroyBase:
     Parses a lecroy packet
 
     Arguments:
-        data: a frame comming from the lecroy tango device
+        data: one or more frames with lecroy data
 
     Returns:
-        a LecroyPacket
+        either the original control packet or a LecroyParsed packet
     """
 
     assert data.typ == "lecroy"
