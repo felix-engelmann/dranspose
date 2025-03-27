@@ -28,7 +28,7 @@ class ZmqSubLecroyIngester(Ingester):
     Continuous mode
     m0, m1, tt..., m2, tt..., m2, tt..., m2, [...], m3
     that is
-        LecroyPrepare - LecroyStart
+        LecroyPrepare - LecroySeqStart
     followed by a lot of
         LecroyData - LecroyData... - LecroySeqEnd
     and ended by a
@@ -39,14 +39,14 @@ class ZmqSubLecroyIngester(Ingester):
     that is
         LecroyPrepare
     followed by a lot of
-        LecroyStart - LecroyData - LecroyData... - LecroySeqEnd
+        LecroySeqStart - LecroyData - LecroyData... - LecroySeqEnd
     and ended by a
         LecroyEnd
 
-    Notes: I decided to cache the first LecroyStart received and to send it
+    Notes: I decided to cache the first LecroySeqStart received and to send it
     over and over at the beginning of each StreamData in continuos_mode
     so that the message structure would always be:
-    LecroyStart - LecroyData... - LecroySeqEnd
+    LecroySeqStart - LecroyData... - LecroySeqEnd
     for both modes.
     """
 
@@ -92,7 +92,7 @@ class ZmqSubLecroyIngester(Ingester):
                     yield StreamData(typ="lecroy", frames=frames)
                     break
         continuos_mode = seqstart_pkt.ntriggers == -1
-        frames = parts  # LecroyStart0
+        frames = parts  # LecroySeqStart0
         while True:
             parts = await self.in_socket.recv_multipart(copy=False)
             try:
@@ -103,45 +103,29 @@ class ZmqSubLecroyIngester(Ingester):
             self._logger.debug(
                 f"received frame of type {type(packet)} with header {packet}"
             )
-            if continuos_mode:
-                # LecroyStart0 has been already received
-                # receive LecroyData - LecroyData... - LecroySeqEnd
-                # then send LecroyStart0 - LecroyData... - LecroySeqEnd
-                if isinstance(packet, LecroyData):
-                    frames += parts
-                elif isinstance(packet, LecroySeqEnd):
-                    frames += parts
-                    yield StreamData(typ="lecroy", frames=frames)
-                    frames = [frames[0]]  # keep LecroyStart0
-                elif isinstance(packet, LecroyEnd):
-                    self._logger.info("reached end %s", packet)
-                    if len(frames) != 1:
-                        self._logger.error(
-                            "Untrasmitted frames left in the buffer %s",
-                            frames.__repr__(),
-                        )
-                    yield StreamData(typ="lecroy", frames=parts)
-                    break
-            else:
-                # LecroyStart has been already received
-                # receive LecroyData - LecroyData... - LecroySeqEnd
-                # then send LecroyStart - LecroyData - LecroyData... - LecroySeqEnd
-                # receive LecroyStart
-                if isinstance(packet, LecroySeqStart) or isinstance(packet, LecroyData):
-                    frames += parts
-                elif isinstance(packet, LecroySeqEnd):
-                    frames += parts
-                    yield StreamData(typ="lecroy", frames=frames)
+            # LecroySeqStart0 has been already received
+            # receive LecroyData - LecroyData... - LecroySeqEnd
+            # then send LecroySeqStart0 - LecroyData... - LecroySeqEnd
+            if isinstance(packet, LecroySeqStart) or isinstance(packet, LecroyData):
+                frames += parts
+            elif isinstance(packet, LecroySeqEnd):
+                frames += parts
+                yield StreamData(typ="lecroy", frames=frames)
+                if continuos_mode:
+                    frames = frames[:1]  # keep LecroySeqStart0
+                else:
                     frames = []  # empty buffer
-                elif isinstance(packet, LecroyEnd):
-                    self._logger.info("reached end %s", packet)
-                    if len(frames) > 0:
-                        self._logger.error(
-                            "Untrasmitted frames left in the buffer %s",
-                            frames.__repr__(),
-                        )
-                    yield StreamData(typ="lecroy", frames=parts)
-                    break
+            elif isinstance(packet, LecroyEnd):
+                self._logger.info("reached end %s", packet)
+                if (continuos_mode and len(frames) != 1) or (
+                    not continuos_mode and len(frames) != 0
+                ):
+                    self._logger.error(
+                        "Untrasmitted frames left in the buffer %s",
+                        frames.__repr__(),
+                    )
+                yield StreamData(typ="lecroy", frames=parts)
+                break
 
         while True:
             self._logger.debug("discarding messages until next run")
