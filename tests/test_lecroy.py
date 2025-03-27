@@ -5,6 +5,7 @@ from pathlib import PosixPath
 from typing import Awaitable, Callable, Coroutine, Optional, Any
 
 import aiohttp
+import h5pyd
 import zmq.asyncio
 
 import pytest
@@ -24,16 +25,17 @@ from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.parametrize(
-    "filename, ntrig",
+    "filename, ntrig, nburst",
     [
-        ("tests/data/maui-02-continuous-3.cbor", 3),
-        # ("tests/data/maui-02-sequential-3.cbor", 3),
+        ("tests/data/maui-02-continuous-3.cbor", 3, 1),
+        ("tests/data/maui-02-sequential-3.cbor", 3, 20),
     ],
 )
 @pytest.mark.asyncio
 async def test_lecroy(
     filename: str,
     ntrig: int,
+    nburst: int,
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -116,3 +118,16 @@ async def test_lecroy(
             "total_events": ntrig + 1,
             "finished": True,
         }
+
+    def work() -> None:
+        f = h5pyd.File("http://localhost:5001/", "r")
+        logging.info(
+            f"file {f.keys()}",
+        )
+        logging.info(f"max_val {f['max_val']}")
+        logging.info(f"ts {f['ts']}")
+        assert f["max_val"].shape == (nburst,), "Unexpected shape of max_val result"
+        assert f["ts"].shape == (nburst,), "Unexpected shape of ts result"
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work)

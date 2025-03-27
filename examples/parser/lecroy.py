@@ -68,5 +68,7 @@ class LecroyReducer:
         self, result: ResultData, parameters: dict[ParameterName, WorkParameter]
     ) -> None:
         if result.payload and isinstance(result.payload, Result):
+            logger.info(f"max_val is {result.payload.max_val}")
+            logger.info(f"timestamps is {result.payload.ts}")
             self.publish["max_val"] = result.payload.max_val
             self.publish["ts"] = result.payload.ts
