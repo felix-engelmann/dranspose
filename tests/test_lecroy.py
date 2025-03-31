@@ -25,10 +25,22 @@ from dranspose.worker import Worker, WorkerSettings
 
 
 @pytest.mark.parametrize(
-    "filename, ntrig, nburst",
+    "filename, ntrig, nburst, max0, ts0",
     [
-        ("tests/data/maui-02-continuous-3.cbor.gz", 3, 1),
-        ("tests/data/maui-02-sequential-3.cbor.gz", 3, 20),
+        (
+            "tests/data/maui-02-continuous-3.cbor.gz",
+            3,
+            1,
+            0.1675630532008654,
+            1740563664.335,
+        ),
+        (
+            "tests/data/maui-02-sequential-3.cbor.gz",
+            3,
+            20,
+            0.022609806155742262,
+            1740736919.435,
+        ),
     ],
 )
 @pytest.mark.asyncio
@@ -36,6 +48,8 @@ async def test_lecroy(
     filename: str,
     ntrig: int,
     nburst: int,
+    max0: float,
+    ts0: float,
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -120,8 +134,8 @@ async def test_lecroy(
         logging.info(
             f"file {f.keys()}",
         )
-        logging.info(f"max_val {f['max_val']}")
-        logging.info(f"ts {f['ts']}")
+        assert f["max_val"][0] == max0
+        assert f["ts"][0] == ts0
         assert f["max_val"].shape == (nburst,), "Unexpected shape of max_val result"
         assert f["ts"].shape == (nburst,), "Unexpected shape of ts result"
 
