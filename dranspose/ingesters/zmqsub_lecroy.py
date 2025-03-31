@@ -3,6 +3,7 @@ from typing import AsyncGenerator, Optional
 import zmq
 
 from dranspose.data.lecroy import (
+    LECROY_TYPE,
     LecroyPacket,
     LecroyPrepare,
     LecroySeqEnd,
@@ -78,7 +79,7 @@ class ZmqSubLecroyIngester(Ingester):
             self._logger.debug(
                 f"received frame of type {type(prepare_pkt)} with header {prepare_pkt}"
             )
-            if type(prepare_pkt) is LecroyPrepare:
+            if isinstance(prepare_pkt, LecroyPrepare):
                 self._logger.info("prepare new run %s", prepare_pkt)
                 frames = parts
                 parts = await self.in_socket.recv_multipart(copy=False)
@@ -87,9 +88,9 @@ class ZmqSubLecroyIngester(Ingester):
                 except Exception as e:
                     self._logger.warning("packet not valid %s", e.__repr__())
                     continue
-                if type(seqstart_pkt) is LecroySeqStart:
+                if isinstance(seqstart_pkt, LecroySeqStart):
                     self._logger.info("start of new sequence %s", seqstart_pkt)
-                    yield StreamData(typ="lecroy", frames=frames)
+                    yield StreamData(typ=LECROY_TYPE, frames=frames)
                     break
         continuos_mode = seqstart_pkt.ntriggers == -1
         frames = parts  # LecroySeqStart0
@@ -110,7 +111,7 @@ class ZmqSubLecroyIngester(Ingester):
                 frames += parts
             elif isinstance(packet, LecroySeqEnd):
                 frames += parts
-                yield StreamData(typ="lecroy", frames=frames)
+                yield StreamData(typ=LECROY_TYPE, frames=frames)
                 if continuos_mode:
                     frames = frames[:1]  # keep LecroySeqStart0
                 else:
@@ -124,7 +125,7 @@ class ZmqSubLecroyIngester(Ingester):
                         "Untrasmitted frames left in the buffer %s",
                         frames.__repr__(),
                     )
-                yield StreamData(typ="lecroy", frames=parts)
+                yield StreamData(typ=LECROY_TYPE, frames=parts)
                 break
 
         while True:
