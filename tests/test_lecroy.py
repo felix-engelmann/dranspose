@@ -102,11 +102,7 @@ async def test_lecroy(
         st = await session.get("http://localhost:5000/api/v1/progress")
         content = await st.json()
         logging.debug(f"Progress {content=}")
-        i = 0
         while not content["finished"]:
-            if i > 20:
-                break
-            i += 1
             await asyncio.sleep(0.3)
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
