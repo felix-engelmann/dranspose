@@ -1,3 +1,4 @@
+from enum import IntEnum
 from typing import Any, List, Literal
 
 from numpy.typing import NDArray
@@ -6,37 +7,25 @@ from pydantic import BaseModel, TypeAdapter, ConfigDict
 
 from dranspose.event import StreamData
 
+LECROY_TYPE = "lecroy_9fwdWp6Rq7"
+
+
+class WhatEnum(IntEnum):
+    PREPARE = 0
+    START = 1
+    SEQEND = 2
+    STOP = 3
+
 
 class LecroyBase(BaseModel):
     frame: int
-    htype: Literal["msg", "traces"]
 
     def to_stream_data(self) -> StreamData:
         dat = self.model_dump_json()
-        return StreamData(typ="lecroy", frames=[zmq.Frame(dat)])
+        return StreamData(typ=LECROY_TYPE, frames=[zmq.Frame(dat)])
 
 
-class LecroyMessage(LecroyBase):
-    # len(parts) parts[0]
-    # 1 b'{"htype": "msg", "what": 0, "frame": 0}'
-    """
-    Example:
-        ``` py
-        LecroyMessage(
-            htype='msg'
-            what=0,
-            frame=0,
-        )
-        ```
-    """
-
-    model_config = ConfigDict(extra="allow")
-
-    htype: Literal["msg"]
-    what: Literal[0, 1, 2, 3]  # PREPARE = 0 START = 1 SEQEND = 2 STOP = 3
-
-
-class LecroyPrepare(LecroyMessage):
+class LecroyPrepare(LecroyBase):
     # len(parts) parts[0]
     # 1 b'{"htype": "msg", "what": 0, "frame": 0}'
     """
@@ -52,10 +41,11 @@ class LecroyPrepare(LecroyMessage):
 
     model_config = ConfigDict(extra="allow")
 
-    what: Literal[0]  # PREPARE = 0
+    htype: Literal["msg"]
+    what: Literal[WhatEnum.PREPARE]  # PREPARE = 0
 
 
-class LecroySeqStart(LecroyMessage):
+class LecroySeqStart(LecroyBase):
     # len(parts) parts[0]
     # 1 b'{"htype": "msg", "what": 1, "frame": 0, "ntriggers": -1, "seqno": 0, "channels": [2, 4]}'
     """
@@ -74,12 +64,14 @@ class LecroySeqStart(LecroyMessage):
 
     model_config = ConfigDict(extra="allow")
 
-    what: Literal[1]  # START = 1
+    htype: Literal["msg"]
+    what: Literal[WhatEnum.START]  # START = 1
     ntriggers: int
+    seqno: int
     channels: List[int]
 
 
-class LecroySeqEnd(LecroyMessage):
+class LecroySeqEnd(LecroyBase):
     # len(parts) parts[0]
     # 1 b'{"htype": "msg", "what": 2, "frame": 2}'
     """
@@ -95,10 +87,11 @@ class LecroySeqEnd(LecroyMessage):
 
     model_config = ConfigDict(extra="allow")
 
-    what: Literal[2]  # SEQEND = 2
+    htype: Literal["msg"]
+    what: Literal[WhatEnum.SEQEND]  # SEQEND = 2
 
 
-class LecroyEnd(LecroyMessage):
+class LecroyEnd(LecroyBase):
     # len(parts) parts[0]
     """
     Example:
@@ -113,8 +106,8 @@ class LecroyEnd(LecroyMessage):
     """
 
     model_config = ConfigDict(extra="allow")
-
-    what: Literal[3]  # STOP = 3
+    frames: int
+    what: Literal[WhatEnum.STOP]  # STOP = 3
 
 
 class LecroyData(LecroyBase):
@@ -147,6 +140,8 @@ class LecroyData(LecroyBase):
     frame: int
     shape: List[int]
     dtype: str
+    horiz_offset: float
+    horiz_interval: float
 
 
 class LecroyParsed(LecroySeqStart):
@@ -154,18 +149,9 @@ class LecroyParsed(LecroySeqStart):
     # without trying to validate them strictly
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    meta: List[LecroyData]
-    data: List[NDArray[Any]]
-    timestamps: List[List[float]]
-
-
-def seqstart_to_parsed(start: LecroySeqStart) -> LecroyParsed:
-    return LecroyParsed(
-        **start.model_dump(),
-        meta=[],
-        data=[],
-        timestamps=[],
-    )
+    meta: List[LecroyData] = []
+    data: List[NDArray[Any]] = []
+    timestamps: List[List[float]] = []
 
 
 LecroyPacket: TypeAdapter = TypeAdapter(LecroyPrepare | LecroySeqStart | LecroyEnd | LecroySeqEnd | LecroyData | LecroyParsed)  # type: ignore [type-arg]
