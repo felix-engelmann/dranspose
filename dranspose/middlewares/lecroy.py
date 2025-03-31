@@ -6,13 +6,14 @@ import logging
 import zmq
 
 from dranspose.data.lecroy import (
+    LECROY_TYPE,
     LecroyBase,
     LecroyData,
     LecroyEnd,
     LecroyPacket,
+    LecroyParsed,
     LecroyPrepare,
     LecroySeqStart,
-    seqstart_to_parsed,
 )
 from dranspose.event import StreamData
 
@@ -30,7 +31,7 @@ def parse(data: StreamData) -> LecroyBase:
         either the original control packet or a LecroyParsed packet
     """
 
-    assert data.typ == "lecroy"
+    assert data.typ == LECROY_TYPE
     assert data.length >= 1, "wrong number of multiparts"
     start = data.frames[0]
     if isinstance(start, zmq.Frame):
@@ -49,7 +50,7 @@ def parse(data: StreamData) -> LecroyBase:
         data.length == 1 + nch * 3 + 1
     ), f"Unexpected number of frames ({data.length}) for {nch} channels"
 
-    res = seqstart_to_parsed(start_pkt)
+    res = LecroyParsed(**start_pkt.model_dump())
     for ich in range(nch):
         offset = 1 + ich * 3
         metaframe = data.frames[offset]
