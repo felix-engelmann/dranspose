@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 import logging
 import multiprocessing
@@ -21,6 +22,7 @@ from typing import (
 )
 
 import aiohttp
+import cbor2
 import numpy as np
 import pytest
 import pytest_asyncio
@@ -84,7 +86,9 @@ class ErrorLoggingHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         # Check if the log message starts with "ERROR"
         if record.levelname == "ERROR":
-            if "Unclosed connection" in record.message:  # aiohttp benign error
+            if hasattr(record, "message") and (
+                "Unclosed connection" in record.message
+            ):  # aiohttp benign error
                 return
             self.error_found = True
 
@@ -480,23 +484,31 @@ async def stream_pkls() -> Callable[
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
                 await asyncio.sleep(0.1)
-        with open(filename, "rb") as f:
-            i = 0
-            while True:
-                try:
+        base, ext = os.path.splitext(filename)
+        if ext == ".gz":
+            f = gzip.open(filename, "rb")
+            _, ext = os.path.splitext(base)
+        else:
+            f = open(filename, "rb")
+        i = 0
+        while True:
+            try:
+                if "cbor" in ext:
+                    frames = cbor2.load(f)
+                else:
                     frames = pickle.load(f)
-                    send = True
-                    if i < (begin or 0):
+                send = True
+                if i < (begin or 0):
+                    send = False
+                if end:
+                    if i >= end:
                         send = False
-                    if end:
-                        if i >= end:
-                            send = False
-                    if send:
-                        await socket.send_multipart(frames)
-                        await asyncio.sleep(frame_time)
-                except EOFError:
-                    break
-
+                if send:
+                    await socket.send_multipart(frames)
+                    await asyncio.sleep(frame_time)
+            except EOFError:
+                break
+        f.close()
         socket.close()
 
     return _make_pkls
