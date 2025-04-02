@@ -39,8 +39,6 @@ class LecroyPrepare(LecroyBase):
         ```
     """
 
-    model_config = ConfigDict(extra="allow")
-
     htype: Literal["msg"]
     what: Literal[WhatEnum.PREPARE]  # PREPARE = 0
 
@@ -61,8 +59,6 @@ class LecroySeqStart(LecroyBase):
         )
         ```
     """
-
-    model_config = ConfigDict(extra="allow")
 
     htype: Literal["msg"]
     what: Literal[WhatEnum.START]  # START = 1
@@ -85,8 +81,6 @@ class LecroySeqEnd(LecroyBase):
         ```
     """
 
-    model_config = ConfigDict(extra="allow")
-
     htype: Literal["msg"]
     what: Literal[WhatEnum.SEQEND]  # SEQEND = 2
 
@@ -105,7 +99,6 @@ class LecroyEnd(LecroyBase):
         ```
     """
 
-    model_config = ConfigDict(extra="allow")
     frames: int
     what: Literal[WhatEnum.STOP]  # STOP = 3
 
@@ -131,8 +124,6 @@ class LecroyData(LecroyBase):
             )
         ```
     """
-
-    model_config = ConfigDict(extra="allow")
 
     htype: Literal["traces"]
     ch: int
