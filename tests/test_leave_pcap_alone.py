@@ -17,7 +17,6 @@ from dranspose.ingesters.zmqpull_single import (
 )
 from dranspose.ingesters.tcp_positioncap import TcpPcapIngester, TcpPcapSettings
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -25,6 +24,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 async def handle_client(reader: StreamReader, writer: StreamWriter) -> None:
@@ -69,14 +69,8 @@ async def test_pcapingester(
         )
     )
 
+    await wait_for_controller(streams={"pcap", "eiger"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"pcap", "eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
@@ -97,13 +91,7 @@ async def test_pcapingester(
     context = zmq.asyncio.Context()
     await stream_eiger(context, 9999, ntrig - 1)
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    content = await wait_for_finish()
 
     await cancel_and_wait(task)
     context.destroy()

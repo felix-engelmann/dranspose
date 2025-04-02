@@ -7,12 +7,12 @@ import pytest
 import zmq.asyncio
 
 from dranspose.protocol import (
-    EnsembleState,
     VirtualWorker,
     VirtualConstraint,
     WorkerName,
 )
 from dranspose.worker import Worker
+from tests.utils import wait_for_controller, wait_for_finish
 
 rust = pytest.mark.skipif("not config.getoption('rust')")
 
@@ -40,15 +40,8 @@ async def test_rust_basic(
 
     await asyncio.sleep(2)
 
+    await wait_for_controller(streams={"eiger"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        print("content", state.ingesters)
-        while {"eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         logging.info("startup done")
 
         ntrig = 50000
@@ -71,13 +64,6 @@ async def test_rust_basic(
     context = zmq.asyncio.Context()
     await stream_small(context, 9999, ntrig - 1, 0.000001)
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
-            logging.debug("progress is %s", content)
+    await wait_for_finish()
 
     context.destroy()

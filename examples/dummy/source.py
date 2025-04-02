@@ -134,7 +134,7 @@ class FluorescenceSource:
             PositionCapField(name="INENC1.VAL.Mean", type="double"),
             PositionCapField(name="PCAP.TS_TRIG.Value", type="double"),
         ]
-        start = PositionCapStart(arm_time=datetime.datetime.utcnow())
+        start = PositionCapStart(arm_time=datetime.datetime.now(datetime.UTC))
         yield InternalWorkerMessage(
             event_number=0,
             streams={"pcap": start.to_stream_data(fields)},

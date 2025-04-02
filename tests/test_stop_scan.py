@@ -1,4 +1,3 @@
-import asyncio
 from typing import Awaitable, Callable, Optional
 import zmq.asyncio
 
@@ -12,13 +11,13 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
 from dranspose.worker import Worker
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.asyncio
@@ -39,14 +38,8 @@ async def test_stop_scans(
         )
     )
 
+    await wait_for_controller(streams={"eiger"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         ntrig = 30
         mp = {
             "eiger": [
@@ -70,12 +63,6 @@ async def test_stop_scans(
             "http://localhost:5000/api/v1/stop",
         )
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while content["finished"] is False:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    await wait_for_finish()
 
     context.destroy()

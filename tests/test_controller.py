@@ -1,4 +1,3 @@
-import asyncio
 from typing import Callable, Awaitable
 
 import aiohttp
@@ -11,11 +10,11 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     VirtualWorker,
     VirtualConstraint,
     StreamName,
 )
+from tests.utils import wait_for_controller
 
 
 @pytest.mark.asyncio
@@ -62,14 +61,8 @@ async def test_not_enough_workers(
             ),
         )
     )
+    await wait_for_controller(streams={"eiger"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",

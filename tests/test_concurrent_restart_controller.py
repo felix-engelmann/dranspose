@@ -8,8 +8,8 @@ import pytest
 import redis.asyncio as redis
 import uvicorn
 from dranspose.protocol import (
-    EnsembleState,
     RedisKeys,
+    EnsembleState,
 )
 
 

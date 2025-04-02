@@ -15,7 +15,6 @@ from dranspose.ingesters.zmqpull_eiger_legacy import (
     ZmqPullEigerLegacySettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -23,6 +22,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.asyncio
@@ -54,14 +54,8 @@ async def test_eiger_legacy(
         )
     )
 
+    await wait_for_controller(streams={"eiger"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         ntrig = 3
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
@@ -92,12 +86,6 @@ async def test_eiger_legacy(
         )
     )
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    content = await wait_for_finish()
 
     print(content)

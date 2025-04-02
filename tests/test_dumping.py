@@ -20,7 +20,6 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -28,6 +27,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
@@ -87,17 +87,8 @@ async def test_dump(
         )
     )
 
+    await wait_for_controller(streams={"eiger", "orca", "alba", "slow"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        logging.debug("content %s", state)
-        while {"eiger", "orca", "alba", "slow"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
-        logging.info("startup done")
-
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
@@ -163,20 +154,14 @@ async def test_dump(
     asyncio.create_task(stream_small(context, 9997, ntrig - 1))
     asyncio.create_task(stream_small(context, 9996, ntrig // 4))
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    content = await wait_for_finish()
 
-        assert content == {
-            "last_assigned": ntrig + 1,
-            "completed_events": ntrig + 1,
-            "total_events": ntrig + 1,
-            "finished": True,
-        }
+    assert content == {
+        "last_assigned": ntrig + 1,
+        "completed_events": ntrig + 1,
+        "total_events": ntrig + 1,
+        "finished": True,
+    }
 
     # read dump
     with open(p_eiger, "rb") as f:
@@ -234,17 +219,8 @@ async def test_dump_xrd(
         )
     )
 
+    await wait_for_controller(streams={"xrd"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        logging.debug("content %s", state)
-        while {"xrd"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
-        logging.info("startup done")
-
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
@@ -274,20 +250,14 @@ async def test_dump_xrd(
 
     asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    content = await wait_for_finish()
 
-        assert content == {
-            "last_assigned": ntrig + 1,
-            "completed_events": ntrig + 1,
-            "total_events": ntrig + 1,
-            "finished": True,
-        }
+    assert content == {
+        "last_assigned": ntrig + 1,
+        "completed_events": ntrig + 1,
+        "total_events": ntrig + 1,
+        "finished": True,
+    }
     context.destroy()
 
 
@@ -313,17 +283,8 @@ async def test_dump_map_and_parameters(
         )
     )
 
+    await wait_for_controller(streams={"xrd"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        logging.debug("content %s", state)
-        while {"xrd"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
-        logging.info("startup done")
-
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
@@ -400,17 +361,8 @@ async def test_dump_bin_parameters(
         )
     )
 
+    await wait_for_controller(streams={"xrd"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        logging.debug("content %s", state)
-        while {"xrd"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
-        logging.info("startup done")
-
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 

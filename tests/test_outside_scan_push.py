@@ -18,7 +18,6 @@ from dranspose.ingesters.zmqpull_single import (
 )
 from dranspose.middlewares.stream1 import parse
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -27,6 +26,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.asyncio
@@ -53,15 +53,8 @@ async def test_outside(
 
     context = zmq.asyncio.Context()
 
+    await wait_for_controller(streams={"eiger"}, workers={"w1"})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set() or {"w1"} - set(
-            state.get_workers()
-        ) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
         await time_beacon(context, 9999, 5, flags=zmq.NOBLOCK)  # type: ignore[call-arg]
         ntrig = 10
         resp = await session.post(
@@ -82,13 +75,7 @@ async def test_outside(
 
     asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    await wait_for_finish()
 
     context.destroy()
 
