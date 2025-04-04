@@ -278,7 +278,9 @@ class MappingSequence:
         self.uuid = uuid.uuid4()
         self.complete_events = 0
 
-        self.queued_workers = []
+        self.queued_workers: list[
+            tuple[WorkerState, list[WorkerState], EventNumber | None]
+        ] = []
 
         self.current_sequence_index = 0
         first_active = ActiveMap(
