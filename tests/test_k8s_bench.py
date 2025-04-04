@@ -176,7 +176,7 @@ async def est_single_ingester(ingester: str, plt: Any, size: int) -> None:
             plt.plot(measured_times, ingester_times[dname], label=dname)
         plt.plot(stat_times, sent_times, label="generated packets")
         plt.plot(stat_times, bytes_times, label="outgoing MiBi/s")
-        plt.title(f"{ntrig} frames, {delay}s delay, {size*size*2} bytes/f")
+        plt.title(f"{ntrig} frames, {delay}s delay, {size * size * 2} bytes/f")
         plt.ylabel("pakets/s")
         plt.xlabel("time in s")
         plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1))
@@ -384,7 +384,7 @@ async def est_dual_ingester(plt: Any, size: int) -> None:
         for ing in ingesters:
             plt.plot(stat_times[ing], sent_times[ing], label="generated packets")
             plt.plot(stat_times[ing], bytes_times[ing], label="outgoing MiBi/s")
-        plt.title(f"{ntrig} frames, {delay}s delay, {size*size*2} bytes/f")
+        plt.title(f"{ntrig} frames, {delay}s delay, {size * size * 2} bytes/f")
         plt.ylabel("pakets/s")
         plt.xlabel("time in s")
         plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1))
@@ -520,7 +520,7 @@ async def est_multi_ingester(plt: Any, size: int, num_ing: int) -> None:
         for ing in ingesters:
             # plt.plot(stat_times[ing], sent_times[ing], label="generated packets")
             plt.plot(stat_times[ing], bytes_times[ing], label="outgoing MiBi/s")
-        plt.title(f"{ntrig} frames, {delay}s delay, {size*size*2} bytes/f")
+        plt.title(f"{ntrig} frames, {delay}s delay, {size * size * 2} bytes/f")
         plt.ylabel("pakets/s")
         plt.xlabel("time in s")
         plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1))
@@ -628,7 +628,7 @@ async def test_raw_zmq(plt: Any, size: int) -> None:
                 if t < exp_start and sent - sentp == 0:
                     break
 
-        with open(f"bench/raw_zmq_{size*size*2}.json", "w") as f:
+        with open(f"bench/raw_zmq_{size * size * 2}.json", "w") as f:
             json.dump(
                 {
                     "times": stat_times,
@@ -646,7 +646,7 @@ async def test_raw_zmq(plt: Any, size: int) -> None:
             plt.plot(
                 stat_times[ing], bytes_rx_times[ing], label=f"incoming MiBi/s {ing}"
             )
-        plt.title(f"{nframes} frames, no delay, {size*size*2/1024} kbytes/f")
+        plt.title(f"{nframes} frames, no delay, {size * size * 2 / 1024} kbytes/f")
         plt.ylabel("pakets/s")
         plt.xlabel("time in s")
         plt.legend(loc="upper center", bbox_to_anchor=(0.5, -0.1))

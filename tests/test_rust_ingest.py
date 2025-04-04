@@ -10,6 +10,7 @@ from dranspose.protocol import (
     VirtualWorker,
     VirtualConstraint,
     WorkerName,
+    StreamName,
 )
 from dranspose.worker import Worker
 from tests.utils import wait_for_controller, wait_for_finish
@@ -40,7 +41,7 @@ async def test_rust_basic(
 
     await asyncio.sleep(2)
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         logging.info("startup done")
 

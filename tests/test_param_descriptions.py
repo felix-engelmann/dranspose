@@ -43,7 +43,7 @@ async def test_params(
         )
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         par = await session.get("http://localhost:5000/api/v1/parameters")
         params = ParameterList.validate_python(await par.json())

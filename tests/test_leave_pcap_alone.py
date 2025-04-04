@@ -69,7 +69,7 @@ async def test_pcapingester(
         )
     )
 
-    await wait_for_controller(streams={"pcap", "eiger"})
+    await wait_for_controller(streams={StreamName("pcap"), StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
         resp = await session.post(

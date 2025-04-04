@@ -51,7 +51,7 @@ async def test_simple(
         )
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
         resp = await session.post(
@@ -81,7 +81,7 @@ async def test_simple(
         st = await session.get("http://localhost:5002/api/v1/last_events?number=20")
         content = await st.content.read()
         res: list[EventData] = pickle.loads(content)
-        got_frames = []
+        got_frames: list[int] = []
         for ev in res:
             assert set(ev.streams.keys()) == {"eiger"}
             pkt = parse(ev.streams[StreamName("eiger")])

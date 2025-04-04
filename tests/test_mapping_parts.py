@@ -144,7 +144,11 @@ def test_useless_worker() -> None:
             },
             MappingName("next"): {
                 StreamName("test"): [
-                    [VirtualWorker(constraint=VirtualConstraint(i), tags={"useless"})]
+                    [
+                        VirtualWorker(
+                            constraint=VirtualConstraint(i), tags={WorkerTag("useless")}
+                        )
+                    ]
                     for i in range(ntrig)
                 ]
             },
@@ -176,14 +180,16 @@ def test_useless_worker() -> None:
         assert len(ret) == 1, f"failed assign {i}"
 
     for i in range(400):
-        workers = m.get_event_workers(i)
+        workers = m.get_event_workers(EventNumber(i))
         if i < 200:
             assert workers == WorkAssignment(
-                event_number=i, assignments={"test": ["w1"]}
+                event_number=EventNumber(i),
+                assignments={StreamName("test"): [WorkerName("w1")]},
             )
         else:
             assert workers == WorkAssignment(
-                event_number=i, assignments={"test": ["useless"]}
+                event_number=EventNumber(i),
+                assignments={StreamName("test"): [WorkerName("useless")]},
             )
 
 

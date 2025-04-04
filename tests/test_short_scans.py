@@ -68,7 +68,7 @@ async def test_short_scans(
         )
     )
 
-    await wait_for_controller(streams={"contrast", "xspress3"})
+    await wait_for_controller(streams={StreamName("contrast"), StreamName("xspress3")})
     async with aiohttp.ClientSession() as session:
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/roi1",

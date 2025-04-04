@@ -78,7 +78,7 @@ async def test_simple(
         )
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         await session.post(
             "http://localhost:5000/api/v1/parameter/sleep_time",

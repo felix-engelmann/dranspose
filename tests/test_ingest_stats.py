@@ -57,7 +57,7 @@ async def test_map(
         )
     )
 
-    await wait_for_controller(streams={"eiger", "orca"})
+    await wait_for_controller(streams={StreamName("eiger"), StreamName("orca")})
     async with aiohttp.ClientSession() as session:
         ntrig = 100
         resp = await session.post(

@@ -60,7 +60,7 @@ async def test_slowreduce(
         )
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         st = await session.get(
             "http://localhost:5000/api/v1/load?intervals=1&intervals=10&scan=True"

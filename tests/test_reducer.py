@@ -77,7 +77,7 @@ async def test_reduction(
         )
     )
 
-    await wait_for_controller(streams={"contrast", "xspress3"})
+    await wait_for_controller(streams={StreamName("contrast"), StreamName("xspress3")})
     async with aiohttp.ClientSession() as session:
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/roi1",
@@ -138,8 +138,8 @@ async def test_reduction(
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5001/api/v1/result/pickle")
-        content = await st.content.read()
-        result = pickle.loads(content)
+        content_bytes = await st.content.read()
+        result = pickle.loads(content_bytes)
         assert result == {
             "map": {
                 (-2.004051863, -2.002903037): {"roi1": 81},

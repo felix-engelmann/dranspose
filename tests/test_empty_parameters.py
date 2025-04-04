@@ -63,7 +63,7 @@ async def test_empty_params(
 
     await asyncio.sleep(1)
 
-    state = await wait_for_controller(streams={"eiger"})
+    state = await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         logging.warning("ensemble state uuids are %s", state.parameters_version)
 

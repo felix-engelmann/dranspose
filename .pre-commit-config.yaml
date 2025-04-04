@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b
     hooks:
       - id: check-json
       - id: trailing-whitespace
@@ -13,7 +13,7 @@ repos:
       - id: check-symlinks
 
   - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
+    rev: 16f5f28a384f0781bebb37a08aa45e65b9526c50
     hooks:
       - id: flake8
         exclude: ^docs/

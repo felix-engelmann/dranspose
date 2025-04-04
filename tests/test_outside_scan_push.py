@@ -53,7 +53,7 @@ async def test_outside(
 
     context = zmq.asyncio.Context()
 
-    await wait_for_controller(streams={"eiger"}, workers={"w1"})
+    await wait_for_controller(streams={StreamName("eiger")}, workers={WorkerName("w1")})
     async with aiohttp.ClientSession() as session:
         await time_beacon(context, 9999, 5, flags=zmq.NOBLOCK)  # type: ignore[call-arg]
         ntrig = 10
@@ -83,7 +83,7 @@ async def test_outside(
         st = await session.get("http://localhost:5002/api/v1/last_events?number=20")
         content = await st.content.read()
         res: list[EventData] = pickle.loads(content)
-        got_frames = []
+        got_frames: list[int] = []
         for ev in res:
             print("got event", ev.event_number, ev.streams.keys())
             pkt = parse(ev.streams[StreamName("eiger")])

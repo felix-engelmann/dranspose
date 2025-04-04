@@ -72,7 +72,7 @@ async def test_ingester(
         )
     )
 
-    await wait_for_controller(streams={"contrast", "pcap"})
+    await wait_for_controller(streams={StreamName("contrast"), StreamName("pcap")})
     async with aiohttp.ClientSession() as session:
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",

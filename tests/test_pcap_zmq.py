@@ -51,7 +51,7 @@ async def test_pcap(
         )
     )
 
-    await wait_for_controller(streams={"pcap"})
+    await wait_for_controller(streams={StreamName("pcap")})
     async with aiohttp.ClientSession() as session:
         ntrig = 1500
         resp = await session.post(

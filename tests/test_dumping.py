@@ -87,7 +87,14 @@ async def test_dump(
         )
     )
 
-    await wait_for_controller(streams={"eiger", "orca", "alba", "slow"})
+    await wait_for_controller(
+        streams={
+            StreamName("eiger"),
+            StreamName("orca"),
+            StreamName("alba"),
+            StreamName("slow"),
+        }
+    )
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
@@ -219,7 +226,7 @@ async def test_dump_xrd(
         )
     )
 
-    await wait_for_controller(streams={"xrd"})
+    await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
@@ -283,7 +290,7 @@ async def test_dump_map_and_parameters(
         )
     )
 
-    await wait_for_controller(streams={"xrd"})
+    await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
@@ -361,7 +368,7 @@ async def test_dump_bin_parameters(
         )
     )
 
-    await wait_for_controller(streams={"xrd"})
+    await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))

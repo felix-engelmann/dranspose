@@ -57,7 +57,7 @@ async def test_multiple_scans(
         )
     )
 
-    await wait_for_controller(streams={"eiger", "pcap"})
+    await wait_for_controller(streams={StreamName("eiger"), StreamName("pcap")})
     async with aiohttp.ClientSession() as session:
         ntrig = 20
         mp = {

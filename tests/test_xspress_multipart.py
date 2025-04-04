@@ -57,7 +57,7 @@ async def test_multipart(
         )
     )
 
-    await wait_for_controller(streams={"xspress3"})
+    await wait_for_controller(streams={StreamName("xspress3")})
     async with aiohttp.ClientSession() as session:
         ntrig = 5
         resp = await session.post(

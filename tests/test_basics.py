@@ -51,7 +51,9 @@ async def test_simple(
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
-        await wait_for_controller(streams={"eiger"}, workers={"w1"})
+        await wait_for_controller(
+            streams={StreamName("eiger")}, workers={WorkerName("w1")}
+        )
 
         ntrig = 10
         resp = await session.post(
@@ -158,7 +160,14 @@ async def test_map(
         )
     )
 
-    await wait_for_controller(streams={"eiger", "orca", "alba", "slow"})
+    await wait_for_controller(
+        streams={
+            StreamName("eiger"),
+            StreamName("orca"),
+            StreamName("alba"),
+            StreamName("slow"),
+        }
+    )
     async with aiohttp.ClientSession() as session:
         print("startup done")
         ntrig = 10

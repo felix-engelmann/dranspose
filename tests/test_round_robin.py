@@ -87,7 +87,7 @@ async def test_roundrobin(
         )
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
         resp = await session.post(

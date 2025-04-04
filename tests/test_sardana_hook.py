@@ -34,7 +34,7 @@ async def test_not_enough_workers(
             ),
         )
     )
-    await wait_for_controller(streams={"orca"})
+    await wait_for_controller(streams={StreamName("orca")})
     async with aiohttp.ClientSession() as session:
         data = json.loads(payload)
         resp = await session.post(

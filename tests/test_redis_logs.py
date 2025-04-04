@@ -39,7 +39,7 @@ async def test_logs(
         )
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         logs = await session.get("http://localhost:5000/api/v1/logs?level=warning")
         lgs = await logs.json()

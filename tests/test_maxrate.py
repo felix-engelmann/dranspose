@@ -57,7 +57,7 @@ async def test_simple(
         subprocess=True,  # type: ignore[call-arg]
     )
 
-    await wait_for_controller(streams={"eiger"})
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 100
         mapping = {

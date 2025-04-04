@@ -1,14 +1,21 @@
 import asyncio
 import logging
+from typing import Optional, Any
 
 import aiohttp
 
-from dranspose.protocol import EnsembleState
+from pydantic_core import Url
+
+from dranspose.protocol import EnsembleState, StreamName, WorkerName
 
 
-async def wait_for_controller(streams=None, workers=None, controller="localhost:5000"):
+async def wait_for_controller(
+    streams: Optional[set[StreamName]] = None,
+    workers: Optional[set[WorkerName]] = None,
+    controller: Url = Url("http://localhost:5000"),
+) -> EnsembleState:
     async with aiohttp.ClientSession() as session:
-        st = await session.get(f"http://{controller}/api/v1/config")
+        st = await session.get(f"{controller}api/v1/config")
         if streams is None:
             streams = set()
         if workers is None:
@@ -21,7 +28,7 @@ async def wait_for_controller(streams=None, workers=None, controller="localhost:
         ):
             await asyncio.sleep(0.3)
             timeout += 1
-            st = await session.get(f"http://{controller}/api/v1/config")
+            st = await session.get(f"{controller}api/v1/config")
             state = EnsembleState.model_validate(await st.json())
             if timeout < 20:
                 logging.debug("queried for components to become available %s", state)
@@ -36,16 +43,18 @@ async def wait_for_controller(streams=None, workers=None, controller="localhost:
         return state
 
 
-async def wait_for_finish(controller="localhost:5000"):
+async def wait_for_finish(
+    controller: Url = Url("http://localhost:5000"),
+) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        st = await session.get(f"http://{controller}/api/v1/progress")
+        st = await session.get(f"{controller}api/v1/progress")
         content = await st.json()
         timeout = 0
         completed_before = -1
         while not content["finished"]:
             await asyncio.sleep(0.3)
             timeout += 1
-            st = await session.get(f"http://{controller}/api/v1/progress")
+            st = await session.get(f"{controller}api/v1/progress")
             content = await st.json()
             if content["completed_events"] != completed_before:
                 timeout = 0

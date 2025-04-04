@@ -49,7 +49,7 @@ async def test_debugger(
 
     await create_worker(WorkerName("w1"))
 
-    state = await wait_for_controller(workers={"w1"})
+    state = await wait_for_controller(workers={WorkerName("w1")})
 
     assert set([w.name for w in state.workers]) == {"w1", "debugworker"}
 
@@ -75,7 +75,7 @@ async def test_debug(
         )
     )
 
-    state = await wait_for_controller(streams={"eiger"})
+    state = await wait_for_controller(streams={StreamName("eiger")})
     assert set([w.name for w in state.workers]) == {"w1", "debugworker"}
     async with aiohttp.ClientSession() as session:
         ntrig = 10

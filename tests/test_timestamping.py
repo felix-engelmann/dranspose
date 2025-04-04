@@ -53,7 +53,7 @@ async def test_timestamps(
         )
     )
 
-    await wait_for_controller(streams={"fast"})
+    await wait_for_controller(streams={StreamName("fast")})
     async with aiohttp.ClientSession() as session:
         st = await session.get(
             "http://localhost:5000/api/v1/load?intervals=1&intervals=10&scan=True"

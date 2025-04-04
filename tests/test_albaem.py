@@ -44,7 +44,7 @@ async def test_albaem(
         )
     )
 
-    await wait_for_controller(streams={"albaem"})
+    await wait_for_controller(streams={StreamName("albaem")})
     async with aiohttp.ClientSession() as session:
         ntrig = 5
         resp = await session.post(

@@ -14,6 +14,7 @@ from dranspose.protocol import (
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
+    StreamName,
 )
 
 from dranspose.worker import Worker
@@ -35,7 +36,7 @@ async def test_sardana(
     await create_worker(WorkerName("w1"))
     await http_ingester(custom_app, 5002, {"ingester_streams": ["sardana"]})
 
-    await wait_for_controller(streams={"sardana"})
+    await wait_for_controller(streams={StreamName("sardana")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
         resp = await session.post(
