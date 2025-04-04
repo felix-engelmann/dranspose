@@ -169,6 +169,7 @@ def test_useless_worker() -> None:
     ret = m.assign_next(all_workers[0], all_workers, future=100)
     assert ret == []
 
+    assert len(m.active_maps) == 12
     for i in range(200):
         ret = m.assign_next(all_workers[1], all_workers, future=100)
         assert len(ret) == 1, f"failed assign {i}"
