@@ -28,3 +28,9 @@ class RepubWorker:
         self.buffer[event.event_number] = event
 
         self.sock.send_multipart(event.streams["eiger"].frames)
+
+    def close(self, context):
+        if "socket" in context:
+            context["socket"].close()
+        if "context" in context:
+            context["context"].destroy(linger=0)
