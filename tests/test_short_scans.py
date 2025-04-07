@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 from pathlib import PosixPath
@@ -115,10 +116,19 @@ async def test_short_scans(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
         content = await st.json()
+        timeout = 0
         while content["completed_events"] < 22:
             await asyncio.sleep(0.3)
+            timeout += 1
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
+            if timeout < 20:
+                logging.debug("at progress", content)
+            elif timeout % 4 == 0:
+                logging.warning("stuck at progress %s", content)
+            elif timeout > 40:
+                logging.error("stalled at progress %s", content)
+                raise TimeoutError("processing stalled")
 
         st = await session.get("http://localhost:5001/api/v1/result/pickle")
         content = await st.content.read()
