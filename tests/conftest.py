@@ -479,19 +479,7 @@ async def stream_pkls() -> Callable[
         end: Optional[int] = None,
     ) -> None:
         socket: zmq.Socket[Any] = ctx.socket(typ)
-        try:
-            socket.bind(f"tcp://*:{port}")
-        except zmq.ZMQError as e:
-            if e.errno == 98:
-                logging.warning(
-                    "binding not possible %d: %s, retry in 2 seconds",
-                    e.errno,
-                    e.__repr__(),
-                )
-                await asyncio.sleep(2)
-                socket.bind(f"tcp://*:{port}")
-            else:
-                raise e
+        socket.bind(f"tcp://*:{port}")
         if begin is None and end is None:
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
