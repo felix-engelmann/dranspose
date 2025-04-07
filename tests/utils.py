@@ -22,9 +22,8 @@ async def wait_for_controller(
             workers = set()
         state = EnsembleState.model_validate(await st.json())
         timeout = 0
-        while (
-            streams - set(state.get_streams()) != set()
-            or workers - set(state.get_workers()) != set()
+        while not (
+            streams <= set(state.get_streams()) and workers <= set(state.get_workers())
         ):
             await asyncio.sleep(0.3)
             timeout += 1
