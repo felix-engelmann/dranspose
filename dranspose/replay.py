@@ -8,7 +8,7 @@ import random
 import threading
 import time
 import traceback
-from typing import Iterator, Any, Optional
+from typing import Iterator, Any, Optional, IO
 
 import cbor2
 import uvicorn
@@ -38,8 +38,9 @@ from dranspose.protocol import (
 
 
 def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMessage]:
+    f: IO[bytes]
     if str(filename).endswith(".gz"):
-        f = gzip.open(filename, "rb")
+        f = gzip.open(filename, "rb")  # type: ignore[assignment]
         filename = str(filename)[:-3]
     else:
         f = open(filename, "rb")

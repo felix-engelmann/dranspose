@@ -5,7 +5,7 @@ import logging
 import pickle
 import shutil
 import threading
-from typing import Awaitable, Callable, Any, Coroutine, Optional
+from typing import Awaitable, Callable, Any, Coroutine, Optional, IO
 
 import aiohttp
 import cbor2
@@ -24,7 +24,6 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -33,6 +32,7 @@ from dranspose.protocol import (
 
 from dranspose.replay import replay
 from dranspose.worker import Worker
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
@@ -92,17 +92,15 @@ async def test_replay(
         )
     )
 
+    await wait_for_controller(
+        streams={
+            StreamName("eiger"),
+            StreamName("orca"),
+            StreamName("alba"),
+            StreamName("slow"),
+        }
+    )
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        logging.debug("content %s", state)
-        while {"eiger", "orca", "alba", "slow"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
-        logging.info("startup done")
-
         p_prefix = tmp_path / "dump_"
         logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
@@ -168,13 +166,7 @@ async def test_replay(
     asyncio.create_task(stream_small(context, 9997, ntrig - 1))
     asyncio.create_task(stream_small(context, 9996, ntrig // 4))
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    await wait_for_finish()
 
     # read dump
 
@@ -223,24 +215,24 @@ async def test_replay(
         logging.warning("params in reducer is %s", result["results"][5][0])
         ev5: EventData = result["results"][5][0]
         assert ev5.event_number == 5
-        assert ev5.streams["eiger"].typ == "STINS"
-        assert (
-            ev5.streams["eiger"]
-            .frames[0]
-            .startswith(
-                b'{"htype": "image", "frame": 4, "shape": [1475, 831], "type": "uint16", "compression": "none", "msg_number": 5, "timestamps": {"dummy": "'
-            )
+        assert ev5.streams[StreamName("eiger")].typ == "STINS"
+        eiger_frame_header = ev5.streams[StreamName("eiger")].frames[0]
+        eiger_frame_payload = ev5.streams[StreamName("eiger")].frames[1]
+        assert isinstance(eiger_frame_header, bytes)
+        assert isinstance(eiger_frame_payload, bytes)
+        assert eiger_frame_header.startswith(
+            b'{"htype": "image", "frame": 4, "shape": [1475, 831], "type": "uint16", "compression": "none", "msg_number": 5, "timestamps": {"dummy": "'
         )
-        assert len(ev5.streams["eiger"].frames[1]) > 4500
-        assert ev5.streams["orca"].typ == "STINS"
-        assert (
-            ev5.streams["orca"]
-            .frames[0]
-            .startswith(
-                b'{"htype": "image", "frame": 4, "shape": [2000, 4000], "type": "uint16", "compression": "none", "msg_number": 5}'
-            )
+        assert len(eiger_frame_payload) > 4500
+        assert ev5.streams[StreamName("orca")].typ == "STINS"
+        orca_frame_header = ev5.streams[StreamName("orca")].frames[0]
+        orca_frame_payload = ev5.streams[StreamName("orca")].frames[1]
+        assert isinstance(orca_frame_header, bytes)
+        assert isinstance(orca_frame_payload, bytes)
+        assert orca_frame_header.startswith(
+            b'{"htype": "image", "frame": 4, "shape": [2000, 4000], "type": "uint16", "compression": "none", "msg_number": 5}'
         )
-        assert len(ev5.streams["orca"].frames[1]) > 4500
+        assert len(orca_frame_payload) > 4500
     logging.info("shut down server")
     stop_event.set()
 
@@ -248,14 +240,15 @@ async def test_replay(
 
     bin_file = tmp_path / "binparams.pkl"
 
-    with open(bin_file, "wb") as f:
+    fb: IO[bytes]
+    with open(bin_file, "wb") as fb:
         arr = np.ones((10, 10))
         pickle.dump(
             [
                 {"name": "roi1", "data": "[10,20]"},
                 {"name": "file_parameter_file", "data": pickle.dumps(arr)},
             ],
-            f,
+            fb,
         )
 
     stop_event = threading.Event()
@@ -278,14 +271,14 @@ async def test_replay(
     done_event.wait()
     logging.info("replay done")
 
-    def work() -> None:
+    def work_first() -> None:
         f = h5pyd.File("http://localhost:5010/", "r")
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))
         assert list(f.keys()) == ["map"]
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, work)
+    await loop.run_in_executor(None, work_first)
 
     logging.info("shut down server")
     stop_event.set()
@@ -294,14 +287,14 @@ async def test_replay(
 
     cbor_file = tmp_path / "binparams.cbor"
 
-    with open(cbor_file, "wb") as f:
+    with open(cbor_file, mode="wb") as fb:
         arr = np.ones((10, 10))
         cbor2.dump(
             [
                 {"name": "roi1", "data": "[10,20]"},
                 {"name": "file_parameter_file", "data": pickle.dumps(arr)},
             ],
-            f,
+            fb,
         )
 
     stop_event = threading.Event()
@@ -324,14 +317,14 @@ async def test_replay(
     done_event.wait()
     logging.info("replay done")
 
-    def work() -> None:
+    def work_second() -> None:
         f = h5pyd.File("http://localhost:5010/", "r")
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))
         assert list(f.keys()) == ["map"]
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, work)
+    await loop.run_in_executor(None, work_second)
 
     logging.info("shut down server")
     stop_event.set()

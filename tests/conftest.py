@@ -479,7 +479,19 @@ async def stream_pkls() -> Callable[
         end: Optional[int] = None,
     ) -> None:
         socket: zmq.Socket[Any] = ctx.socket(typ)
-        socket.bind(f"tcp://*:{port}")
+        try:
+            socket.bind(f"tcp://*:{port}")
+        except zmq.ZMQError as e:
+            if e.errno == 98:
+                logging.warning(
+                    "binding not possible %d: %s, retry in 2 seconds",
+                    e.errno,
+                    e.__repr__(),
+                )
+                await asyncio.sleep(2)
+                socket.bind(f"tcp://*:{port}")
+            else:
+                raise e
         if begin is None and end is None:
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
@@ -861,14 +873,14 @@ fields:
 END 11 Disarmed"""
 
 
-def sample_table_to_md(table, filename):
+def sample_table_to_md(table: dict[str, Any], filename: str) -> None:
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w") as f:
         col_order = sorted(table.keys())  # , key=lambda name: name[::-1])
         logging.info("column order is %s", col_order)
         f.write(f'| {" | ".join(col_order)} |\n')
         f.write(f'| {" | ".join(["---" for _ in table])} |\n')
-        last_line = [""] * len(table)
+        last_line: tuple[Any, ...] = tuple([""] * len(table))
         for line in zip(*[table[col] for col in col_order]):
             if line == last_line:
                 continue
@@ -924,7 +936,9 @@ def sample_table_to_md(table, filename):
     logging.info("written redis observation to %s", filename)
 
 
-def sample_table_to_html(table, filename):
+def sample_table_to_html(
+    table: dict[str, str | list[tuple[str, str]] | bytes], filename: str
+) -> None:
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w") as f:
         col_order = sorted(table.keys())  # , key=lambda name: name[::-1])
@@ -955,7 +969,7 @@ def sample_table_to_html(table, filename):
         <tbody>
         """
         )
-        last_line = [""] * len(table)
+        last_line: tuple[Any, ...] = tuple([""] * len(table))
         for line in zip(*[table[col] for col in col_order]):
             if line == last_line:
                 continue
@@ -1013,13 +1027,13 @@ def sample_table_to_html(table, filename):
     logging.info("written redis observation to %s", filename)
 
 
-async def sample_redis(filename):
+async def sample_redis(filename: str) -> None:
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
     r_raw = redis.Redis(host="localhost", port=6379, decode_responses=False, protocol=3)
-    table = {}
+    table: dict[str, Any] = {}
     try:
         tick = 0
-        start_ids = {}
+        start_ids: dict[str, str] = {}
         while True:
             keys = await r.keys("dranspose:*")
             logging.debug("all redis keys %s", keys)
@@ -1061,7 +1075,7 @@ async def sample_redis(filename):
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def observe_redis(request):
+async def observe_redis(request: FixtureRequest) -> AsyncIterator[None]:
     if request.config.getoption("observe"):
         filename = (
             "redis-observations/"

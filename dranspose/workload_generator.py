@@ -65,7 +65,8 @@ class NetworkConfig(BaseModel):
 class WorkloadGenerator:
     def __init__(self, **kwargs: Any) -> None:
         self.context = zmq.asyncio.Context()
-        self.socket: AcquisitionSocket | None | zmq.Socket[Any] = None
+        self.out_socket: AcquisitionSocket | None = None
+        self.in_socket: zmq.asyncio.Socket | None = None
         self.task: Task[Any] | None = None
         self.stat = Statistics()
         logger.info("Workload generator initialised")
@@ -93,16 +94,16 @@ class WorkloadGenerator:
     async def open_socket(self, spec: SocketSpec) -> None:
         await self.close_socket()
         self.stat = Statistics()
-        self.socket = AcquisitionSocket(
+        self.out_socket = AcquisitionSocket(
             self.context, Url(f"tcp://*:{spec.port}"), typ=spec.type
         )
-        logger.info("socket opened to %s is %s", spec, self.socket)
+        logger.info("socket opened to %s is %s", spec, self.out_socket)
 
     async def sink_packets(self) -> None:
-        if not isinstance(self.socket, zmq.Socket):
+        if not isinstance(self.in_socket, zmq.Socket):
             raise Exception("only sink packets from connected socket")
         while True:
-            pkt = await self.socket.recv_multipart(copy=False)
+            pkt = await self.in_socket.recv_multipart(copy=False)
             try:
                 header = json.loads(pkt[0].bytes)
                 ts = header.get("timestamps", {})
@@ -118,21 +119,21 @@ class WorkloadGenerator:
     async def connect_socket(self, spec: ConnectSpec) -> None:
         await self.close_socket()
         self.stat = Statistics()
-        self.socket = self.context.socket(spec.type)
-        self.socket.connect(str(spec.url))
+        self.in_socket = self.context.socket(spec.type)
+        self.in_socket.connect(str(spec.url))
         if spec.type == zmq.SUB:
-            self.socket.setsockopt(zmq.SUBSCRIBE, b"")
+            self.in_socket.setsockopt(zmq.SUBSCRIBE, b"")
         logger.info("socket connected to %s", spec)
         self.task = asyncio.create_task(self.sink_packets())
         self.task.add_done_callback(done_callback)
 
     async def send_packets(self, spec: WorkloadSpec) -> None:
-        logger.info("send packets from socket %s", self.socket)
-        if self.socket is None:
+        logger.info("send packets from socket %s", self.out_socket)
+        if self.out_socket is None:
             raise Exception("must open socket before sending packets")
-        if not isinstance(self.socket, AcquisitionSocket):
-            raise Exception("must be AcquisitionSocket to send, is %s", self.socket)
-        acq = await self.socket.start(filename=spec.filename)
+        if not isinstance(self.out_socket, AcquisitionSocket):
+            raise Exception("must be AcquisitionSocket to send, is %s", self.out_socket)
+        acq = await self.out_socket.start(filename=spec.filename)
         logger.info("sending packets %s", spec)
         self.stat.packets += 1
         width = spec.shape[0]
@@ -154,11 +155,10 @@ class WorkloadGenerator:
         self.stat.packets += 1
 
     async def close_socket(self) -> None:
-        if self.socket is not None:
-            if isinstance(self.socket, zmq.Socket):
-                self.socket.close()
-            else:
-                await self.socket.close()
+        if self.in_socket is not None:
+            self.in_socket.close()
+        if self.out_socket is not None:
+            await self.out_socket.close()
         logger.info("socket closed")
 
     async def close(self) -> None:

@@ -35,7 +35,7 @@ router = APIRouter()
 logger = logging.getLogger()
 
 
-def _path_to_uuid(path: list[str], collection_type) -> H5UUID:
+def _path_to_uuid(path: list[str], collection_type: Literal["g-", "d-"]) -> H5UUID:
     abspath = "/" + "/".join(path)
     # print("abspath", abspath)
     uuid = base64.b16encode(abspath.encode()).decode()
@@ -146,6 +146,7 @@ def _dataset_from_obj(
 
 def _get_group_link(obj: Any, path: list[str]) -> H5Link:
     collection: Literal["datasets", "groups"]
+    collection_type: Literal["g-", "d-"]
     if isinstance(obj, dict):
         collection = "groups"
         collection_type = "g-"

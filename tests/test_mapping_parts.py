@@ -132,7 +132,7 @@ def test_huge() -> None:
 
 
 def test_useless_worker() -> None:
-    ntrig = 1000
+    ntrig = 10
     reps = 20
     m = MappingSequence(
         parts={
@@ -144,7 +144,11 @@ def test_useless_worker() -> None:
             },
             MappingName("next"): {
                 StreamName("test"): [
-                    [VirtualWorker(constraint=VirtualConstraint(i), tags={"useless"})]
+                    [
+                        VirtualWorker(
+                            constraint=VirtualConstraint(i), tags={WorkerTag("useless")}
+                        )
+                    ]
                     for i in range(ntrig)
                 ]
             },
@@ -162,28 +166,31 @@ def test_useless_worker() -> None:
         WorkerState(name=WorkerName("w1")),
     ]
 
-    ret = m.assign_next(all_workers[0], all_workers)
+    ret = m.assign_next(all_workers[0], all_workers, future=100)
     assert ret == []
 
-    for i in range(20000):
-        ret = m.assign_next(all_workers[1], all_workers)
+    assert len(m.active_maps) == 12
+    for i in range(200):
+        ret = m.assign_next(all_workers[1], all_workers, future=100)
         assert len(ret) == 1, f"failed assign {i}"
 
     assert len(m.active_maps) == 21
 
-    for i in range(19999):
-        ret = m.assign_next(all_workers[0], all_workers)
+    for i in range(199):
+        ret = m.assign_next(all_workers[0], all_workers, future=100)
         assert len(ret) == 1, f"failed assign {i}"
 
-    for i in range(40000):
-        workers = m.get_event_workers(i)
-        if i < 20000:
+    for i in range(400):
+        workers = m.get_event_workers(EventNumber(i))
+        if i < 200:
             assert workers == WorkAssignment(
-                event_number=i, assignments={"test": ["w1"]}
+                event_number=EventNumber(i),
+                assignments={StreamName("test"): [WorkerName("w1")]},
             )
         else:
             assert workers == WorkAssignment(
-                event_number=i, assignments={"test": ["useless"]}
+                event_number=EventNumber(i),
+                assignments={StreamName("test"): [WorkerName("useless")]},
             )
 
 

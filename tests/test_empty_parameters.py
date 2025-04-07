@@ -19,11 +19,11 @@ from dranspose.parameters import ParameterList
 from dranspose.protocol import (
     WorkerName,
     StreamName,
-    EnsembleState,
     VirtualWorker,
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller
 
 
 @pytest.mark.asyncio
@@ -63,14 +63,8 @@ async def test_empty_params(
 
     await asyncio.sleep(1)
 
+    state = await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         logging.warning("ensemble state uuids are %s", state.parameters_version)
 
         assert state.parameters_hash is not None

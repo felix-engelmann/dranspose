@@ -16,13 +16,13 @@ from dranspose.ingesters.zmqsub_xspress3 import (
     ZmqSubXspressSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.asyncio
@@ -57,14 +57,8 @@ async def test_multipart(
         )
     )
 
+    await wait_for_controller(streams={StreamName("xspress3")})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"xspress3"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         ntrig = 5
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
@@ -94,13 +88,7 @@ async def test_multipart(
         )
     )
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    content = await wait_for_finish()
 
     context.destroy()
 

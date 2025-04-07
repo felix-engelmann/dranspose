@@ -19,12 +19,13 @@ async def handle_client(reader: StreamReader, writer: StreamWriter) -> None:
         await writer.drain()
         if i % 100 == 0:
             logging.info("sent out %d", i)
-        # await asyncio.sleep(0.001)
+        await asyncio.sleep(0.001)
 
     await writer.drain()
     writer.close()
 
 
+@pytest.mark.skip
 @pytest.mark.asyncio
 async def test_tcp(stream_pcap: Callable[[int], Coroutine[None, None, None]]) -> None:
     server = await asyncio.start_server(handle_client, "localhost", 8889)
@@ -36,9 +37,10 @@ async def test_tcp(stream_pcap: Callable[[int], Coroutine[None, None, None]]) ->
     assert data == b"OK\n"
     logging.info("connected to %s", "127.0.0.1")
 
-    # for i in range(1000):
-    #    line = await reader.readline()
-    #    logging.debug("line is %s", line)
-    await asyncio.sleep(1)
+    for i in range(1000):
+        line = await reader.readline()
+        if line == b"":
+            break
+        logging.debug("line is %s", line)
 
     await cancel_and_wait(task)

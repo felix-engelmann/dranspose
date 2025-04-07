@@ -12,7 +12,6 @@ from pydantic_core import Url
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqsub_albaem import ZmqSubAlbaemIngester, ZmqSubAlbaemSettings
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -20,6 +19,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.asyncio
@@ -44,14 +44,8 @@ async def test_albaem(
         )
     )
 
+    await wait_for_controller(streams={StreamName("albaem")})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"albaem"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         ntrig = 5
         resp = await session.post(
             "http://localhost:5000/api/v1/mapping",
@@ -81,17 +75,11 @@ async def test_albaem(
         )
     )
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    content = await wait_for_finish()
 
-        assert content == {
-            "last_assigned": 6,
-            "completed_events": 6,
-            "total_events": 6,
-            "finished": True,
-        }
+    assert content == {
+        "last_assigned": 6,
+        "completed_events": 6,
+        "total_events": 6,
+        "finished": True,
+    }
