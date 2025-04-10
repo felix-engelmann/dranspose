@@ -1,3 +1,4 @@
+import logging
 import os
 import pickle
 from pathlib import PosixPath
@@ -20,13 +21,13 @@ from dranspose.ingesters.zmqsub_xspress3 import (
     ZmqSubXspressSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller, wait_for_finish
 
 
 @pytest.mark.asyncio
@@ -68,14 +69,8 @@ async def test_short_scans(
         )
     )
 
+    await wait_for_controller(streams={StreamName("contrast"), StreamName("xspress3")})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"contrast", "xspress3"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/roi1",
             json=[0, 10],
@@ -121,10 +116,19 @@ async def test_short_scans(
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/progress")
         content = await st.json()
+        timeout = 0
         while content["completed_events"] < 22:
             await asyncio.sleep(0.3)
+            timeout += 1
             st = await session.get("http://localhost:5000/api/v1/progress")
             content = await st.json()
+            if timeout < 20:
+                logging.debug("at progress", content)
+            elif timeout % 4 == 0:
+                logging.warning("stuck at progress %s", content)
+            elif timeout > 40:
+                logging.error("stalled at progress %s", content)
+                raise TimeoutError("processing stalled")
 
         st = await session.get("http://localhost:5001/api/v1/result/pickle")
         content = await st.content.read()
@@ -214,14 +218,9 @@ async def test_short_scans(
         )
     )
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
+    await wait_for_finish()
 
+    async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5001/api/v1/result/pickle")
         content = await st.content.read()
         result = pickle.loads(content)

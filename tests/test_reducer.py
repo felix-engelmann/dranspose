@@ -23,13 +23,13 @@ from dranspose.ingesters.zmqsub_xspress3 import (
     ZmqSubXspressSettings,
 )
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_finish, wait_for_controller
 
 
 @pytest.mark.asyncio
@@ -77,14 +77,8 @@ async def test_reduction(
         )
     )
 
+    await wait_for_controller(streams={StreamName("contrast"), StreamName("xspress3")})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"contrast", "xspress3"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/roi1",
             json=[0, 10],
@@ -134,24 +128,18 @@ async def test_reduction(
         )
     )
 
+    content = await wait_for_finish()
+    assert content == {
+        "last_assigned": ntrig + 2,
+        "completed_events": ntrig + 2,
+        "total_events": ntrig + 2,
+        "finished": True,
+    }
+
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/progress")
-        content = await st.json()
-        while not content["finished"]:
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
-
-        assert content == {
-            "last_assigned": ntrig + 2,
-            "completed_events": ntrig + 2,
-            "total_events": ntrig + 2,
-            "finished": True,
-        }
-
         st = await session.get("http://localhost:5001/api/v1/result/pickle")
-        content = await st.content.read()
-        result = pickle.loads(content)
+        content_bytes = await st.content.read()
+        result = pickle.loads(content_bytes)
         assert result == {
             "map": {
                 (-2.004051863, -2.002903037): {"roi1": 81},

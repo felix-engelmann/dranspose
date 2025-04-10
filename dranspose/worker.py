@@ -510,6 +510,19 @@ class Worker(DistributedService):
             await asyncio.sleep(2)
 
     async def close(self) -> None:
+        if self.worker:
+            if hasattr(self.worker, "close"):
+                try:
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, self.worker.close, self.custom_context
+                    )
+                except Exception as e:
+                    self._logger.error(
+                        "custom worker failed to close: %s\n%s",
+                        e.__repr__(),
+                        traceback.format_exc(),
+                    )
         await cancel_and_wait(self.manage_ingester_task)
         await cancel_and_wait(self.manage_receiver_task)
         await cancel_and_wait(self.metrics_task)

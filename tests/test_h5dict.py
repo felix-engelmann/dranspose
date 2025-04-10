@@ -311,7 +311,7 @@ def test_dtype_to_h5() -> None:
         if canonical[1] == "f":
             # floating
             htyp = {"class": "H5T_FLOAT"}
-            htyp["base"] = f"H5T_IEEE_F{8*bytelen}{order}"
+            htyp["base"] = f"H5T_IEEE_F{8 * bytelen}{order}"
         elif canonical[1] in ["u", "i"]:
             htyp = {"class": "H5T_INTEGER"}
             signed = canonical[1].upper()

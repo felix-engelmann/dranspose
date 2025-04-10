@@ -30,3 +30,7 @@ from dranspose.ingesters.zmqsub_albaem import (  # noqa: F401
     ZmqSubAlbaemIngester,
     ZmqSubAlbaemSettings,
 )
+from dranspose.ingesters.zmqsub_lecroy import (  # noqa: F401
+    ZmqSubLecroyIngester,
+    ZmqSubLecroySettings,
+)

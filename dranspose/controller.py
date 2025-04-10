@@ -282,14 +282,24 @@ class Controller:
             )
 
             cfgs = await self.get_configs()
+            timeout = 0
             while cfgs.reducer is None or set(
                 [u.mapping_uuid for u in cfgs.ingesters]
                 + [u.mapping_uuid for u in cfgs.workers]
                 + [cfgs.reducer.mapping_uuid]
             ) != {self.mapping.uuid}:
                 await asyncio.sleep(0.1)
+                timeout += 1
                 cfgs = await self.get_configs()
-                logger.debug("updated configs %s", cfgs)
+                if timeout < 50:
+                    logger.debug("updated configs %s", cfgs)
+                elif timeout % 10 == 0:
+                    logger.warning(
+                        "still waiting for configs %s to reach everyone", cfgs
+                    )
+                elif timeout > 100:
+                    logger.error("could not distribute mapping within 10 seconds")
+                    raise TimeoutError("could not distribute mapping")
             logger.info("new mapping with uuid %s distributed", self.mapping.uuid)
             if ParameterName("dump_prefix") in self.parameters:
                 await self.dump_map_and_parameters()

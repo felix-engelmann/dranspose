@@ -12,9 +12,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+license = "MIT"
 dependencies = [
     "pyzmq",
     "redis[hiredis]",
@@ -68,6 +68,10 @@ dranspose = "dranspose.cli:run"
 "Homepage" = "https://github.com/felix-engelmann/dranspose"
 "Bug Tracker" = "https://github.com/felix-engelmann/dranspose/issues"
 
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+
 [tool.mypy]
 plugins = [
   "pydantic.mypy"
@@ -87,6 +91,10 @@ disallow_untyped_defs = true
 init_forbid_extra = true
 init_typed = true
 warn_required_dynamic_aliases = true
+
+[[tool.mypy.overrides]]
+module = ["h5pyd.*", "rlh.*"]
+ignore_missing_imports = true
 
 [tool.black]
 extend-exclude = '''

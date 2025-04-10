@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import json
 import logging
 import multiprocessing
@@ -21,6 +22,7 @@ from typing import (
 )
 
 import aiohttp
+import cbor2
 import numpy as np
 import pytest
 import pytest_asyncio
@@ -84,7 +86,9 @@ class ErrorLoggingHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         # Check if the log message starts with "ERROR"
         if record.levelname == "ERROR":
-            if "Unclosed connection" in record.message:  # aiohttp benign error
+            if hasattr(record, "message") and (
+                "Unclosed connection" in record.message
+            ):  # aiohttp benign error
                 return
             self.error_found = True
 
@@ -480,23 +484,31 @@ async def stream_pkls() -> Callable[
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
                 await asyncio.sleep(0.1)
-        with open(filename, "rb") as f:
-            i = 0
-            while True:
-                try:
+        base, ext = os.path.splitext(filename)
+        if ext == ".gz":
+            f = gzip.open(filename, "rb")
+            _, ext = os.path.splitext(base)
+        else:
+            f = open(filename, "rb")
+        i = 0
+        while True:
+            try:
+                if "cbor" in ext:
+                    frames = cbor2.load(f)
+                else:
                     frames = pickle.load(f)
-                    send = True
-                    if i < (begin or 0):
+                send = True
+                if i < (begin or 0):
+                    send = False
+                if end:
+                    if i >= end:
                         send = False
-                    if end:
-                        if i >= end:
-                            send = False
-                    if send:
-                        await socket.send_multipart(frames)
-                        await asyncio.sleep(frame_time)
-                except EOFError:
-                    break
-
+                if send:
+                    await socket.send_multipart(frames)
+                    await asyncio.sleep(frame_time)
+            except EOFError:
+                break
+        f.close()
         socket.close()
 
     return _make_pkls
@@ -849,14 +861,14 @@ fields:
 END 11 Disarmed"""
 
 
-def sample_table_to_md(table, filename):
+def sample_table_to_md(table: dict[str, Any], filename: str) -> None:
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w") as f:
         col_order = sorted(table.keys())  # , key=lambda name: name[::-1])
         logging.info("column order is %s", col_order)
         f.write(f'| {" | ".join(col_order)} |\n')
         f.write(f'| {" | ".join(["---" for _ in table])} |\n')
-        last_line = [""] * len(table)
+        last_line: tuple[Any, ...] = tuple([""] * len(table))
         for line in zip(*[table[col] for col in col_order]):
             if line == last_line:
                 continue
@@ -912,7 +924,9 @@ def sample_table_to_md(table, filename):
     logging.info("written redis observation to %s", filename)
 
 
-def sample_table_to_html(table, filename):
+def sample_table_to_html(
+    table: dict[str, str | list[tuple[str, str]] | bytes], filename: str
+) -> None:
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     with open(filename, "w") as f:
         col_order = sorted(table.keys())  # , key=lambda name: name[::-1])
@@ -943,7 +957,7 @@ def sample_table_to_html(table, filename):
         <tbody>
         """
         )
-        last_line = [""] * len(table)
+        last_line: tuple[Any, ...] = tuple([""] * len(table))
         for line in zip(*[table[col] for col in col_order]):
             if line == last_line:
                 continue
@@ -1001,13 +1015,13 @@ def sample_table_to_html(table, filename):
     logging.info("written redis observation to %s", filename)
 
 
-async def sample_redis(filename):
+async def sample_redis(filename: str) -> None:
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
     r_raw = redis.Redis(host="localhost", port=6379, decode_responses=False, protocol=3)
-    table = {}
+    table: dict[str, Any] = {}
     try:
         tick = 0
-        start_ids = {}
+        start_ids: dict[str, str] = {}
         while True:
             keys = await r.keys("dranspose:*")
             logging.debug("all redis keys %s", keys)
@@ -1049,7 +1063,7 @@ async def sample_redis(filename):
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def observe_redis(request):
+async def observe_redis(request: FixtureRequest) -> AsyncIterator[None]:
     if request.config.getoption("observe"):
         filename = (
             "redis-observations/"

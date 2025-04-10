@@ -184,6 +184,19 @@ class Reducer(DistributedService):
         )
 
     async def close(self) -> None:
+        if self.reducer:
+            if hasattr(self.reducer, "close"):
+                try:
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(
+                        None, self.reducer.close, self.custom_context
+                    )
+                except Exception as e:
+                    self._logger.error(
+                        "custom reducer failed to close: %s\n%s",
+                        e.__repr__(),
+                        traceback.format_exc(),
+                    )
         await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.metrics_task)

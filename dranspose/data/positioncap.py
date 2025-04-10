@@ -36,7 +36,7 @@ fields:
 """
         for field in fields:
             where = field.name.split(".")[-1]
-            data += f" {field.name[:-len(where)-1]} {field.type} {where}\n"
+            data += f" {field.name[:-len(where) - 1]} {field.type} {where}\n"
         return StreamData(typ="PCAP_RAW", frames=[zmq.Frame(data.encode())])
 
 

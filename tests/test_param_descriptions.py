@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Callable, Optional, Awaitable
 
@@ -13,8 +12,9 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleSettings,
 )
 from dranspose.parameters import ParameterList, BinaryParameter, StrParameter
-from dranspose.protocol import WorkerName, StreamName, EnsembleState, ParameterName
+from dranspose.protocol import WorkerName, StreamName, ParameterName
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller
 
 
 @pytest.mark.asyncio
@@ -43,14 +43,8 @@ async def test_params(
         )
     )
 
+    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"eiger"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-
         par = await session.get("http://localhost:5000/api/v1/parameters")
         params = ParameterList.validate_python(await par.json())
 
