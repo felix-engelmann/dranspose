@@ -2,20 +2,17 @@
 
 The reducer publishes data available for live viewing or to influence the scanning.
 
-To retrieve the data, the reducer exposes a HTTP interface. All data is available at
+To retrieve the data, the reducer exposes an HTTP interface which follows the [hdf rest api](https://github.com/HDFGroup/hdf-rest-api)
 
-```
-/api/v1/result/$
-```
+This allows direct viewing with [h5pyd](https://github.com/HDFGroup/h5pyd) compatible software, such as [silx >= 2.2.0](https://github.com/silx-kit/silx)
 
-and returns pickle objects.
-
-However, if you are only interested in a subset of data for your specific live viewer,
-use [JSONpath](https://pypi.org/project/jsonpath-ng/#description) to select the specific data you need. To handle large numpy arrays better,
-there is a special filter `numpy()` which takes numpy slicing syntax.
 
 !!! Example
-    ```jsonpath
-    /api/v1/result/$.map.`numpy(:,4:8,3)`
+    ```python
+    import h5pyd
+
+    f = h5pyd.File("http://<reducer>:<port>/", "r")
+    data = f["map"][:,4:8,3]
     ```
-    returns the `publish["map"][:,4:8,3]` element of the numpy array in "map"
+
+    sets data to the `publish["map"][:,4:8,3]` element of the numpy array in "map" and otherwise behaves like an hdf5 file.

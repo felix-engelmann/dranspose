@@ -15,6 +15,13 @@ The easiest way to test dranspose is to install the python package
 
 To get a feel of building an analysis, please follow the [tutorial](tutorials/analysis.md).
 
+### Conda
+
+Dranspose is also available on [conda-forge](https://anaconda.org/conda-forge/dranspose) and is installed with
+
+     conda install conda-forge::dranspose 
+
+
 ## CLI
 
 The packet provides a cli `dranspose` to run the components separately or all combined. 
@@ -39,4 +46,10 @@ To run the full distributed system, a `redis` server is required. A convenient w
 ## Applications
 
 If you are looking for help with developing an application on top of dranspose, have a look at the [application section](applications/overview.md)
+
+### Example Payloads
+
+There are some [examples](https://github.com/orgs/maxiv-science/repositories?q=drp) of analysis payloads available for beamlines at Max IV.
+They provide an overview of possible live calculations possible with dranspose.
+
 
