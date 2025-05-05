@@ -29,6 +29,8 @@ markdown_extensions:
 
 
 exclude_docs: |
+  /seminar-2024-09-04
+  !/seminar-2024-09-04/main.pdf
   /seminar-2024-06-13
   !/seminar-2024-06-13/main.pdf
   /seminar-2023-11-30
