@@ -94,7 +94,9 @@ class ErrorLoggingHandler(logging.Handler):
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
+async def fail_on_error_log(
+    request: FixtureRequest, caplog: LogCaptureFixture
+) -> AsyncIterator[None]:
     handler = ErrorLoggingHandler()
     logging.getLogger().addHandler(handler)
 
@@ -102,8 +104,8 @@ async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
 
     # After the test runs, check if any "ERROR" log was encountered
     logging.getLogger().removeHandler(handler)
-
-    if handler.error_found:
+    fail_on_log_err = request.node.get_closest_marker("do_not_fail_on_err_log")
+    if handler.error_found and fail_on_log_err is None:
         pytest.fail("Test failed due to log message starting with 'ERROR'")
 
 

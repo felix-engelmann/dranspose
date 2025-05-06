@@ -82,6 +82,7 @@ async def test_mapping() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.do_not_fail_on_err_log
 async def test_lock() -> None:
     app = FastAPI()
 
@@ -157,11 +158,10 @@ async def test_lock() -> None:
             "/", "r", endpoint="http://localhost:5000/results", timeout=1, retries=0
         )
         w_lock.acquire()
-        # with pytest.raises(TimeoutError):
 
-        # with pytest.raises(KeyError):
-        #     f["live"]
-        # w_lock.release()
+        with pytest.raises(KeyError):
+            f["live"]
+        w_lock.release()
 
         logging.info("file %s", f["live"][()])
         logging.info("typ %s", f["specialtyp"])
