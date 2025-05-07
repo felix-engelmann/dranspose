@@ -10,8 +10,19 @@ class ParamReducer:
 
     def process_result(self, result: ResultData, parameters=None):
         logging.info("parameters are %s", parameters)
-        self.publish["params"] = parameters
-        self.publish["worker_params"] = result.payload
+        self.publish["params"] = {n: p.value for n, p in parameters.items()}
+        self.publish["params"]["bytes_param"] = self.publish["params"][
+            "bytes_param"
+        ].decode()
+        self.publish["params"]["bool_param"] = int(self.publish["params"]["bool_param"])
+        logging.info("params %s", self.publish["params"])
+        self.publish["worker_params"] = {n: p.value for n, p in result.payload.items()}
+        self.publish["worker_params"]["bytes_param"] = self.publish["worker_params"][
+            "bytes_param"
+        ].decode()
+        self.publish["worker_params"]["bool_param"] = int(
+            self.publish["worker_params"]["bool_param"]
+        )
 
     def finish(self, parameters=None):
         print("finished dummy reducer work")
