@@ -252,8 +252,8 @@ async def get_result() -> Any | bytes:
         lock: ContextManager[None] = getattr(
             reducer.reducer, "publish_rlock", nullcontext()
         )
-        with lock:
-            if hasattr(reducer.reducer, "publish"):
+        if hasattr(reducer.reducer, "publish"):
+            with lock:
                 data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
     except pickle.PicklingError:
         logging.warning("publishable data cannot be pickled")
