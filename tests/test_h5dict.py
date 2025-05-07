@@ -90,11 +90,13 @@ async def test_lock() -> None:
 
     rw_lock = RWLockFair()
     r_lock = rw_lock.gen_rlock()
+    r_lock2 = rw_lock.gen_rlock()
     w_lock = rw_lock.gen_wlock()
-    # lock = Lock()
 
     def get_data() -> Tuple[dict[str, Any], ContextManager[Any]]:
-        data: dict[str, Any] = {
+        dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
+        arr = np.array([(0.5, 1)], dtype=dt)
+        data = {
             "live": 34,
             "other": {"third": [1, 2, 3]},  # only _attrs allowed in root
             "other_attrs": {"NX_class": "NXother"},
@@ -103,10 +105,11 @@ async def test_lock() -> None:
             "image": np.ones((1000, 1000)),
             "specialtyp": np.ones((10, 10), dtype=">u8"),
             "specialtyp_attrs": {"NXdata": "NXspecial"},
+            "composite": arr,
+            "composite_attrs": {"axes": ["I", "q"]},
             "hello": "World",
             "_attrs": {"NX_class": "NXentry"},
         }
-
         return data, r_lock  # type: ignore
 
     app.state.get_data = get_data
@@ -117,70 +120,53 @@ async def test_lock() -> None:
     while server.started is False:
         await asyncio.sleep(0.1)
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/results")
-        data = await st.json()
-        logging.info("content %s", data)
-
-        comr_data = await session.get(
-            "http://localhost:5000/results/datasets/d-h5dict-2F696D616765/value",
-            headers={"Accept-Encoding": "deflate"},
-        )
-        data_len = comr_data.content_length
-        logging.info("data len %d", data_len)
-        logging.info("headers are %s", comr_data.headers.items())
-        assert "Content-Encoding" not in comr_data.headers
-        assert data_len == 8e6
-
-        with w_lock:
-            with pytest.raises(TimeoutError):
-                comr_data = await session.get(
-                    "http://localhost:5000/results/datasets/h5dict-2F696D616765/value",
-                    headers={"Accept-Encoding": "deflate"},
-                    timeout=aiohttp.ClientTimeout(1),
-                )
-
-        w_lock.acquire()
-        t = asyncio.create_task(
-            session.get(
-                "http://localhost:5000/results/datasets/h5dict-2F696D616765/value",
-                headers={"Accept-Encoding": "deflate"},
-            )
-        )
-        await asyncio.sleep(0.1)
-        assert not t.done()
-        w_lock.release()
-        await asyncio.sleep(0.1)
-        assert t.done()
-
     def work() -> None:
         f = h5pyd.File(
             "/", "r", endpoint="http://localhost:5000/results", timeout=1, retries=0
         )
         w_lock.acquire()
-
+        logging.info("Write Lock acquired")
         with pytest.raises(KeyError):
             f["live"]
+        with pytest.raises(KeyError):
+            f["other"]
+        with pytest.raises(KeyError):
+            f["spaced group"]
+        with pytest.raises(KeyError):
+            f["spaced group/space ds"]
+        with pytest.raises(KeyError):
+            f["image"]
+        with pytest.raises(KeyError):
+            f["specialtyp"]
+        with pytest.raises(KeyError):
+            f["hello"]
+        with pytest.raises(KeyError):
+            f["composite"][:]
         w_lock.release()
+        logging.info("Write Lock released")
 
+        r_lock2.acquire()
+        logging.info("Read Lock acquired")
         logging.info("file %s", f["live"][()])
         logging.info("typ %s", f["specialtyp"])
-        # logging.info("comp %s", f["composite"])
-        # logging.info("comp data %s", f["composite"][:])
-        # logging.info("spaces %s", list(f["spaced group"].keys()))
-        # assert list(f["spaced group"].keys()) == ["space ds"]
-        # assert f["spaced group"].attrs["spaced attr"] == 3
-        # assert f["spaced group/space ds"][()] == 4
-        # assert f["spaced group/space ds"].attrs["bla"] == 5
-        # assert f["specialtyp"].dtype == ">u8"
-        # assert f["specialtyp"].attrs["NXdata"] == "NXspecial"
-        # assert f["other"].attrs["NX_class"] == "NXother"
-        # assert f.attrs["NX_class"] == "NXentry"
-        # assert list(f["composite"].attrs["axes"]) == ["I", "q"]
-        # assert f["composite"].dtype == np.dtype(
-        #     {"names": ["a", "b"], "formats": [float, int]}
-        # )
-        # assert np.array_equal(f["image"], np.ones((1000, 1000)))
+        logging.info("comp %s", f["composite"])
+        logging.info("comp data %s", f["composite"][:])
+        logging.info("spaces %s", list(f["spaced group"].keys()))
+        assert list(f["spaced group"].keys()) == ["space ds"]
+        assert f["spaced group"].attrs["spaced attr"] == 3
+        assert f["spaced group/space ds"][()] == 4
+        assert f["spaced group/space ds"].attrs["bla"] == 5
+        assert f["specialtyp"].dtype == ">u8"
+        assert f["specialtyp"].attrs["NXdata"] == "NXspecial"
+        assert f["other"].attrs["NX_class"] == "NXother"
+        assert f.attrs["NX_class"] == "NXentry"
+        assert list(f["composite"].attrs["axes"]) == ["I", "q"]
+        assert f["composite"].dtype == np.dtype(
+            {"names": ["a", "b"], "formats": [float, int]}
+        )
+        assert np.array_equal(f["image"], np.ones((1000, 1000)))
+        r_lock2.release()
+        logging.info("Read Lock released")
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
@@ -287,7 +273,7 @@ async def test_slice() -> None:
 
     app.include_router(router, prefix="/results")
 
-    def get_data() -> dict[str, Any]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager]:
         return {
             "image": [[r * 100 + c for c in range(10)] for r in range(10)],
         }, nullcontext()
