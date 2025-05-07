@@ -10,7 +10,7 @@ class InteractiveReducer:
 
     def process_result(self, result: ResultData, parameters=None):
         logging.info("parameters are %s", parameters)
-        self.publish["params"] = parameters
+        self.publish["params"] = {n: p.value for n, p in parameters.items()}
 
     def finish(self, parameters=None):
         print("finished dummy reducer work")
