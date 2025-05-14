@@ -249,12 +249,8 @@ async def get_result() -> Any | bytes:
     global reducer
     data = b""
     try:
-        lock: ContextManager[None] = getattr(
-            reducer.reducer, "publish_rlock", nullcontext()
-        )
         if hasattr(reducer.reducer, "publish"):
-            with lock:
-                data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
+            data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
     except pickle.PicklingError:
         logging.warning("publishable data cannot be pickled")
     return Response(data, media_type="application/x.pickle")
@@ -270,12 +266,8 @@ async def get_path(path: str) -> Any:
             path = "$"
         jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
         print("expr", jsonpath_expr.__repr__())
-        lock: ContextManager[None] = getattr(
-            reducer.reducer, "publish_rlock", nullcontext()
-        )
-        with lock:
-            ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
-            data = pickle.dumps(ret)
+        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
+        data = pickle.dumps(ret)
         return Response(data, media_type="application/x.pickle")
     except Exception as e:
         raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
