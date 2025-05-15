@@ -207,6 +207,16 @@ async def test_replay(
     done_event.wait()
     logging.info("replay done")
 
+    def work_pre() -> None:
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info("file %s", list(f.keys()))
+        logging.warning("map %s", f["results"])
+        logging.warning("res 5 keys %s", list(f["results"].keys()))
+        assert list(f.keys()) == ["results", "parameters"]
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work_pre)
+
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5010/api/v1/result/")
         content = await st.content.read()
