@@ -82,7 +82,7 @@ async def test_mapping() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.do_not_fail_on_err_log
+@pytest.mark.allow_errors_in_log
 async def test_lock() -> None:
     app = FastAPI()
 
