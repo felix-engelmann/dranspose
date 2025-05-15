@@ -16,7 +16,7 @@ import time
 import cbor2
 from pydantic import UUID4, ValidationError
 from starlette.requests import Request
-from starlette.responses import Response, FileResponse
+from starlette.responses import Response, FileResponse, StreamingResponse
 
 from dranspose.distributed import DistributedSettings
 from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
@@ -109,15 +109,20 @@ class Controller:
             nx=True,
         )
         logger.debug("result of lock acquisition %s", dist_lock)
+        timeout = 30
         while dist_lock is None:
             logger.warning("another controller is already running, will retry ")
             await asyncio.sleep(2)
+            timeout -= 1
             dist_lock = await self.redis.set(
                 RedisKeys.lock(),
                 "🔒",
                 ex=10,
                 nx=True,
             )
+            if timeout < 0:
+                logger.error("could not acquire lock!")
+                raise RuntimeError("Could not acquire lock")
         logger.info("controller lock acquired")
 
         self.assign_task = asyncio.create_task(self.assign_work())
@@ -791,6 +796,26 @@ async def stop() -> None:
     global ctrl
     logger.info("externally stopped scan")
     ctrl.external_stop = True
+
+
+async def log_streamer():
+    latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
+    last = 0
+    if len(latest) > 0:
+        last = latest[0][0]
+
+    while True:
+        update_msgs = await ctrl.redis.xread({"dranspose_logs": last}, block=1300)
+        if "dranspose_logs" in update_msgs:
+            update_msg = update_msgs["dranspose_logs"][0][-1]
+            last = update_msg[0]
+            for log in update_msgs["dranspose_logs"][0]:
+                yield json.dumps(log[1]) + "\n"
+
+
+@app.get("/api/v1/log_stream")
+async def get_log_stream():
+    return StreamingResponse(log_streamer())
 
 
 @app.get("/api/v1/logs")
