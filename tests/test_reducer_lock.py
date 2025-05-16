@@ -16,9 +16,10 @@ from dranspose.protocol import ParameterName, WorkParameter
 logger = logging.getLogger(__name__)
 
 
-allow_lock_release = threading.Event()
+process_result_called = threading.Event()
 lock_acquired = threading.Event()
-allow_processing = threading.Event()
+file_opened = threading.Event()
+test_done = threading.Event()
 
 
 class BlockingReducer:
@@ -34,16 +35,15 @@ class BlockingReducer:
         result: ResultData,
         parameters: dict[ParameterName, WorkParameter] | None = None,
     ) -> None:
-        logger.info("ready to process result %s", result)
-        allow_processing.wait()
+        process_result_called.set()
+        file_opened.wait()
+        process_result_called.clear()
         with self.publish_wlock:
             lock_acquired.set()
-            logger.info("writer lock acquired")
-            self.publish["map"][result.event_number] = 1
-            logger.info("updated publish to %s", self.publish)
-            allow_lock_release.wait()
-        lock_acquired.clear()
-        logger.info("processing done")
+            self.publish["map"][str(result.event_number)] = 1
+
+            test_done.wait()
+            lock_acquired.clear()
 
 
 class BlockingWorker:
@@ -78,27 +78,23 @@ async def test_replay(
         kwargs={"port": 5010, "stop_event": stop_event, "done_event": done_event},
     )
     thread.start()
-    sleep(1)
 
     def work() -> None:
-        logger.info("opening remote file")
-        f = h5pyd.File("http://localhost:5010/", "r", timeout=1, retries=0)
-        logger.info("remote file opened")
-        allow_processing.set()
-        logger.info("allow process_result to continue")
-        sleep(0.1)
+        f = None
         for i in range(5):
-            logger.info(f"iteration {i}")
-            allow_lock_release.clear()
-            logger.info("allow_lock_release cleared, wait for red to acq lock")
+            process_result_called.wait()
+            test_done.clear()
+            if f is None:
+                f = h5pyd.File("http://localhost:5010/", "r", timeout=1, retries=0)
+            file_opened.set()
             lock_acquired.wait()
-            logger.info("try to read data")
+            file_opened.clear()
             with pytest.raises(KeyError):
                 f["map"]
-                logging.warning("map %s (this should never appear)", list(f["map"]))
-            logger.info("read should have failed, allow reducer to terminate")
-            allow_lock_release.set()
+            test_done.set()
+        file_opened.set()
         sleep(1)
+        assert f is not None
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))
         assert list(f.keys()) == ["map"]
