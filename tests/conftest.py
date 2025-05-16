@@ -78,6 +78,13 @@ def pytest_addoption(parser: Parser) -> None:
     )
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "allow_errors_in_log: do not fail test if there are ERROR logging messages",
+    )
+
+
 class ErrorLoggingHandler(logging.Handler):
     def __init__(self) -> None:
         super().__init__()
@@ -94,7 +101,9 @@ class ErrorLoggingHandler(logging.Handler):
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
+async def fail_on_error_log(
+    request: FixtureRequest, caplog: LogCaptureFixture
+) -> AsyncIterator[None]:
     handler = ErrorLoggingHandler()
     logging.getLogger().addHandler(handler)
 
@@ -102,8 +111,8 @@ async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
 
     # After the test runs, check if any "ERROR" log was encountered
     logging.getLogger().removeHandler(handler)
-
-    if handler.error_found:
+    fail_on_log_err = request.node.get_closest_marker("allow_errors_in_log")
+    if handler.error_found and fail_on_log_err is None:
         pytest.fail("Test failed due to log message starting with 'ERROR'")
 
 
