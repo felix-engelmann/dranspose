@@ -81,15 +81,18 @@ async def test_replay(
 
     def work() -> None:
         f = None
-        for i in range(5):
+        for _ in range(5):
             process_result_called.wait()
             test_done.clear()
             if f is None:
                 f = h5pyd.File("http://localhost:5010/", "r", timeout=1, retries=0)
+            else:
+                logging.info(f"{list(f.keys())=}")
             file_opened.set()
             lock_acquired.wait()
             file_opened.clear()
-            with pytest.raises(KeyError):
+            with pytest.raises((KeyError, OSError)):
+                # KeyError the first time, OSError the rest, when it has the key but can't
                 f["map"]
             test_done.set()
         file_opened.set()
