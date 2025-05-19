@@ -133,6 +133,7 @@ class WorkloadGenerator:
             raise Exception("must open socket before sending packets")
         if not isinstance(self.out_socket, AcquisitionSocket):
             raise Exception("must be AcquisitionSocket to send, is %s", self.out_socket)
+        logger.info("sending packets on socket %s", self.out_socket)
         acq = await self.out_socket.start(filename=spec.filename)
         logger.info("sending packets %s", spec)
         self.stat.packets += 1
@@ -156,10 +157,12 @@ class WorkloadGenerator:
 
     async def close_socket(self) -> None:
         if self.in_socket is not None:
+            logger.info("closing in_socket %s", self.in_socket)
             self.in_socket.close()
         if self.out_socket is not None:
+            logger.info("closing out_socket %s", self.out_socket.data_socket)
             await self.out_socket.close()
-        logger.info("socket closed")
+        logger.info("sockets closed")
 
     async def close(self) -> None:
         self.context.destroy(linger=0)

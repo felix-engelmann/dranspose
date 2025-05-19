@@ -1,7 +1,6 @@
 import asyncio
 import logging
-import multiprocessing
-from typing import Any
+from tests.conftest import UvicornServer
 
 import aiohttp
 import pytest
@@ -11,20 +10,6 @@ from dranspose.protocol import (
     RedisKeys,
     EnsembleState,
 )
-
-
-class UvicornServer(multiprocessing.Process):
-    def __init__(self, config: uvicorn.Config):
-        super().__init__()
-        self.server = uvicorn.Server(config=config)
-        self.config = config
-
-    def stop(self) -> None:
-        self.terminate()
-
-    def run(self, *args: Any, **kwargs: Any) -> None:
-        self.server.run()
-
 
 # A lot of distributed state assumes that there is only ever one controller with the same prefix running per redis instance
 # This does not hold when redeploying on k8s as it starts the new container before the old is terminated.

@@ -5,14 +5,15 @@ import logging
 import multiprocessing
 import os
 import pickle
+import queue
 import random
 import struct
+import threading
 import time
 from asyncio import StreamReader, StreamWriter, Task
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from json import JSONDecodeError
-from multiprocessing import Process
 from typing import (
     Coroutine,
     AsyncIterator,
@@ -131,14 +132,14 @@ class AsyncDistributed:
 
 
 @dataclass
-class ProcessDistributed:
+class ThreadDistributed:
     instance: DistributedService
-    process: multiprocessing.Process
+    thread: threading.Thread
     queue: Any
 
     async def stop(self) -> None:
         self.queue.put("stop")
-        self.process.join()
+        self.thread.join()
 
 
 @dataclass
@@ -160,21 +161,19 @@ class ExternalDistributed:
 async def create_worker() -> AsyncIterator[
     Callable[[WorkerName], Coroutine[None, None, Worker]]
 ]:
-    workers: list[AsyncDistributed | ProcessDistributed] = []
+    workers: list[AsyncDistributed | ThreadDistributed] = []
 
-    async def _make_worker(
-        name: WorkerName | Worker, subprocess: bool = False
-    ) -> Worker:
+    async def _make_worker(name: WorkerName | Worker, threaded: bool = False) -> Worker:
         if not isinstance(name, Worker):
             worker = Worker(WorkerSettings(worker_name=name))
         else:
             worker = name
 
-        if subprocess:
-            q: Any = multiprocessing.Queue()
-            p = Process(target=worker.sync_run, args=(q,), daemon=True)
+        if threaded:
+            q: Any = queue.Queue()
+            p = threading.Thread(target=worker.sync_run, args=(q,), daemon=True)
             p.start()
-            workers.append(ProcessDistributed(instance=worker, process=p, queue=q))
+            workers.append(ThreadDistributed(instance=worker, thread=p, queue=q))
         else:
             worker_task = asyncio.create_task(worker.run())
             workers.append(AsyncDistributed(instance=worker, task=worker_task))
@@ -191,7 +190,7 @@ async def create_worker() -> AsyncIterator[
 async def create_ingester(
     request: FixtureRequest,
 ) -> AsyncIterator[Callable[[Ingester], Coroutine[None, None, Ingester]]]:
-    ingesters: list[AsyncDistributed | ProcessDistributed | ExternalDistributed] = []
+    ingesters: list[AsyncDistributed | ThreadDistributed | ExternalDistributed] = []
 
     async def forward_pipe(
         out: StreamReader | None, settings: IngesterSettings
@@ -218,7 +217,7 @@ async def create_ingester(
                 logging.error("outputing broke %s", e.__repr__())
                 break
 
-    async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
+    async def _make_ingester(inst: Ingester, threaded: bool = False) -> Ingester:
         if request.config.getoption("rust"):
             logging.warning("replace ingester with rust")
             if isinstance(inst, ZmqPullSingleIngester):
@@ -246,11 +245,11 @@ async def create_ingester(
                     )
                 )
                 return inst
-        if subprocess:
-            q: Any = multiprocessing.Queue()
-            p = Process(target=inst.sync_run, args=(q,), daemon=True)
+        if threaded:
+            q: Any = queue.Queue()
+            p = threading.Thread(target=inst.sync_run, args=(q,), daemon=True)
             p.start()
-            ingesters.append(ProcessDistributed(instance=inst, process=p, queue=q))
+            ingesters.append(ThreadDistributed(instance=inst, thread=p, queue=q))
         else:
             ingester_task = asyncio.create_task(inst.run())
             ingesters.append(AsyncDistributed(instance=inst, task=ingester_task))
@@ -384,7 +383,21 @@ async def debug_worker(
     await asyncio.sleep(0.1)
 
 
-class UvicornServer(multiprocessing.Process):
+class UvicornServer(threading.Thread):
+    def __init__(self, config: uvicorn.Config):
+        super().__init__()
+        self.server = uvicorn.Server(config=config)
+        self.config = config
+
+    def stop(self) -> None:
+        self.server.should_exit = True
+        self.join()
+
+    def run(self, *args: Any, **kwargs: Any) -> None:
+        self.server.run()
+
+
+class UvicornServerProcess(multiprocessing.Process):
     def __init__(self, config: uvicorn.Config):
         super().__init__()
         self.server = uvicorn.Server(config=config)
