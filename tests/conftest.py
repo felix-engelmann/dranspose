@@ -30,6 +30,7 @@ import uvicorn
 import zmq
 from _pytest.fixtures import FixtureRequest
 from _pytest.logging import LogCaptureFixture
+from _pytest.config import Config
 from aiohttp import ClientConnectionError
 from fastapi import FastAPI
 from pydantic import HttpUrl
@@ -78,7 +79,7 @@ def pytest_addoption(parser: Parser) -> None:
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config: Config) -> None:
     config.addinivalue_line(
         "markers",
         "allow_errors_in_log: do not fail test if there are ERROR logging messages",
