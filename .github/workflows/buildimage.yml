@@ -52,7 +52,7 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm --env REDIS_URL="redis://localhost:6379/0" ${{ steps.meta.outputs.tags }} -- pytest tests/* --rust --log-cli-level=INFO
+          docker run --rm --network host --env REDIS_URL="redis://localhost:6379/0" ${{ steps.meta.outputs.tags }} sh -c "python -m pip install '.[tests]' && pytest tests/* --rust --log-cli-level=INFO"
 
     services:
       # Label used to access the service container
