@@ -326,6 +326,7 @@ class Controller:
         cupd = ControllerUpdate(
             mapping_uuid=self.mapping.uuid,
             parameters_version={n: p.uuid for n, p in self.parameters.items()},
+            target_parameters_hash=self.parameters_hash,
         )
         logger.debug("send update %s", cupd)
         await self.redis.xadd(
