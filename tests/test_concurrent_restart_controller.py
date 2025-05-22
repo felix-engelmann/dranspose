@@ -117,4 +117,10 @@ async def test_restart() -> None:
 
     instance2.stop()
 
+    instance2.join()
+
+    keys = await r.keys("*:*")
+
     await r.aclose()
+
+    assert keys == []
