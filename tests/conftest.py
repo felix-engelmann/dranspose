@@ -220,11 +220,16 @@ async def create_ingester(
 
     async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
         if request.config.getoption("rust"):
-            logging.warning("replace ingester with rust")
+            logging.info("replace ingester with rust")
             if isinstance(inst, ZmqPullSingleIngester):
-                logging.warning("ues settings %s", inst._streaming_single_settings)
+                logging.info("use settings %s", inst._streaming_single_settings)
+                if os.path.exists("/bin/fast_ingester"):
+                    binary_path = "/bin/fast_ingester"
+                else:
+                    binary_path = "./perf/target/debug/fast_ingester"
+                    logging.warning("using debug ingester")
                 proc = await asyncio.create_subprocess_exec(
-                    "./perf/target/debug/fast_ingester",
+                    binary_path,
                     "--stream",
                     inst._streaming_single_settings.ingester_streams[0],
                     "--upstream-url",
