@@ -626,18 +626,26 @@ class Controller:
         await cancel_and_wait(self.default_task)
         await cancel_and_wait(self.consistent_task)
         await self.redis.delete(RedisKeys.updates())
+        logger.info("deleted updates redis stream")
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
             await self.redis.delete(*queues)
+            logger.info("deleted ready queues %s", queues)
         assigned = await self.redis.keys(RedisKeys.assigned("*"))
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
         params = await self.redis.keys(RedisKeys.parameters("*", "*"))
         if len(params) > 0:
             await self.redis.delete(*params)
+            logger.info("deleted parameters %s", params)
+        param_descr = await self.redis.keys(RedisKeys.parameter_description("*"))
+        if len(param_descr) > 0:
+            await self.redis.delete(*param_descr)
+            logger.info("deleted parameter descriptions %s", params)
         await cancel_and_wait(self.lock_task)
         await self.redis.delete(RedisKeys.lock())
         await self.redis.aclose()
+        logger.info("controller closed")
 
 
 ctrl: Controller

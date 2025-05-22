@@ -37,16 +37,16 @@ async def test_simple(
     ],
 ) -> None:
     await reducer(None)
-    await create_worker(WorkerName("w1"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w2"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w3"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w4"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w5"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w6"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w7"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w8"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w9"), subprocess=True)  # type: ignore[call-arg]
-    await create_worker(WorkerName("w10"), subprocess=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w1"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w2"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w3"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w4"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w5"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w6"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w7"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w8"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w9"), threaded=True)  # type: ignore[call-arg]
+    await create_worker(WorkerName("w10"), threaded=True)  # type: ignore[call-arg]
     await create_ingester(
         ZmqPullSingleIngester(
             settings=ZmqPullSingleSettings(
@@ -54,7 +54,7 @@ async def test_simple(
                 upstream_url=Url("tcp://localhost:9999"),
             ),
         ),
-        subprocess=True,  # type: ignore[call-arg]
+        threaded=True,  # type: ignore[call-arg]
     )
 
     await wait_for_controller(streams={StreamName("eiger")})

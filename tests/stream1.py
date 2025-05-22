@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Any, Iterator, Optional
 
@@ -21,6 +22,7 @@ class Acquisition:
             "filename": self._filename,
             "msg_number": next(self._msg_number),
         }
+        logging.info("sending socket is %s", self._socket)
         if not meta:
             await self._socket.send_json(header)
         else:
@@ -69,6 +71,7 @@ class AcquisitionSocket:
         self.data_socket = ctx.socket(typ)
         self.data_socket.bind(str(bind))
         self.msg_number = itertools.count(0)
+        logging.info("bound acquisition socket %s to %s", self.data_socket, bind)
 
     async def start(self, filename: str, meta: Any = None) -> Acquisition:
         print("return acq")
