@@ -1,4 +1,4 @@
-import contextlib
+from contextlib import nullcontext, contextmanager
 import gzip
 import json
 import logging
@@ -8,7 +8,7 @@ import random
 import threading
 import time
 import traceback
-from typing import Iterator, Any, Optional, IO
+from typing import ContextManager, Iterator, Any, Optional, IO, Tuple
 
 import cbor2
 import uvicorn
@@ -67,11 +67,16 @@ reducer_app = FastAPI()
 reducer: Any | None = None
 
 
-def get_data() -> dict[str, Any]:
+def get_data() -> Tuple[dict[str, Any], ContextManager]:
     global reducer
-    if reducer is not None and hasattr(reducer, "publish"):
-        return reducer.publish
-    return {}
+    data = {}
+    lock = nullcontext()
+    if reducer is not None:
+        if hasattr(reducer, "publish"):
+            data = reducer.publish
+        if hasattr(reducer, "publish_rlock"):
+            lock = reducer.publish_rlock
+    return data, lock
 
 
 reducer_app.state.get_data = get_data
@@ -121,7 +126,7 @@ class Server(uvicorn.Server):
     def install_signal_handlers(self) -> None:
         pass
 
-    @contextlib.contextmanager
+    @contextmanager
     def run_in_thread(self, port: Optional[int]) -> Iterator[None]:
         if port is None:
             yield
