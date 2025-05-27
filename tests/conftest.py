@@ -2,7 +2,6 @@ import asyncio
 import gzip
 import json
 import logging
-import multiprocessing
 import os
 import pickle
 import queue
@@ -45,7 +44,7 @@ from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
-from dranspose.workload_generator import app as generator_app
+from dranspose.workload_generator import create_app
 from tests.stream1 import AcquisitionSocket
 
 import redis.asyncio as redis
@@ -383,34 +382,6 @@ async def debug_worker(
     await asyncio.sleep(0.1)
 
 
-class UvicornServer(threading.Thread):
-    def __init__(self, config: uvicorn.Config):
-        super().__init__()
-        self.server = uvicorn.Server(config=config)
-        self.config = config
-
-    def stop(self) -> None:
-        self.server.should_exit = True
-        self.join()
-
-    def run(self, *args: Any, **kwargs: Any) -> None:
-        self.server.run()
-
-
-class UvicornServerProcess(multiprocessing.Process):
-    def __init__(self, config: uvicorn.Config):
-        super().__init__()
-        self.server = uvicorn.Server(config=config)
-        self.config = config
-        logging.info("started server with config %s", config)
-
-    def stop(self) -> None:
-        self.terminate()
-
-    def run(self, *args: Any, **kwargs: Any) -> None:
-        self.server.run()
-
-
 @pytest_asyncio.fixture()
 async def workload_generator(
     tmp_path: Any,
@@ -418,9 +389,11 @@ async def workload_generator(
     server_tasks = []
 
     async def start_generator(port: int = 5003) -> None:
-        config = uvicorn.Config(generator_app, port=port, log_level="debug")
-        instance = UvicornServer(config=config)
-        instance.start()
+        app = create_app()
+
+        config = uvicorn.Config(app, port=port, log_level="debug")
+        server = uvicorn.Server(config=config)
+        task = asyncio.create_task(server.serve())
 
         async with aiohttp.ClientSession() as session:
             while True:
@@ -433,12 +406,13 @@ async def workload_generator(
                 except ClientConnectionError:
                     await asyncio.sleep(0.5)
 
-        server_tasks.append(instance)
+        server_tasks.append((task, server))
 
     yield start_generator
 
-    for server in server_tasks:
-        server.stop()
+    for task, server in server_tasks:
+        server.should_exit = True
+        await task
 
     await asyncio.sleep(0.1)
 

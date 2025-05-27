@@ -13,7 +13,7 @@ from typing import AsyncGenerator, Any, Tuple
 import numpy as np
 import psutil
 import zmq.asyncio
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from psutil._common import snicaddr, snetio, snicstats
 from pydantic import BaseModel, Field, field_serializer
 from pydantic_core import Url
@@ -169,14 +169,11 @@ class WorkloadGenerator:
         logger.info("context destroyed")
 
 
-gen: WorkloadGenerator
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
-    global gen
     gen = WorkloadGenerator()
+    app.state.gen = gen
     task = asyncio.create_task(gen.calc_stat())
     yield
     await cancel_and_wait(task)
@@ -184,51 +181,47 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Clean up the ML models and release the resources
 
 
-app = FastAPI(lifespan=lifespan)
+def create_app() -> FastAPI:
+    app = FastAPI(lifespan=lifespan)
+
+    @app.get("/api/v1/finished")
+    async def get_fin(request: Request) -> bool:
+        return request.app.state.gen.finished()
+
+    @app.get("/api/v1/config")
+    async def get_conf() -> NetworkConfig:
+        return NetworkConfig(
+            addresses=psutil.net_if_addrs(), stats=psutil.net_if_stats()
+        )
+
+    @app.get("/api/v1/statistics")
+    async def get_stat(request: Request) -> Statistics:
+        return request.app.state.gen.stat
+
+    @app.post("/api/v1/open_socket")
+    async def open_sock(request: Request, sockspec: SocketSpec) -> SocketSpec:
+        print(sockspec)
+        await request.app.state.gen.open_socket(sockspec)
+        return sockspec
+
+    @app.post("/api/v1/frames")
+    async def frames(request: Request, spec: WorkloadSpec) -> bool:
+        gen = request.app.state.gen
+        gen.task = asyncio.create_task(gen.send_packets(spec))
+        gen.task.add_done_callback(done_callback)
+        return True
+
+    @app.post("/api/v1/close_socket")
+    async def close_sock(request: Request) -> bool:
+        await request.app.state.gen.close_socket()
+        return True
+
+    @app.post("/api/v1/connect_socket")
+    async def connect_sock(request: Request, sockspec: ConnectSpec) -> ConnectSpec:
+        await request.app.state.gen.connect_socket(sockspec)
+        return sockspec
+
+    return app
 
 
-@app.get("/api/v1/finished")
-async def get_fin() -> bool:
-    global gen
-    return gen.finished()
-
-
-@app.get("/api/v1/config")
-async def get_conf() -> NetworkConfig:
-    return NetworkConfig(addresses=psutil.net_if_addrs(), stats=psutil.net_if_stats())
-
-
-@app.get("/api/v1/statistics")
-async def get_stat() -> Statistics:
-    global gen
-    return gen.stat
-
-
-@app.post("/api/v1/open_socket")
-async def open_sock(sockspec: SocketSpec) -> SocketSpec:
-    global gen
-    print(sockspec)
-    await gen.open_socket(sockspec)
-    return sockspec
-
-
-@app.post("/api/v1/frames")
-async def frames(spec: WorkloadSpec) -> bool:
-    global gen
-    gen.task = asyncio.create_task(gen.send_packets(spec))
-    gen.task.add_done_callback(done_callback)
-    return True
-
-
-@app.post("/api/v1/close_socket")
-async def close_sock() -> bool:
-    global gen
-    await gen.close_socket()
-    return True
-
-
-@app.post("/api/v1/connect_socket")
-async def connect_sock(sockspec: ConnectSpec) -> ConnectSpec:
-    global gen
-    await gen.connect_socket(sockspec)
-    return sockspec
+app = create_app()

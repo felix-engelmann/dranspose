@@ -121,10 +121,13 @@ async def test_sink(
     workload_generator: Callable[[Optional[int]], Awaitable[None]]
 ) -> None:
     await workload_generator(5003)
+    logging.debug("start gen at 5004")
     await workload_generator(5004)
 
     async with aiohttp.ClientSession() as session:
         nframes = 100
+
+        logging.debug("opening PUSH on 9999 at 5003")
 
         st = await session.post(
             "http://localhost:5003/api/v1/open_socket",
@@ -133,6 +136,7 @@ async def test_sink(
         state = await st.json()
         logging.info("open %s", state)
 
+        logging.debug("connect PULL to 127.0.0.1:9999 at 5004")
         st = await session.post(
             "http://localhost:5004/api/v1/connect_socket",
             json={"type": zmq.PULL, "url": "tcp://127.0.0.1:9999"},
