@@ -186,7 +186,7 @@ def _get_attr(
         if h5shape is not None and h5type is not None:
             ret = H5Attribute(name=name, shape=h5shape, type=h5type)
             if include_values:
-                val = aobj[name]
+                val = copy.copy(aobj[name])
                 if isinstance(val, np.ndarray):
                     val = val.tolist()
                 ret = H5ValuedAttribute(**ret.model_dump(by_alias=True), value=val)
