@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-def create_app():
+def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
 
     @app.get("/identity")

@@ -665,7 +665,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Clean up the ML models and release the resources
 
 
-def routes_legacy(app):
+def routes_legacy(app: FastAPI) -> None:
     @app.post("/api/v1/mapping")
     async def set_mapping(
         request: Request,
@@ -749,7 +749,7 @@ def routes_legacy(app):
         return s.uuid
 
 
-def routes_status(app):
+def routes_status(app: FastAPI) -> None:
     @app.get("/api/v1/config")
     async def get_configs(request: Request) -> EnsembleState:
         return await request.app.state.ctrl.get_configs()
@@ -849,7 +849,7 @@ def create_app() -> FastAPI:
         logger.info("externally stopped scan")
         request.app.state.ctrl.external_stop = True
 
-    async def log_streamer(ctrl) -> AsyncIterator[str]:
+    async def log_streamer(ctrl: Controller) -> AsyncIterator[str]:
         latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
         last = 0
         if len(latest) > 0:

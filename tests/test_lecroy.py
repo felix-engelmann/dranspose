@@ -17,6 +17,7 @@ from dranspose.protocol import (
     StreamName,
     WorkerName,
     VirtualWorker,
+    ParameterName,
     VirtualConstraint,
 )
 
@@ -77,7 +78,9 @@ async def test_lecroy(
         )
     )
 
-    await wait_for_controller(streams={StreamName("lecroy")}, parameters={"channel"})
+    await wait_for_controller(
+        streams={StreamName("lecroy")}, parameters={ParameterName("channel")}
+    )
     async with aiohttp.ClientSession() as session:
         map = {
             "lecroy": [
