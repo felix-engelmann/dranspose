@@ -76,3 +76,4 @@ def test_replay_no_redis() -> None:
     text = (b"".join(p.communicate())).decode()
     logging.info("got out+err: %s", text)
     assert "usage: dranspose" in text
+    p.wait()

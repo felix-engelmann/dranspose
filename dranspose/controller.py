@@ -8,7 +8,7 @@ import os.path
 from asyncio import Task
 from collections import defaultdict
 from types import UnionType
-from typing import Any, AsyncGenerator, Optional, Annotated, Literal
+from typing import Any, AsyncGenerator, Optional, Annotated, Literal, AsyncIterator
 
 import logging
 import time
@@ -326,6 +326,7 @@ class Controller:
         cupd = ControllerUpdate(
             mapping_uuid=self.mapping.uuid,
             parameters_version={n: p.uuid for n, p in self.parameters.items()},
+            target_parameters_hash=self.parameters_hash,
         )
         logger.debug("send update %s", cupd)
         await self.redis.xadd(
@@ -629,18 +630,26 @@ class Controller:
         await cancel_and_wait(self.default_task)
         await cancel_and_wait(self.consistent_task)
         await self.redis.delete(RedisKeys.updates())
+        logger.info("deleted updates redis stream")
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
             await self.redis.delete(*queues)
+            logger.info("deleted ready queues %s", queues)
         assigned = await self.redis.keys(RedisKeys.assigned("*"))
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
         params = await self.redis.keys(RedisKeys.parameters("*", "*"))
         if len(params) > 0:
             await self.redis.delete(*params)
+            logger.info("deleted parameters %s", params)
+        param_descr = await self.redis.keys(RedisKeys.parameter_description("*"))
+        if len(param_descr) > 0:
+            await self.redis.delete(*param_descr)
+            logger.info("deleted parameter descriptions %s", params)
         await cancel_and_wait(self.lock_task)
         await self.redis.delete(RedisKeys.lock())
         await self.redis.aclose()
+        logger.info("controller closed")
 
 
 ctrl: Controller
@@ -801,7 +810,7 @@ async def stop() -> None:
     ctrl.external_stop = True
 
 
-async def log_streamer():
+async def log_streamer() -> AsyncIterator[str]:
     latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
     last = 0
     if len(latest) > 0:
@@ -817,7 +826,7 @@ async def log_streamer():
 
 
 @app.get("/api/v1/log_stream")
-async def get_log_stream():
+async def get_log_stream() -> StreamingResponse:
     return StreamingResponse(log_streamer())
 
 
