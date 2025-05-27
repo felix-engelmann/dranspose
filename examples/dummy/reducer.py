@@ -1,23 +1,31 @@
+from typing import Any
 from dranspose.event import ResultData
-from dranspose.parameters import StrParameter, BinaryParameter
+from dranspose.parameters import ParameterType, StrParameter, BinaryParameter
+from dranspose.protocol import ParameterName, ReducerState
 
 
 class FluorescenceReducer:
-    def __init__(self, state=None, **kwargs):
+    def __init__(
+        self, state: ReducerState | None = None, **kwargs: dict[str, Any]
+    ) -> None:
         self.number = 0
-        self.publish = {"map": {"x": [], "y": [], "data": {}}}
+        self.publish: dict[str, dict[str, Any]] = {
+            "map": {"x": [], "y": [], "data": {}}
+        }
         if state is not None and state.mapreduce_version is not None:
             self.publish["version"] = state.mapreduce_version.model_dump(mode="json")
 
     @staticmethod
-    def describe_parameters():
+    def describe_parameters() -> list[ParameterType]:
         params = [
-            StrParameter(name="string_parameter"),
-            BinaryParameter(name="other_file_parameter"),
+            StrParameter(name=ParameterName("string_parameter")),
+            BinaryParameter(name=ParameterName("other_file_parameter")),
         ]
         return params
 
-    def process_result(self, result: ResultData, parameters=None):
+    def process_result(
+        self, result: ResultData, parameters: dict | None = None
+    ) -> None:
         print(result)
         if result.payload:
             self.publish["map"]["x"].append(result.payload["position"][0])
@@ -27,5 +35,5 @@ class FluorescenceReducer:
                     self.publish["map"]["data"][key] = []
                 self.publish["map"]["data"][key].append(val)
 
-    def finish(self, parameters=None):
+    def finish(self, parameters: dict | None = None) -> None:
         print("finished dummy reducer work")

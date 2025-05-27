@@ -1,5 +1,5 @@
 import time
-from typing import NewType, Any, Literal, Iterable
+from typing import NewType, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -71,7 +71,7 @@ class H5ScalarShape(BaseModel):
 
 class H5SimpleShape(BaseModel):
     class_: Literal["H5S_SIMPLE"] = Field("H5S_SIMPLE", alias="class")
-    dims: Iterable[int]
+    dims: list[int]
 
 
 H5Shape = H5SimpleShape | H5ScalarShape

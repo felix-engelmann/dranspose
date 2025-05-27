@@ -1,10 +1,11 @@
 import logging
 
 from dranspose.event import ResultData
+from dranspose.protocol import ReducerState
 
 
 class ParamReducer:
-    def __init__(self, state=None, **kwargs):
+    def __init__(self, state: ReducerState | None = None, **kwargs):
         self.number = 0
         self.publish = {"params": {}}
 

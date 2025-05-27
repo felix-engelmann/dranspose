@@ -3,8 +3,8 @@ import json
 import logging
 import pickle
 import traceback
-from contextlib import asynccontextmanager
-from typing import Optional, AsyncGenerator, Any
+from contextlib import asynccontextmanager, nullcontext
+from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple
 
 import zmq.asyncio
 from fastapi import FastAPI
@@ -215,11 +215,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
 
-    def get_data() -> dict[str, Any]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager]:
+        data = {}
+        lock = nullcontext()
         if reducer.reducer is not None:
             if hasattr(reducer.reducer, "publish"):
-                return reducer.reducer.publish
-        return {}
+                data = reducer.reducer.publish
+            if hasattr(reducer.reducer, "publish_rlock"):
+                lock = reducer.reducer.publish_rlock
+        return data, lock
 
     app.state.get_data = get_data
     yield
