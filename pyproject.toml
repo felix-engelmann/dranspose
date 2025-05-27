@@ -46,7 +46,8 @@ tests = [
     "psutil",
     "types-psutil",
     "pytest-plt",
-    "h5pyd"
+    "h5pyd",
+    "readerwriterlock",
 ]
 docs = [
     "mkdocs",
@@ -70,6 +71,10 @@ dranspose = "dranspose.cli:run"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers"
+markers = [
+    "allow_errors_in_log: do not fail test if there are ERROR logging messages",
+]
 
 [tool.mypy]
 plugins = [

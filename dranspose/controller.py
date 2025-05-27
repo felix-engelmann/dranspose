@@ -361,6 +361,9 @@ class Controller:
                 desc_keys = await self.redis.keys(RedisKeys.parameter_description())
                 param_json = await self.redis.mget(desc_keys)
                 for i in param_json:
+                    if i is None:
+                        # this is a race condition where the key gets deleted between keys and mget
+                        continue
                     val: ParameterType = Parameter.validate_json(i)
                     if val.name not in self.parameters:
                         logger.info(
