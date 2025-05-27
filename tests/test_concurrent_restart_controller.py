@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from tests.conftest import UvicornServer
 
 import aiohttp
 import pytest
@@ -10,6 +9,7 @@ from dranspose.protocol import (
     RedisKeys,
     EnsembleState,
 )
+from dranspose.controller import create_app
 
 # A lot of distributed state assumes that there is only ever one controller with the same prefix running per redis instance
 # This does not hold when redeploying on k8s as it starts the new container before the old is terminated.
@@ -20,11 +20,10 @@ from dranspose.protocol import (
 
 @pytest.mark.asyncio
 async def test_restart() -> None:
-    config = uvicorn.Config(
-        "dranspose.controller:app", host="127.0.0.1", port=5000, log_level="debug"
-    )
-    instance = UvicornServer(config=config)
-    instance.start()
+    og_app = create_app()
+    og_config = uvicorn.Config(og_app, host="127.0.0.1", port=5000, log_level="debug")
+    og_server = uvicorn.Server(config=og_config)
+    og_task = asyncio.create_task(og_server.serve())
 
     r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
 
@@ -56,13 +55,17 @@ async def test_restart() -> None:
         assert len(params) == 1
         assert params[0].startswith("dranspose:parameters:testname:")
 
-        config2 = uvicorn.Config(
-            "dranspose.controller:app", host="127.0.0.1", port=5001, log_level="debug"
+        new_app = create_app()
+        new_config = uvicorn.Config(
+            new_app, host="127.0.0.1", port=5001, log_level="debug"
         )
-        instance2 = UvicornServer(config=config2)
-        instance2.start()
+        new_server = uvicorn.Server(config=new_config)
+        new_task = asyncio.create_task(new_server.serve())
 
-        instance.stop()
+        await asyncio.sleep(2)
+
+        og_server.should_exit = True
+        await og_task
 
         running = False
         while not running:
@@ -100,9 +103,9 @@ async def test_restart() -> None:
 
     assert any([p.startswith("dranspose:parameters:testnew") for p in params])
 
-    instance2.stop()
+    new_server.should_exit = True
 
-    instance2.join()
+    await new_task
 
     keys = await r.keys("*:*")
 
