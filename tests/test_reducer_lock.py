@@ -101,6 +101,20 @@ async def test_replay(
         logging.info("file %s", list(f.keys()))
         logging.info("map %s", list(f["map"].keys()))
         assert list(f.keys()) == ["map"]
+        assert list(f["map"].keys()) == [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "11",
+        ]
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)

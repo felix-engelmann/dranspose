@@ -248,31 +248,33 @@ def values(
             return {"value": copy.copy(obj)}
         else:
             ret = np.array(obj)
-            slices = []
-            if select is not None:
-                dims = select[1:-1].split(",")
-                slices = [slice(*map(int, dim.split(":"))) for dim in dims]
+            # np.array copes the content of obj, so we can release the lock
 
-            logger.debug("slices %s", slices)
+    slices = []
+    if select is not None:
+        dims = select[1:-1].split(",")
+        slices = [slice(*map(int, dim.split(":"))) for dim in dims]
 
-            if len(slices) == 1:
-                ret = ret[slices[0]]
-            elif len(slices) > 1:
-                # TODO: from python 3.11, this can be written as
-                # ret = ret[*slices]
-                ret = ret[tuple(slices)]
+    logger.debug("slices %s", slices)
 
-            ret_bytes = ret.tobytes()
-            if "gzip" in req.headers.get("Accept-Encoding", ""):
-                if len(ret_bytes) > 1000:
-                    compressed_data = gzip.compress(ret_bytes, compresslevel=7)
+    if len(slices) == 1:
+        ret = ret[slices[0]]
+    elif len(slices) > 1:
+        # TODO: from python 3.11, this can be written as
+        # ret = ret[*slices]
+        ret = ret[tuple(slices)]
 
-                    return Response(
-                        content=compressed_data,
-                        media_type="application/octet-stream",
-                        headers={"Content-Encoding": "gzip"},
-                    )
-            return Response(content=ret_bytes, media_type="application/octet-stream")
+    ret_bytes = ret.tobytes()
+    if "gzip" in req.headers.get("Accept-Encoding", ""):
+        if len(ret_bytes) > 1000:
+            compressed_data = gzip.compress(ret_bytes, compresslevel=7)
+
+            return Response(
+                content=compressed_data,
+                media_type="application/octet-stream",
+                headers={"Content-Encoding": "gzip"},
+            )
+    return Response(content=ret_bytes, media_type="application/octet-stream")
 
 
 @router.get("/datasets/{uuid}")

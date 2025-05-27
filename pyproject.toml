@@ -22,7 +22,6 @@ dependencies = [
     "uvicorn",
     "numpy",
     # "requests",
-    "readerwriterlock",
     "pydantic",
     "pydantic-settings",
     "jsonpath-ng",
@@ -47,7 +46,8 @@ tests = [
     "psutil",
     "types-psutil",
     "pytest-plt",
-    "h5pyd"
+    "h5pyd",
+    "readerwriterlock",
 ]
 docs = [
     "mkdocs",
