@@ -5,7 +5,6 @@ from typing import Callable, Optional, Awaitable, Sequence, Any
 import aiohttp
 import pytest
 
-from dranspose.ingester import Ingester
 from dranspose.parameters import ParameterList, ParameterBase, StrParameter
 from dranspose.protocol import WorkerName, ParameterName
 from dranspose.worker import Worker, WorkerSettings
@@ -29,8 +28,8 @@ async def test_default_params(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
-    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
 ) -> None:
+    await reducer(None)
     await create_worker(
         Worker(
             settings=WorkerSettings(

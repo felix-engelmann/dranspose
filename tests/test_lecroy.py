@@ -14,7 +14,6 @@ from pydantic_core import Url
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqsub_lecroy import ZmqSubLecroyIngester, ZmqSubLecroySettings
 from dranspose.protocol import (
-    EnsembleState,
     StreamName,
     WorkerName,
     VirtualWorker,
@@ -22,6 +21,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller
 
 
 @pytest.mark.parametrize(
@@ -77,15 +77,10 @@ async def test_lecroy(
         )
     )
 
+    await wait_for_controller(
+        streams={StreamName("lecroy")}, parameters={"channel", "blub"}
+    )
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/config")
-        state = EnsembleState.model_validate(await st.json())
-        while {"lecroy"} - set(state.get_streams()) != set():
-            await asyncio.sleep(0.3)
-            st = await session.get("http://localhost:5000/api/v1/config")
-            state = EnsembleState.model_validate(await st.json())
-            logging.debug(f"Waiting for lecroy ingester {state.get_streams()=}")
-
         map = {
             "lecroy": [
                 [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
