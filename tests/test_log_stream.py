@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import subprocess
+from typing import Any
+
 import aiohttp
 
 import pytest
@@ -9,7 +11,7 @@ import pytest
 from dranspose.helpers.utils import cancel_and_wait
 
 
-async def sink(msgs):
+async def sink(msgs: list[Any]) -> None:
     async with aiohttp.ClientSession(raise_for_status=True) as session:
         async with session.get("http://localhost:5000/api/v1/log_stream") as r:
             async for line in r.content:

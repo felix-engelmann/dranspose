@@ -1,20 +1,27 @@
+import asyncio
 import logging
-from typing import Callable, Optional, Awaitable
+from typing import Callable, Optional, Awaitable, Sequence, Any
 
 import aiohttp
 import pytest
-from pydantic_core import Url
-
 
 from dranspose.ingester import Ingester
-from dranspose.ingesters.zmqpull_single import (
-    ZmqPullSingleIngester,
-    ZmqPullSingleSettings,
-)
-from dranspose.parameters import ParameterList
-from dranspose.protocol import WorkerName, StreamName
+from dranspose.parameters import ParameterList, ParameterBase, StrParameter
+from dranspose.protocol import WorkerName, ParameterName
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller
+
+
+class ParamWorker:
+    def __init__(self, **kwargs: Any) -> None:
+        pass
+
+    @staticmethod
+    def describe_parameters() -> Sequence[ParameterBase]:
+        params = [
+            StrParameter(name=ParameterName("roi1"), default="bla"),
+            StrParameter(name=ParameterName("file_parameter")),
+        ]
+        return params
 
 
 @pytest.mark.asyncio
@@ -24,32 +31,23 @@ async def test_default_params(
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
 ) -> None:
-    await reducer("examples.dummy.reducer:FluorescenceReducer")
     await create_worker(
         Worker(
             settings=WorkerSettings(
                 worker_name=WorkerName("w1"),
-                worker_class="examples.dummy.worker:FluorescenceWorker",
+                worker_class="tests.test_default_parameters:ParamWorker",
             ),
         )
     )
 
-    await create_ingester(
-        ZmqPullSingleIngester(
-            settings=ZmqPullSingleSettings(
-                ingester_streams=[StreamName("eiger")],
-                upstream_url=Url("tcp://localhost:9999"),
-            ),
-        )
-    )
-
-    await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         par = await session.get("http://localhost:5000/api/v1/parameters")
         assert par.status == 200
         params = ParameterList.validate_python(await par.json())
 
         logging.warning("params %s", params)
+
+        await asyncio.sleep(3)  # the default check runs every 2 seconds
 
         resp = await session.get(
             "http://localhost:5000/api/v1/parameter/roi1",
