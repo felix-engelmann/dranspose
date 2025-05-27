@@ -8,7 +8,7 @@ import os.path
 from asyncio import Task
 from collections import defaultdict
 from types import UnionType
-from typing import Any, AsyncGenerator, Optional, Annotated, Literal
+from typing import Any, AsyncGenerator, Optional, Annotated, Literal, AsyncIterator
 
 import logging
 import time
@@ -807,7 +807,7 @@ async def stop() -> None:
     ctrl.external_stop = True
 
 
-async def log_streamer():
+async def log_streamer() -> AsyncIterator[str]:
     latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
     last = 0
     if len(latest) > 0:
@@ -823,7 +823,7 @@ async def log_streamer():
 
 
 @app.get("/api/v1/log_stream")
-async def get_log_stream():
+async def get_log_stream() -> StreamingResponse:
     return StreamingResponse(log_streamer())
 
 

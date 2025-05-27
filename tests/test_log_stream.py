@@ -26,7 +26,7 @@ async def test_stream() -> None:
 
     logging.info("started process")
     await asyncio.sleep(4)
-    msgs = []
+    msgs: list[Any] = []
     s = asyncio.create_task(sink(msgs))
     logging.info("created sink")
     await asyncio.sleep(1)

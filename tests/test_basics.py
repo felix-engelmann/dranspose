@@ -6,6 +6,7 @@ from typing import Awaitable, Callable, Any, Coroutine, Optional
 import aiohttp
 
 import pytest
+from _pytest.fixtures import FixtureRequest
 import zmq.asyncio
 import zmq
 from pydantic_core import Url
@@ -32,7 +33,7 @@ from tests.utils import wait_for_controller, wait_for_finish
 
 @pytest.mark.asyncio
 async def test_simple(
-    request,
+    request: FixtureRequest,
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
