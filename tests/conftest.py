@@ -94,7 +94,9 @@ class ErrorLoggingHandler(logging.Handler):
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
+async def fail_on_error_log(
+    request: FixtureRequest, caplog: LogCaptureFixture
+) -> AsyncIterator[None]:
     handler = ErrorLoggingHandler()
     logging.getLogger().addHandler(handler)
 
@@ -102,8 +104,8 @@ async def fail_on_error_log(caplog: LogCaptureFixture) -> AsyncIterator[None]:
 
     # After the test runs, check if any "ERROR" log was encountered
     logging.getLogger().removeHandler(handler)
-
-    if handler.error_found:
+    fail_on_log_err = request.node.get_closest_marker("allow_errors_in_log")
+    if handler.error_found and fail_on_log_err is None:
         pytest.fail("Test failed due to log message starting with 'ERROR'")
 
 
@@ -218,11 +220,16 @@ async def create_ingester(
 
     async def _make_ingester(inst: Ingester, threaded: bool = False) -> Ingester:
         if request.config.getoption("rust"):
-            logging.warning("replace ingester with rust")
+            logging.info("replace ingester with rust")
             if isinstance(inst, ZmqPullSingleIngester):
-                logging.warning("ues settings %s", inst._streaming_single_settings)
+                logging.info("use settings %s", inst._streaming_single_settings)
+                if os.path.exists("/bin/fast_ingester"):
+                    binary_path = "/bin/fast_ingester"
+                else:
+                    binary_path = "./perf/target/debug/fast_ingester"
+                    logging.warning("using debug ingester")
                 proc = await asyncio.create_subprocess_exec(
-                    "./perf/target/debug/fast_ingester",
+                    binary_path,
                     "--stream",
                     inst._streaming_single_settings.ingester_streams[0],
                     "--upstream-url",

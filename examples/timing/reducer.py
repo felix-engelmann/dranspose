@@ -11,7 +11,7 @@ class TimingReducer:
         self.publish: dict[StreamName, list[tuple[float, float]]] = {}
         pass
 
-    def process_result(self, result: ResultData, parameters=None):
+    def process_result(self, result: ResultData, parameters: Any = None) -> None:
         print(result)
         logging.debug("result is %s", result.payload)
         if result.payload:
@@ -24,5 +24,5 @@ class TimingReducer:
                 self.publish[stream].append((delta, total))
                 logging.debug("result total delta was %s, workerdelta %s", total, delta)
 
-    def finish(self, parameters=None):
+    def finish(self, parameters: Any = None) -> None:
         print("finished dummy reducer work")

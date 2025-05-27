@@ -8,7 +8,7 @@ import os.path
 from asyncio import Task
 from collections import defaultdict
 from types import UnionType
-from typing import Any, AsyncGenerator, Optional, Annotated, Literal
+from typing import Any, AsyncGenerator, Optional, Annotated, Literal, AsyncIterator
 
 import logging
 import time
@@ -326,6 +326,7 @@ class Controller:
         cupd = ControllerUpdate(
             mapping_uuid=self.mapping.uuid,
             parameters_version={n: p.uuid for n, p in self.parameters.items()},
+            target_parameters_hash=self.parameters_hash,
         )
         logger.debug("send update %s", cupd)
         await self.redis.xadd(
@@ -361,6 +362,9 @@ class Controller:
                 desc_keys = await self.redis.keys(RedisKeys.parameter_description())
                 param_json = await self.redis.mget(desc_keys)
                 for i in param_json:
+                    if i is None:
+                        # this is a race condition where the key gets deleted between keys and mget
+                        continue
                     val: ParameterType = Parameter.validate_json(i)
                     if val.name not in self.parameters:
                         logger.info(
@@ -845,7 +849,7 @@ def create_app() -> FastAPI:
         logger.info("externally stopped scan")
         request.app.state.ctrl.external_stop = True
 
-    async def log_streamer(ctrl):
+    async def log_streamer(ctrl) -> AsyncIterator[str]:
         latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
         last = 0
         if len(latest) > 0:
@@ -860,7 +864,7 @@ def create_app() -> FastAPI:
                     yield json.dumps(log[1]) + "\n"
 
     @app.get("/api/v1/log_stream")
-    async def get_log_stream(request: Request):
+    async def get_log_stream(request: Request) -> StreamingResponse:
         return StreamingResponse(log_streamer(request.app.state.ctrl))
 
     @app.post("/api/v1/parameter/{name}")
