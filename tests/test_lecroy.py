@@ -77,9 +77,7 @@ async def test_lecroy(
         )
     )
 
-    await wait_for_controller(
-        streams={StreamName("lecroy")}, parameters={"channel", "blub"}
-    )
+    await wait_for_controller(streams={StreamName("lecroy")}, parameters={"channel"})
     async with aiohttp.ClientSession() as session:
         map = {
             "lecroy": [
