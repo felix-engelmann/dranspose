@@ -2,17 +2,17 @@ import asyncio
 import gzip
 import json
 import logging
-import multiprocessing
 import os
 import pickle
+import queue
 import random
 import struct
+import threading
 import time
 from asyncio import StreamReader, StreamWriter, Task
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from json import JSONDecodeError
-from multiprocessing import Process
 from typing import (
     Coroutine,
     AsyncIterator,
@@ -44,7 +44,7 @@ from dranspose.protocol import WorkerName
 from dranspose.worker import Worker, WorkerSettings
 from dranspose.reducer import app as reducer_app
 from dranspose.debug_worker import app as debugworker_app
-from dranspose.workload_generator import app as generator_app
+from dranspose.workload_generator import create_app
 from tests.stream1 import AcquisitionSocket
 
 import redis.asyncio as redis
@@ -133,14 +133,14 @@ class AsyncDistributed:
 
 
 @dataclass
-class ProcessDistributed:
+class ThreadDistributed:
     instance: DistributedService
-    process: multiprocessing.Process
+    thread: threading.Thread
     queue: Any
 
     async def stop(self) -> None:
         self.queue.put("stop")
-        self.process.join()
+        self.thread.join()
 
 
 @dataclass
@@ -162,21 +162,19 @@ class ExternalDistributed:
 async def create_worker() -> AsyncIterator[
     Callable[[WorkerName], Coroutine[None, None, Worker]]
 ]:
-    workers: list[AsyncDistributed | ProcessDistributed] = []
+    workers: list[AsyncDistributed | ThreadDistributed] = []
 
-    async def _make_worker(
-        name: WorkerName | Worker, subprocess: bool = False
-    ) -> Worker:
+    async def _make_worker(name: WorkerName | Worker, threaded: bool = False) -> Worker:
         if not isinstance(name, Worker):
             worker = Worker(WorkerSettings(worker_name=name))
         else:
             worker = name
 
-        if subprocess:
-            q: Any = multiprocessing.Queue()
-            p = Process(target=worker.sync_run, args=(q,), daemon=True)
+        if threaded:
+            q: Any = queue.Queue()
+            p = threading.Thread(target=worker.sync_run, args=(q,), daemon=True)
             p.start()
-            workers.append(ProcessDistributed(instance=worker, process=p, queue=q))
+            workers.append(ThreadDistributed(instance=worker, thread=p, queue=q))
         else:
             worker_task = asyncio.create_task(worker.run())
             workers.append(AsyncDistributed(instance=worker, task=worker_task))
@@ -193,7 +191,7 @@ async def create_worker() -> AsyncIterator[
 async def create_ingester(
     request: FixtureRequest,
 ) -> AsyncIterator[Callable[[Ingester], Coroutine[None, None, Ingester]]]:
-    ingesters: list[AsyncDistributed | ProcessDistributed | ExternalDistributed] = []
+    ingesters: list[AsyncDistributed | ThreadDistributed | ExternalDistributed] = []
 
     async def forward_pipe(
         out: StreamReader | None, settings: IngesterSettings
@@ -220,13 +218,18 @@ async def create_ingester(
                 logging.error("outputing broke %s", e.__repr__())
                 break
 
-    async def _make_ingester(inst: Ingester, subprocess: bool = False) -> Ingester:
+    async def _make_ingester(inst: Ingester, threaded: bool = False) -> Ingester:
         if request.config.getoption("rust"):
-            logging.warning("replace ingester with rust")
+            logging.info("replace ingester with rust")
             if isinstance(inst, ZmqPullSingleIngester):
-                logging.warning("ues settings %s", inst._streaming_single_settings)
+                logging.info("use settings %s", inst._streaming_single_settings)
+                if os.path.exists("/bin/fast_ingester"):
+                    binary_path = "/bin/fast_ingester"
+                else:
+                    binary_path = "./perf/target/debug/fast_ingester"
+                    logging.warning("using debug ingester")
                 proc = await asyncio.create_subprocess_exec(
-                    "./perf/target/debug/fast_ingester",
+                    binary_path,
                     "--stream",
                     inst._streaming_single_settings.ingester_streams[0],
                     "--upstream-url",
@@ -248,11 +251,11 @@ async def create_ingester(
                     )
                 )
                 return inst
-        if subprocess:
-            q: Any = multiprocessing.Queue()
-            p = Process(target=inst.sync_run, args=(q,), daemon=True)
+        if threaded:
+            q: Any = queue.Queue()
+            p = threading.Thread(target=inst.sync_run, args=(q,), daemon=True)
             p.start()
-            ingesters.append(ProcessDistributed(instance=inst, process=p, queue=q))
+            ingesters.append(ThreadDistributed(instance=inst, thread=p, queue=q))
         else:
             ingester_task = asyncio.create_task(inst.run())
             ingesters.append(AsyncDistributed(instance=inst, task=ingester_task))
@@ -386,20 +389,6 @@ async def debug_worker(
     await asyncio.sleep(0.1)
 
 
-class UvicornServer(multiprocessing.Process):
-    def __init__(self, config: uvicorn.Config):
-        super().__init__()
-        self.server = uvicorn.Server(config=config)
-        self.config = config
-        logging.info("started server with config %s", config)
-
-    def stop(self) -> None:
-        self.terminate()
-
-    def run(self, *args: Any, **kwargs: Any) -> None:
-        self.server.run()
-
-
 @pytest_asyncio.fixture()
 async def workload_generator(
     tmp_path: Any,
@@ -407,9 +396,11 @@ async def workload_generator(
     server_tasks = []
 
     async def start_generator(port: int = 5003) -> None:
-        config = uvicorn.Config(generator_app, port=port, log_level="debug")
-        instance = UvicornServer(config=config)
-        instance.start()
+        app = create_app()
+
+        config = uvicorn.Config(app, port=port, log_level="debug")
+        server = uvicorn.Server(config=config)
+        task = asyncio.create_task(server.serve())
 
         async with aiohttp.ClientSession() as session:
             while True:
@@ -422,12 +413,13 @@ async def workload_generator(
                 except ClientConnectionError:
                     await asyncio.sleep(0.5)
 
-        server_tasks.append(instance)
+        server_tasks.append((task, server))
 
     yield start_generator
 
-    for server in server_tasks:
-        server.stop()
+    for task, server in server_tasks:
+        server.should_exit = True
+        await task
 
     await asyncio.sleep(0.1)
 

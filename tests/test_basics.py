@@ -1,10 +1,12 @@
 import asyncio
 import json
+import logging
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 import aiohttp
 
 import pytest
+from _pytest.fixtures import FixtureRequest
 import zmq.asyncio
 import zmq
 from pydantic_core import Url
@@ -31,6 +33,7 @@ from tests.utils import wait_for_controller, wait_for_finish
 
 @pytest.mark.asyncio
 async def test_simple(
+    request: FixtureRequest,
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
@@ -82,15 +85,20 @@ async def test_simple(
         "finished": False,
     }
     keys = await r.keys("dranspose:*")
+    logging.info("dranspose keys are %s", keys)
     present_keys = {
         "dranspose:controller:updates",
         "dranspose:worker:w1:config",
         f"dranspose:assigned:{uuid}",
         f"dranspose:ready:{uuid}",
-        "dranspose:ingester:eiger-ingester:config",
         "dranspose:controller_lock",
         "dranspose:reducer:reducer:config",
     }
+    if request.config.getoption("rust"):
+        present_keys.add("dranspose:ingester:rust-eiger-ingester:config")
+    else:
+        present_keys.add("dranspose:ingester:eiger-ingester:config")
+
     assert present_keys.issubset(keys)
 
     context = zmq.asyncio.Context()

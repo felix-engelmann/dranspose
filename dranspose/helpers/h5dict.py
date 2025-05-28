@@ -110,7 +110,7 @@ def _make_shape_type(obj: Any) -> tuple[H5Shape | None, H5Type | None]:
     else:
         try:
             arr = np.array(obj)
-            h5shape = H5SimpleShape(dims=arr.shape)
+            h5shape = H5SimpleShape(dims=list(arr.shape))
 
             if len(arr.dtype.descr) > 1:
                 # compound datatype
@@ -402,7 +402,7 @@ app = FastAPI()
 app.include_router(router)
 
 
-def get_data() -> Tuple[dict[str, Any], ContextManager]:
+def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
     dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
 
     arr = np.array([(0.5, 1)], dtype=dt)

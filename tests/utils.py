@@ -6,12 +6,13 @@ import aiohttp
 
 from pydantic_core import Url
 
-from dranspose.protocol import EnsembleState, StreamName, WorkerName
+from dranspose.protocol import EnsembleState, StreamName, WorkerName, ParameterName
 
 
 async def wait_for_controller(
     streams: Optional[set[StreamName]] = None,
     workers: Optional[set[WorkerName]] = None,
+    parameters: Optional[set[ParameterName]] = None,
     controller: Url = Url("http://localhost:5000"),
 ) -> EnsembleState:
     async with aiohttp.ClientSession() as session:
@@ -38,6 +39,21 @@ async def wait_for_controller(
                     "streams %s and workers %s are not available", streams, workers
                 )
                 raise TimeoutError("failed to bring up components")
+
+        if parameters is None:
+            parameters = set()
+        for param in parameters:
+            timeout = 0
+            resp = await session.get(f"{controller}api/v1/parameter/{param}")
+            while resp.status != 200:
+                await asyncio.sleep(1)
+                timeout += 1
+                logging.warning("waiting for parameter %s", param)
+                resp = await session.get(f"{controller}api/v1/parameter/{param}")
+                if timeout > 20:
+                    logging.error("parameter %s is not available", param)
+                    raise TimeoutError("failed to bring up parameters")
+            logging.info("parameter %s is available", param)
 
         return state
 

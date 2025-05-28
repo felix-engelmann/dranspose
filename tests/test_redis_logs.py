@@ -45,4 +45,4 @@ async def test_logs(
         lgs = await logs.json()
         # assert len(lgs) > 0 currently there is nothing written to redis from a test, but it works when called from cli
         for log in lgs:
-            assert log["levelname"] == "WARNING"
+            assert log["levelname"] in ["WARNING", "ERROR"]

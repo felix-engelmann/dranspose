@@ -35,10 +35,7 @@ from dranspose.worker import Worker
 from tests.utils import wait_for_controller, wait_for_finish
 
 
-@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
-@pytest.mark.asyncio
-async def test_replay(
-    controller: None,
+async def dump_data(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
@@ -46,7 +43,7 @@ async def test_replay(
     stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
     stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
     tmp_path: Any,
-) -> None:
+):
     await reducer(None)
     await create_worker(WorkerName("w1"))
     await create_worker(WorkerName("w2"))
@@ -168,12 +165,43 @@ async def test_replay(
 
     await wait_for_finish()
 
-    # read dump
+    context.destroy()
 
+    return p_eiger, p_prefix, uuid
+
+
+def generate_params(tmp_path):
     par_file = tmp_path / "parameters.json"
 
     with open(par_file, "w") as f:
         json.dump([{"name": "roi1", "data": "[10,20]"}], f)
+    return par_file
+
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_replay(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    p_eiger, p_prefix, uuid = await dump_data(
+        reducer,
+        create_worker,
+        create_ingester,
+        stream_eiger,
+        stream_orca,
+        stream_small,
+        tmp_path,
+    )
+    # read dump
+
+    par_file = generate_params(tmp_path)
 
     replay(
         "examples.dummy.worker:FluorescenceWorker",
@@ -183,12 +211,37 @@ async def test_replay(
         par_file,
     )
 
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_replay_gzip(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    p_eiger, p_prefix, uuid = await dump_data(
+        reducer,
+        create_worker,
+        create_ingester,
+        stream_eiger,
+        stream_orca,
+        stream_small,
+        tmp_path,
+    )
+
     with open(f"{p_prefix}orca-ingester-{uuid}.cbors", "rb") as f_in:
         with gzip.open(f"{p_prefix}orca-ingester-{uuid}.cbors.gz", "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
 
     stop_event = threading.Event()
     done_event = threading.Event()
+
+    par_file = generate_params(tmp_path)
 
     thread = threading.Thread(
         target=replay,
@@ -218,11 +271,14 @@ async def test_replay(
     await loop.run_in_executor(None, work_pre)
 
     async with aiohttp.ClientSession() as session:
+        ntrig = 10
         st = await session.get("http://localhost:5010/api/v1/result/")
         content = await st.content.read()
         result = pickle.loads(content)[0]
         assert list(result["results"].keys()) == list(range(ntrig + 1))
-        logging.warning("params in reducer is %s", result["results"][5][0])
+        logging.warning(
+            "params in reducer is %s", result["results"][5][0].streams.keys()
+        )
         ev5: EventData = result["results"][5][0]
         assert ev5.event_number == 5
         assert ev5.streams[StreamName("eiger")].typ == "STINS"
@@ -247,6 +303,29 @@ async def test_replay(
     stop_event.set()
 
     thread.join()
+
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_replay_pklparam(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    p_eiger, p_prefix, uuid = await dump_data(
+        reducer,
+        create_worker,
+        create_ingester,
+        stream_eiger,
+        stream_orca,
+        stream_small,
+        tmp_path,
+    )
 
     bin_file = tmp_path / "binparams.pkl"
 
@@ -295,6 +374,29 @@ async def test_replay(
 
     thread.join()
 
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_replay_cborparam(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    p_eiger, p_prefix, uuid = await dump_data(
+        reducer,
+        create_worker,
+        create_ingester,
+        stream_eiger,
+        stream_orca,
+        stream_small,
+        tmp_path,
+    )
+
     cbor_file = tmp_path / "binparams.cbor"
 
     with open(cbor_file, mode="wb") as fb:
@@ -340,7 +442,3 @@ async def test_replay(
     stop_event.set()
 
     thread.join()
-
-    context.destroy()
-
-    print(content)
