@@ -652,252 +652,245 @@ class Controller:
         logger.info("controller closed")
 
 
-ctrl: Controller
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
-    global ctrl
-    ctrl = Controller()
+    app.state.ctrl = Controller()
     # run_task = asyncio.create_task(ctrl.run())
-    await ctrl.run()
+    await app.state.ctrl.run()
     # run_task.add_done_callback(done_callback)
     yield
     # await cancel_and_wait(run_task)
-    await ctrl.close()
+    await app.state.ctrl.close()
     # Clean up the ML models and release the resources
 
 
-app = FastAPI(lifespan=lifespan)
+def routes_legacy(app: FastAPI) -> None:
+    @app.post("/api/v1/mapping")
+    async def set_mapping(
+        request: Request,
+        mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]],
+        all_wrap: bool = True,
+    ) -> UUID4 | str:
+        ctrl = request.app.state.ctrl
+        config = await ctrl.get_configs()
+        if set(mapping.keys()) - set(config.get_streams()) != set():
+            logger.warning(
+                "bad request streams %s not available",
+                set(mapping.keys()) - set(config.get_streams()),
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"streams {set(mapping.keys()) - set(config.get_streams())} not available",
+            )
+        m = MappingSequence(
+            parts={MappingName("main"): mapping},
+            sequence=[MappingName("main")],
+            add_start_end=all_wrap,
+        )
+        if len(config.workers) < m.min_workers():
+            logger.warning(
+                "only %d workers available, but %d required",
+                len(config.workers),
+                m.min_workers(),
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"only {len(config.workers)} workers available, but {m.min_workers()} required",
+            )
+        await ctrl.set_mapping(m)
+        return m.uuid
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-)
+    @app.get("/api/v1/logs")
+    async def get_logs(request: Request, level: str = "INFO") -> Any:
+        data = await request.app.state.ctrl.redis.xrange("dranspose_logs", "-", "+")
+        logs = []
+        # TODO: once python 3.10 support is dropped, use
+        # levels = logging.getLevelNamesMapping()
+        levels = {
+            level: logging.__getattribute__(level)
+            for level in dir(logging)
+            if level.isupper() and isinstance(logging.__getattribute__(level), int)
+        }
+        minlevel = levels.get(level.upper(), logging.INFO)
+        for entry in data:
+            msglevel = levels[entry[1].get("levelname", "DEBUG")]
+            if msglevel >= minlevel:
+                logs.append(entry[1])
+        return logs
+
+    @app.post("/api/v1/sardana_hook")
+    async def set_sardana_hook(
+        request: Request, info: dict[Literal["streams"] | Literal["scan"], Any]
+    ) -> UUID4 | str:
+        ctrl = request.app.state.ctrl
+        config = await ctrl.get_configs()
+        print(info)
+        if "scan" not in info:
+            return "no scan info"
+        if "nb_points" not in info["scan"]:
+            return "no nb_points in scan"
+        if "streams" not in info:
+            return "streams required"
+        for st in set(config.get_streams()).intersection(set(info["streams"])):
+            print("use stream", st)
+        logger.debug("create new mapping")
+        m = Map.from_uniform(
+            set(config.get_streams()).intersection(set(info["streams"])),
+            info["scan"]["nb_points"],
+        )
+        s = MappingSequence(
+            parts={MappingName("sardana"): m.mapping},
+            sequence=[MappingName("sardana")],
+            add_start_end=True,
+        )
+        logger.debug("set mapping")
+        await ctrl.set_mapping(s)
+        return s.uuid
 
 
-@app.get("/")
-async def read_index() -> FileResponse:
-    return FileResponse(
-        os.path.join(os.path.dirname(__file__), "frontend", "index.html")
+def routes_status(app: FastAPI) -> None:
+    @app.get("/api/v1/config")
+    async def get_configs(request: Request) -> EnsembleState:
+        return await request.app.state.ctrl.get_configs()
+
+    @app.get("/api/v1/status")
+    async def get_status(request: Request) -> dict[str, Any]:
+        ctrl = request.app.state.ctrl
+        return {
+            "work_completed": ctrl.completed,
+            "last_assigned": ctrl.mapping.complete_events,
+            "assignment": [am.assignments for am in ctrl.mapping.active_maps],
+            "completed_events": ctrl.completed_events,
+            "finished": await ctrl.completed_finish(),
+            "processing_times": ctrl.worker_timing,
+        }
+
+    @app.get("/api/v1/load")
+    async def get_load(
+        request: Request,
+        intervals: Annotated[list[int] | None, Query()] = None,
+        scan: bool = True,
+    ) -> SystemLoadType:
+        if intervals is None:
+            intervals = [1, 10]
+        return await request.app.state.ctrl.get_load(intervals, scan)
+
+    @app.get("/api/v1/progress")
+    async def get_progress(request: Request) -> dict[str, Any]:
+        ctrl = request.app.state.ctrl
+        return {
+            "last_assigned": ctrl.mapping.complete_events,
+            "completed_events": len(ctrl.completed_events),
+            "total_events": ctrl.mapping.len(),
+            "finished": await ctrl.completed_finish(),
+        }
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(lifespan=lifespan)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
     )
 
-
-@app.get("/api/v1/config")
-async def get_configs() -> EnsembleState:
-    global ctrl
-    return await ctrl.get_configs()
-
-
-@app.get("/api/v1/status")
-async def get_status() -> dict[str, Any]:
-    global ctrl
-    return {
-        "work_completed": ctrl.completed,
-        "last_assigned": ctrl.mapping.complete_events,
-        "assignment": [am.assignments for am in ctrl.mapping.active_maps],
-        "completed_events": ctrl.completed_events,
-        "finished": await ctrl.completed_finish(),
-        "processing_times": ctrl.worker_timing,
-    }
-
-
-@app.get("/api/v1/load")
-async def get_load(
-    intervals: Annotated[list[int] | None, Query()] = None, scan: bool = True
-) -> SystemLoadType:
-    global ctrl
-    if intervals is None:
-        intervals = [1, 10]
-    return await ctrl.get_load(intervals, scan)
-
-
-@app.get("/api/v1/progress")
-async def get_progress() -> dict[str, Any]:
-    global ctrl
-    return {
-        "last_assigned": ctrl.mapping.complete_events,
-        "completed_events": len(ctrl.completed_events),
-        "total_events": ctrl.mapping.len(),
-        "finished": await ctrl.completed_finish(),
-    }
-
-
-@app.post("/api/v1/mapping")
-async def set_mapping(
-    mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]],
-    all_wrap: bool = True,
-) -> UUID4 | str:
-    global ctrl
-    config = await ctrl.get_configs()
-    if set(mapping.keys()) - set(config.get_streams()) != set():
-        logger.warning(
-            "bad request streams %s not available",
-            set(mapping.keys()) - set(config.get_streams()),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=f"streams {set(mapping.keys()) - set(config.get_streams())} not available",
-        )
-    m = MappingSequence(
-        parts={MappingName("main"): mapping},
-        sequence=[MappingName("main")],
-        add_start_end=all_wrap,
-    )
-    if len(config.workers) < m.min_workers():
-        logger.warning(
-            "only %d workers available, but %d required",
-            len(config.workers),
-            m.min_workers(),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=f"only {len(config.workers)} workers available, but {m.min_workers()} required",
-        )
-    await ctrl.set_mapping(m)
-    return m.uuid
-
-
-@app.get("/api/v1/mapping")
-async def get_mapping() -> dict[str, Any]:
-    global ctrl
-    return {"parts": ctrl.mapping.parts, "sequence": ctrl.mapping.sequence}
-
-
-@app.post("/api/v1/sequence")
-async def set_sequence(
-    parts: dict[MappingName, dict[StreamName, list[Optional[list[VirtualWorker]]]]],
-    sequence: list[MappingName],
-    all_wrap: bool = True,
-) -> UUID4 | str:
-    global ctrl
-    config = await ctrl.get_configs()
-    m = MappingSequence(
-        parts=parts,
-        sequence=sequence,
-        add_start_end=all_wrap,
-    )
-    if m.all_streams - set(config.get_streams()) != set():
-        logger.warning(
-            "bad request streams %s not available",
-            m.all_streams - set(config.get_streams()),
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=f"streams {m.all_streams - set(config.get_streams())} not available",
+    @app.get("/")
+    async def read_index() -> FileResponse:
+        return FileResponse(
+            os.path.join(os.path.dirname(__file__), "frontend", "index.html")
         )
 
-    if len(config.workers) < m.min_workers():
-        logger.warning(
-            "only %d workers available, but %d required",
-            len(config.workers),
-            m.min_workers(),
+    @app.get("/api/v1/mapping")
+    async def get_mapping(request: Request) -> dict[str, Any]:
+        ctrl = request.app.state.ctrl
+        return {"parts": ctrl.mapping.parts, "sequence": ctrl.mapping.sequence}
+
+    @app.post("/api/v1/sequence")
+    async def set_sequence(
+        request: Request,
+        parts: dict[MappingName, dict[StreamName, list[Optional[list[VirtualWorker]]]]],
+        sequence: list[MappingName],
+        all_wrap: bool = True,
+    ) -> UUID4 | str:
+        ctrl = request.app.state.ctrl
+        config = await ctrl.get_configs()
+        m = MappingSequence(
+            parts=parts,
+            sequence=sequence,
+            add_start_end=all_wrap,
         )
-        raise HTTPException(
-            status_code=400,
-            detail=f"only {len(config.workers)} workers available, but {m.min_workers()} required",
-        )
-    await ctrl.set_mapping(m)
-    return m.uuid
+        if m.all_streams - set(config.get_streams()) != set():
+            logger.warning(
+                "bad request streams %s not available",
+                m.all_streams - set(config.get_streams()),
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"streams {m.all_streams - set(config.get_streams())} not available",
+            )
+
+        if len(config.workers) < m.min_workers():
+            logger.warning(
+                "only %d workers available, but %d required",
+                len(config.workers),
+                m.min_workers(),
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"only {len(config.workers)} workers available, but {m.min_workers()} required",
+            )
+        await ctrl.set_mapping(m)
+        return m.uuid
+
+    @app.post("/api/v1/stop")
+    async def stop(request: Request) -> None:
+        logger.info("externally stopped scan")
+        request.app.state.ctrl.external_stop = True
+
+    async def log_streamer(ctrl: Controller) -> AsyncIterator[str]:
+        latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
+        last = 0
+        if len(latest) > 0:
+            last = latest[0][0]
+
+        while True:
+            update_msgs = await ctrl.redis.xread({"dranspose_logs": last}, block=1300)
+            if "dranspose_logs" in update_msgs:
+                update_msg = update_msgs["dranspose_logs"][0][-1]
+                last = update_msg[0]
+                for log in update_msgs["dranspose_logs"][0]:
+                    yield json.dumps(log[1]) + "\n"
+
+    @app.get("/api/v1/log_stream")
+    async def get_log_stream(request: Request) -> StreamingResponse:
+        return StreamingResponse(log_streamer(request.app.state.ctrl))
+
+    @app.post("/api/v1/parameter/{name}")
+    async def post_param(request: Request, name: ParameterName) -> HashDigest:
+        data = await request.body()
+        logger.info("got %s: %s (len %d)", name, data[:100], len(data))
+        u = await request.app.state.ctrl.set_param(name, data)
+        return u
+
+    @app.get("/api/v1/parameter/{name}")
+    async def get_param(request: Request, name: ParameterName) -> Response:
+        ctrl = request.app.state.ctrl
+        if name not in ctrl.parameters:
+            raise HTTPException(status_code=404, detail="Parameter not found")
+
+        data = ctrl.parameters[name].data
+        return Response(data, media_type="application/x.bytes")
+
+    @app.get("/api/v1/parameters")
+    async def param_descr(request: Request) -> list[ParameterType]:
+        return await request.app.state.ctrl.describe_parameters()
+
+    routes_status(app)
+    routes_legacy(app)
+
+    return app
 
 
-@app.post("/api/v1/stop")
-async def stop() -> None:
-    global ctrl
-    logger.info("externally stopped scan")
-    ctrl.external_stop = True
-
-
-async def log_streamer() -> AsyncIterator[str]:
-    latest = await ctrl.redis.xrevrange("dranspose_logs", count=1)
-    last = 0
-    if len(latest) > 0:
-        last = latest[0][0]
-
-    while True:
-        update_msgs = await ctrl.redis.xread({"dranspose_logs": last}, block=1300)
-        if "dranspose_logs" in update_msgs:
-            update_msg = update_msgs["dranspose_logs"][0][-1]
-            last = update_msg[0]
-            for log in update_msgs["dranspose_logs"][0]:
-                yield json.dumps(log[1]) + "\n"
-
-
-@app.get("/api/v1/log_stream")
-async def get_log_stream() -> StreamingResponse:
-    return StreamingResponse(log_streamer())
-
-
-@app.get("/api/v1/logs")
-async def get_logs(level: str = "INFO") -> Any:
-    global ctrl
-    data = await ctrl.redis.xrange("dranspose_logs", "-", "+")
-    logs = []
-    # TODO: once python 3.10 support is dropped, use
-    # levels = logging.getLevelNamesMapping()
-    levels = {
-        level: logging.__getattribute__(level)
-        for level in dir(logging)
-        if level.isupper() and isinstance(logging.__getattribute__(level), int)
-    }
-    minlevel = levels.get(level.upper(), logging.INFO)
-    for entry in data:
-        msglevel = levels[entry[1].get("levelname", "DEBUG")]
-        if msglevel >= minlevel:
-            logs.append(entry[1])
-    return logs
-
-
-@app.post("/api/v1/sardana_hook")
-async def set_sardana_hook(
-    info: dict[Literal["streams"] | Literal["scan"], Any]
-) -> UUID4 | str:
-    global ctrl
-    config = await ctrl.get_configs()
-    print(info)
-    if "scan" not in info:
-        return "no scan info"
-    if "nb_points" not in info["scan"]:
-        return "no nb_points in scan"
-    if "streams" not in info:
-        return "streams required"
-    for st in set(config.get_streams()).intersection(set(info["streams"])):
-        print("use stream", st)
-    logger.debug("create new mapping")
-    m = Map.from_uniform(
-        set(config.get_streams()).intersection(set(info["streams"])),
-        info["scan"]["nb_points"],
-    )
-    s = MappingSequence(
-        parts={MappingName("sardana"): m.mapping},
-        sequence=[MappingName("sardana")],
-        add_start_end=True,
-    )
-    logger.debug("set mapping")
-    await ctrl.set_mapping(s)
-    return s.uuid
-
-
-@app.post("/api/v1/parameter/{name}")
-async def post_param(request: Request, name: ParameterName) -> HashDigest:
-    data = await request.body()
-    logger.info("got %s: %s (len %d)", name, data[:100], len(data))
-    u = await ctrl.set_param(name, data)
-    return u
-
-
-@app.get("/api/v1/parameter/{name}")
-async def get_param(name: ParameterName) -> Response:
-    if name not in ctrl.parameters:
-        raise HTTPException(status_code=404, detail="Parameter not found")
-
-    data = ctrl.parameters[name].data
-    return Response(data, media_type="application/x.bytes")
-
-
-@app.get("/api/v1/parameters")
-async def param_descr() -> list[ParameterType]:
-    global ctrl
-    return await ctrl.describe_parameters()
+app = create_app()

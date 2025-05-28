@@ -67,7 +67,7 @@ reducer_app = FastAPI()
 reducer: Any | None = None
 
 
-def get_data() -> Tuple[dict[str, Any], ContextManager]:
+def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
     global reducer
     data = {}
     lock = nullcontext()

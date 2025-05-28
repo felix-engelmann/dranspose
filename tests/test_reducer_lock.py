@@ -24,7 +24,7 @@ test_done = threading.Event()
 
 class BlockingReducer:
     def __init__(self, **kwargs: dict[str, object]) -> None:
-        self.publish: dict[str, dict[int, int]] = {"map": {}}
+        self.publish: dict[str, dict[str, int]] = {"map": {}}
 
         self.rw_lock = RWLockFair()
         self.publish_rlock = self.rw_lock.gen_rlock()

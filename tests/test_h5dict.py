@@ -20,7 +20,7 @@ async def test_mapping() -> None:
 
     app.include_router(router, prefix="/results")
 
-    def get_data() -> Tuple[dict[str, Any], ContextManager]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         data = {
             "map": {
                 "x": [
@@ -183,7 +183,7 @@ async def test_root() -> None:
 
     app.include_router(router, prefix="/results")
 
-    def get_data() -> Tuple[dict[str, Any], ContextManager]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         dt = np.dtype({"names": ["a", "b"], "formats": [float, int]})
 
         arr = np.array([(0.5, 1)], dtype=dt)
@@ -273,7 +273,7 @@ async def test_slice() -> None:
 
     app.include_router(router, prefix="/results")
 
-    def get_data() -> Tuple[dict[str, Any], ContextManager]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         return {
             "image": [[r * 100 + c for c in range(10)] for r in range(10)],
         }, nullcontext()

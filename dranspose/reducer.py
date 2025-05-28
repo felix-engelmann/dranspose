@@ -217,7 +217,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     run_task = asyncio.create_task(reducer.run())
     run_task.add_done_callback(done_callback)
 
-    def get_data() -> Tuple[dict[str, Any], ContextManager]:
+    def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         data = {}
         lock = nullcontext()
         if reducer.reducer is not None:
