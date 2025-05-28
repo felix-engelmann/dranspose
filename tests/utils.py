@@ -43,11 +43,17 @@ async def wait_for_controller(
         if parameters is None:
             parameters = set()
         for param in parameters:
+            timeout = 0
             resp = await session.get(f"{controller}api/v1/parameter/{param}")
             while resp.status != 200:
                 await asyncio.sleep(1)
+                timeout += 1
                 logging.warning("waiting for parameter %s", param)
                 resp = await session.get(f"{controller}api/v1/parameter/{param}")
+                if timeout > 20:
+                    logging.error("parameter %s is not available", param)
+                    raise TimeoutError("failed to bring up parameters")
+            logging.info("parameter %s is available", param)
 
         return state
 
