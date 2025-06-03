@@ -2,8 +2,8 @@ name: Publish docs
 
 on:
   push:
-  #  branches:
-  #    - main
+    branches:
+      - main
 permissions:
   contents: write
 jobs:
@@ -32,4 +32,4 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install mkdocs mkdocs-material mkdocstrings[python]
-      #- run: mkdocs gh-deploy --force
+      - run: mkdocs gh-deploy --force
