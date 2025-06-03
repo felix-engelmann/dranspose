@@ -2,8 +2,8 @@ name: Publish docs
 
 on:
   push:
-    branches:
-      - main
+  #  branches:
+  #    - main
 permissions:
   contents: write
 jobs:
@@ -18,12 +18,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV 
+      - uses: xu-cheng/latex-action@v3
+        with:
+          root_file: docs/*/main.tex
+          work_in_root_file_dir: true
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
       - uses: actions/cache@v4
         with:
           key: mkdocs-material-${{ env.cache_id }}
-          path: .cache 
+          path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install mkdocs mkdocs-material mkdocstrings[python]  
-      - run: mkdocs gh-deploy --force
+      - run: pip install mkdocs mkdocs-material mkdocstrings[python]
+      #- run: mkdocs gh-deploy --force
