@@ -152,7 +152,7 @@ async def test_params(
         context = zmq.asyncio.Context()
 
         await stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
 
         st = await session.get("http://localhost:5000/api/v1/progress")

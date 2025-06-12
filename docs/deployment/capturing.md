@@ -54,7 +54,7 @@ The file is then read without any seeking like this:
 
 ```python
 pkgs = []
-with open("ingest-dump.pkls","rb") as f:
+with open("ingest-dump.cbors","rb") as f:
     while True:
         try:
             frames = pickle.load(f)

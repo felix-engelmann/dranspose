@@ -69,7 +69,7 @@ async def test_albaem(
         stream_pkls(
             context,
             22004,
-            PosixPath("tests/data/albaem-dump.pkls"),
+            PosixPath("tests/data/albaem-dump.cbors"),
             0.001,
             zmq.PUB,
         )

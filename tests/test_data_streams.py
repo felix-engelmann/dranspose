@@ -17,7 +17,7 @@ from dranspose.data.xspress3 import XspressPacket, XspressImage, XspressStart
 
 
 def test_contrast_stream() -> None:
-    with open("tests/data/contrast-dump.pkls", "rb") as f:
+    with open("tests/data/contrast-dump.cbors", "rb") as f:
         while True:
             try:
                 frames = pickle.load(f)
@@ -240,7 +240,7 @@ def test_contrast_stream() -> None:
 
 
 def test_xspress3_stream() -> None:
-    with open("tests/data/xspress3-dump.pkls", "rb") as f:
+    with open("tests/data/xspress3-dump.cbors", "rb") as f:
         skip = 0
         frame = 0
         while True:
@@ -274,7 +274,7 @@ def test_xspress3_stream() -> None:
 
 
 def test_albaem_stream() -> None:
-    with open("tests/data/albaem-dump.pkls", "rb") as f:
+    with open("tests/data/albaem-dump.cbors", "rb") as f:
         message_id = 1
         while True:
             try:
@@ -289,7 +289,7 @@ def test_albaem_stream() -> None:
 
 
 def test_eiger_legacy_stream() -> None:
-    with open("tests/data/eiger-small.pkls", "rb") as f:
+    with open("tests/data/eiger-small.cbors", "rb") as f:
         while True:
             try:
                 frames = pickle.load(f)

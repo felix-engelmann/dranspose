@@ -76,7 +76,7 @@ async def test_pcap(
         stream_pkls(
             context,
             22004,
-            PosixPath("tests/data/pcap-zmq.pkls"),
+            PosixPath("tests/data/pcap-zmq.cbors"),
             0.001,
             zmq.PUB,
         )
