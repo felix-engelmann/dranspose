@@ -1,3 +1,4 @@
+import pickle
 import cbor2
 
 from dranspose.data.albaem import AlbaemPacket
@@ -22,7 +23,7 @@ def test_contrast_stream() -> None:
             try:
                 frames = cbor2.load(f)
                 assert len(frames) == 1
-                data = cbor2.loads(frames[0])
+                data = pickle.loads(frames[0])
                 pkg = ContrastPacket.validate_python(data)
                 if isinstance(pkg, ContrastHeartbeat):
                     pass
