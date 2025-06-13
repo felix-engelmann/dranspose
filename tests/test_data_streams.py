@@ -1,4 +1,4 @@
-import pickle
+import cbor2
 
 from dranspose.data.albaem import AlbaemPacket
 from dranspose.data.contrast import (
@@ -20,9 +20,9 @@ def test_contrast_stream() -> None:
     with open("tests/data/contrast-dump.cbors", "rb") as f:
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 assert len(frames) == 1
-                data = pickle.loads(frames[0])
+                data = cbor2.loads(frames[0])
                 pkg = ContrastPacket.validate_python(data)
                 if isinstance(pkg, ContrastHeartbeat):
                     pass
@@ -245,7 +245,7 @@ def test_xspress3_stream() -> None:
         frame = 0
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 assert len(frames) == 1
                 if skip > 0:
                     skip += 1
@@ -278,7 +278,7 @@ def test_albaem_stream() -> None:
         message_id = 1
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 assert len(frames) == 1
                 pkg = AlbaemPacket.validate_json(frames[0])
                 assert pkg.message_id == message_id
@@ -292,7 +292,7 @@ def test_eiger_legacy_stream() -> None:
     with open("tests/data/eiger-small.cbors", "rb") as f:
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 pkg = EigerLegacyPacket.validate_json(frames[0])
                 if isinstance(pkg, EigerLegacyHeader):
                     assert pkg.header_detail == "all"
