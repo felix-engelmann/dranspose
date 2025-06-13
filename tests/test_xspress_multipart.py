@@ -82,7 +82,7 @@ async def test_multipart(
         stream_pkls(
             context,
             9999,
-            PosixPath("tests/data/xspress3-multipart.pkls"),
+            PosixPath("tests/data/xspress3-multipart.cbors"),
             0.001,
             zmq.PUB,
         )

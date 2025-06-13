@@ -79,7 +79,7 @@ async def test_eiger_legacy(
         stream_pkls(
             context,
             22005,
-            PosixPath("tests/data/eiger-small.pkls"),
+            PosixPath("tests/data/eiger-small.cbors"),
             0.001,
             zmq.PUSH,
             begin=0,  # type: ignore[call-arg]

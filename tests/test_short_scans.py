@@ -102,14 +102,14 @@ async def test_short_scans(
         stream_pkls(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
     )
     asyncio.create_task(
         stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 
@@ -169,7 +169,7 @@ async def test_short_scans(
         await stream_pkls(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
@@ -197,7 +197,7 @@ async def test_short_scans(
     await stream_pkls(
         context,
         9999,
-        PosixPath("tests/data/xspress3mini-dump20.pkls"),
+        PosixPath("tests/data/xspress3mini-dump20.cbors"),
         0.001,
         zmq.PUB,
         begin=30,  # type: ignore[call-arg]
@@ -207,14 +207,14 @@ async def test_short_scans(
         stream_pkls(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
     )
     asyncio.create_task(
         stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 

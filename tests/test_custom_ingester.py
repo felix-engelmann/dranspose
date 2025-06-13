@@ -112,7 +112,7 @@ async def test_ingester(
 
     asyncio.create_task(
         stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 

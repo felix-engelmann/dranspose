@@ -130,7 +130,7 @@ If you need parameters, you can provide a json or pickle file which will be prov
 ```shell
 LOG_LEVEL="DEBUG" dranspose replay -w "src.worker:FluorescenceWorker" \
     -r "src.reducer:FluorescenceReducer" \
-    -f ../contrast_ingest.pkls ../xspress_ingest.pkls \
+    -f ../contrast_ingest.cbors ../xspress_ingest.cbors \
     -p ../fullparam.json
 ```
 

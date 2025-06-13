@@ -53,7 +53,7 @@ async def test_reduction(
             ),
         )
     )
-    p_contrast = tmp_path / "contrast_ingest.pkls"
+    p_contrast = tmp_path / "contrast_ingest.cbors"
 
     await create_ingester(
         ZmqSubContrastIngester(
@@ -65,7 +65,7 @@ async def test_reduction(
             ),
         )
     )
-    p_xspress = tmp_path / "xspress_ingest.pkls"
+    p_xspress = tmp_path / "xspress_ingest.cbors"
     await create_ingester(
         ZmqSubXspressIngester(
             settings=ZmqSubXspressSettings(
@@ -117,14 +117,14 @@ async def test_reduction(
         stream_pkls(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
     )
     asyncio.create_task(
         stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 
