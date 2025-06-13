@@ -47,7 +47,7 @@ def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMe
 
     while True:
         try:
-            if str(filename).endswith(".cbors"):
+            if str(filename).endswith(".pkls"):
                 frames = pickle.load(f)
             else:
                 frames = cbor2.load(f, tag_hook=message_tag_hook)
