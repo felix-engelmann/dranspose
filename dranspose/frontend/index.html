@@ -7,6 +7,38 @@
 
 // init
 
+function generateLogTable(logs) {
+  if (!Array.isArray(logs) || logs.length === 0) return "<p>No data available.</p>";
+
+  const headers = ["created", "levelname", "name", "lineno", "msg"];
+  const colorMap = {WARNING: "#c5c226", ERROR: "#e26f4d", CRITICAL: "#f00"}
+  const thead = `
+    <thead>
+      <tr>
+        ${headers.map(header => `<th>${header}</th>`).join('')}
+      </tr>
+    </thead>
+  `;
+
+  const tbody = `
+    <tbody>
+      ${logs.map(log => `
+        <tr style="background-color:${colorMap[log.levelname] || "#fff"};">
+          ${headers.map(header => {
+            let value = log[header];
+            if (header === "created") {
+              const date = new Date(parseFloat(value) * 1000);
+              value = date.toLocaleString();
+            }
+            return `<td>${value}</td>`;
+          }).join('')}
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+
+  return `<table border=1 style="border-collapse: collapse;">${thead}${tbody}</table>`;
+}
 async function update() {
   try {
     const resp = await fetch("/api/v1/progress");
@@ -19,7 +51,7 @@ async function update() {
 
     const resl = await fetch("/api/v1/logs?level=INFO");
     const datal = (await resl.json()).reverse();
-    document.querySelector(`#logs`).innerHTML = JSON.stringify(datal, null, 2);
+    document.querySelector(`#logs`).innerHTML = generateLogTable(datal);
   } catch (e) {
     console.log("unable to fetch", e)
   }
