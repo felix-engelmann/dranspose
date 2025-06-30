@@ -30,6 +30,26 @@ from dranspose.protocol import (
     WorkerName,
 )
 
+def with_dumpfile(func):
+    async def wrapper(self, *args, **kwargs):
+        # Determine dump_filename using original logic
+        dump_filename = self._ingester_settings.dump_path
+        if dump_filename is None and "dump_prefix" in self.parameters:
+            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+            if len(val) > 0:
+                dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
+        
+        dump_file = None
+        if dump_filename:
+            dump_file = open(dump_filename, "ab")
+            self._logger.info("dump file %s opened", dump_filename)
+        try:
+            return await func(self, dump_file, *args, **kwargs)
+        finally:
+            if dump_file:
+                self._logger.info("closing dump file %s", dump_filename)
+                dump_file.close()
+    return wrapper
 
 class IngesterSettings(DistributedSettings):
     ingester_streams: list[StreamName]
@@ -226,13 +246,14 @@ class Ingester(DistributedService):
 
         return zmqparts
 
-    async def work(self) -> None:
+    @with_dumpfile
+    async def work(self, dump_file) -> None:
         """
         The heavy liftig function of an ingester. It consumes a generator `run_source()` which
         should be implemented for a specific protocol.
         It then assembles all streams for this ingester and forwards them to the assigned workers.
 
-        Optionally the worker dumps the internal messages to disk. This is useful to develop workers with actual data captured.
+        Optionally the worker dumps the internal messages to disk. This is useful for development of workers with actual data captured.
         """
         self._logger.info("started ingester work task")
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
@@ -242,19 +263,6 @@ class Ingester(DistributedService):
         swtriggen: Iterator[dict[StreamName, StreamData]] | None = None
         if hasattr(self, "software_trigger"):
             swtriggen = self.software_trigger()
-        self.dump_file = None
-        self.dump_filename = self._ingester_settings.dump_path
-        if self.dump_filename is None and "dump_prefix" in self.parameters:
-            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
-            if len(val) > 0:
-                self.dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
-        if self.dump_filename:
-            self.dump_file = open(self.dump_filename, "ab")
-            self._logger.info(
-                "dump file %s opened at %s",
-                self.dump_filename,
-                self.dump_file,
-            )
         try:
             took = []
             empties = []
@@ -270,9 +278,8 @@ class Ingester(DistributedService):
                 zmqparts = await self._get_zmqparts(
                     work_assignment, sourcegens, swtriggen
                 )
-
-                if self.dump_file:
-                    self._logger.debug("writing dump to path %s", self.dump_filename)
+                if dump_file:
+                    self._logger.debug("writing dump to %s for event number %d", dump_file, work_assignment.event_number)
                     allstr = InternalWorkerMessage(
                         event_number=work_assignment.event_number,
                         streams={k: v.get_bytes() for k, v in zmqparts.items()},
@@ -280,7 +287,7 @@ class Ingester(DistributedService):
                     try:
                         cbor2.dump(
                             CBORTag(55799, allstr),
-                            self.dump_file,
+                            dump_file,
                             default=message_encoder,
                         )
                     except Exception as e:
@@ -314,12 +321,6 @@ class Ingester(DistributedService):
             self._logger.info("stopping worker")
             for stream in self.active_streams:
                 await self.stop_source(stream)
-            if self.dump_file:
-                self._logger.info(
-                    "closing dump file %s at cancelled work", self.dump_file
-                )
-                self.dump_file.close()
-                self.dump_file = None
 
     async def run_source(
         self, stream: StreamName
