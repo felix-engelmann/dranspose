@@ -1,6 +1,7 @@
 import asyncio
 import time
 import os
+import functools
 from io import BufferedWriter
 from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator
 from uuid import UUID
@@ -31,6 +32,7 @@ from dranspose.protocol import (
 )
 
 def with_dumpfile(func):
+    @functools.wraps(func)
     async def wrapper(self, *args, **kwargs):
         # Determine dump_filename using original logic
         dump_filename = self._ingester_settings.dump_path
@@ -39,7 +41,7 @@ def with_dumpfile(func):
             if len(val) > 0:
                 dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
         
-        dump_file = None
+        dump_file: Optional[BufferedWriter] = None
         if dump_filename:
             dump_file = open(dump_filename, "ab")
             self._logger.info("dump file %s opened", dump_filename)
@@ -99,8 +101,6 @@ class Ingester(DistributedService):
         self.state: IngesterState
         self.active_streams: list[StreamName] = []
 
-        self.dump_file: Optional[BufferedWriter] = None
-
     def open_socket(self) -> None:
         self.ctx = zmq.asyncio.Context()
         self.out_socket = self.ctx.socket(zmq.ROUTER)
@@ -157,10 +157,6 @@ class Ingester(DistributedService):
         This hook is called when all events of a trigger map were ingested. It is useful for e.g. closing open files.
         """
         self._logger.info("finishing work")
-        if self.dump_file:
-            self.dump_file.close()
-            self._logger.info("closed dump file at finish %s", self.dump_file)
-            self.dump_file = None
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
@@ -246,8 +242,22 @@ class Ingester(DistributedService):
 
         return zmqparts
 
+    def _cbor_dump(self, fd: BufferedWriter, data: InternalWorkerMessage) -> None:
+        self._logger.debug("writing dump to %s for event number %d", fd, data.event_number)
+        try:
+            cbor2.dump(
+                CBORTag(55799, data),
+                fd,
+                default=message_encoder,
+            )
+            fd.flush()
+            os.fsync(fd.fileno())
+        except Exception as e:
+            self._logger.error("cound not dump %s", e.__repr__())
+        self._logger.debug("written dump")
+
     @with_dumpfile
-    async def work(self, dump_file) -> None:
+    async def work(self, dump_file: Optional[BufferedWriter]) -> None:
         """
         The heavy liftig function of an ingester. It consumes a generator `run_source()` which
         should be implemented for a specific protocol.
@@ -260,9 +270,7 @@ class Ingester(DistributedService):
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
             return
-        swtriggen: Iterator[dict[StreamName, StreamData]] | None = None
-        if hasattr(self, "software_trigger"):
-            swtriggen = self.software_trigger()
+        swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(self, "software_trigger", lambda: None)()
         try:
             took = []
             empties = []
@@ -279,20 +287,13 @@ class Ingester(DistributedService):
                     work_assignment, sourcegens, swtriggen
                 )
                 if dump_file:
-                    self._logger.debug("writing dump to %s for event number %d", dump_file, work_assignment.event_number)
-                    allstr = InternalWorkerMessage(
-                        event_number=work_assignment.event_number,
-                        streams={k: v.get_bytes() for k, v in zmqparts.items()},
-                    )
-                    try:
-                        cbor2.dump(
-                            CBORTag(55799, allstr),
-                            dump_file,
-                            default=message_encoder,
+                    self._cbor_dump(
+                        dump_file,
+                        InternalWorkerMessage(
+                            event_number=work_assignment.event_number,
+                            streams={k: v.get_bytes() for k, v in zmqparts.items()},
+                            )
                         )
-                    except Exception as e:
-                        self._logger.error("cound not dump %s", e.__repr__())
-                    self._logger.debug("written dump")
 
                 workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
