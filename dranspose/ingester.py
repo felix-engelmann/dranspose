@@ -278,17 +278,15 @@ class Ingester(DistributedService):
             self._logger.warning("this ingester has no active streams, stopping worker")
             return
         swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(self, "software_trigger", lambda: None)()
-        took = []
-        empties = []
+        time_spent_per_assignment = []
+        time_spent_waiting = 0
         try:
             while True:
-                empty = False
-                if self.assignment_queue.empty():
-                    empty = True
-                start = time.perf_counter()
+                waiting = self.assignment_queue.empty()
+                start_time = time.perf_counter()
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
-                if empty:
-                    empties.append(work_assignment.event_number)
+                if waiting:
+                    time_spent_waiting += time.perf_counter() - start_time
                 zmqparts = await self._get_zmqparts(
                     work_assignment, sourcegens, swtriggen
                 )
@@ -308,17 +306,18 @@ class Ingester(DistributedService):
                 self._logger.debug("workermessages %s", workermessages)
                 await self._send_workermessages(workermessages)
                 end = time.perf_counter()
-                took.append(end - start)
-                if len(took) > 1000:
+                time_spent_per_assignment.append(end - start_time)
+                if len(time_spent_per_assignment) > 1000:
                     self._logger.info(
-                        "forwarding took avg %lf, min %f max %f",
-                        sum(took) / len(took),
-                        min(took),
-                        max(took),
+                        "forwarding took avg %lf, min %f max %f. waiting time %f%",
+                        sum(time_spent_per_assignment) / len(time_spent_per_assignment),
+                        min(time_spent_per_assignment),
+                        max(time_spent_per_assignment),
+                        time_spent_waiting / sum(time_spent_per_assignment) * 100
                     )
-                    self._logger.info("waiting for queue %d of 1000", len(empties))
-                    took = []
-                    empties = []
+                    # reset counters
+                    time_spent_per_assignment = []
+                    time_spent_waiting = 0
                 self.state.processed_events += 1
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
