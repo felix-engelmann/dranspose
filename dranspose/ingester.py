@@ -3,8 +3,9 @@ import time
 import os
 import functools
 from io import BufferedWriter
-from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator
+from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator, Callable
 from uuid import UUID
+import logging
 
 import cbor2
 import redis.exceptions as rexceptions
@@ -31,27 +32,37 @@ from dranspose.protocol import (
     WorkerName,
 )
 
-def with_dumpfile(func):
-    @functools.wraps(func)
-    async def wrapper(self, *args, **kwargs):
-        # Determine dump_filename using original logic
-        dump_filename = self._ingester_settings.dump_path
-        if dump_filename is None and "dump_prefix" in self.parameters:
-            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
-            if len(val) > 0:
-                dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
-        
-        dump_file: Optional[BufferedWriter] = None
-        if dump_filename:
-            dump_file = open(dump_filename, "ab")
-            self._logger.info("dump file %s opened", dump_filename)
+class Dumper:
+    def __init__(self, dump_path: str | None) -> None:
+        self.dump_path = dump_path
+        self.fh: BufferedWriter | None = None
+        self._logger = logging.getLogger("dumper")
+
+    def write_dump(self, message: Callable[[], Any] | Any) -> None:
+        if self.dump_path is None:
+            return
+        if callable(message):
+            message = message()
+        if not self.fh:
+            self.fh = open(self.dump_path, "ba")
+            self._logger.info("dump file %s opened", self.dump_path)
+        self._logger.debug("writing dump to %s", self.dump_path)
         try:
-            return await func(self, dump_file, *args, **kwargs)
-        finally:
-            if dump_file:
-                self._logger.info("closing dump file %s", dump_filename)
-                dump_file.close()
-    return wrapper
+            cbor2.dump(
+                CBORTag(55799, message),
+                self.fh,
+                default=message_encoder,
+            )
+            self.fh.flush()
+            os.fsync(self.fh.fileno())
+        except Exception as e:
+            self._logger.error("cound not dump %s", e.__repr__())
+        self._logger.debug("written dump")
+
+    def __del__(self) -> None:
+        if self.fh:
+            self.fh.close()
+
 
 class IngesterSettings(DistributedSettings):
     ingester_streams: list[StreamName]
@@ -100,6 +111,16 @@ class Ingester(DistributedService):
         )
         self.state: IngesterState
         self.active_streams: list[StreamName] = []
+
+    def _final_dump_path(self) -> str | None:
+        """ Determines the filepath to write the dump to, if one should be written. Returns None otherwise. """
+        if ret := self._ingester_settings.dump_path:
+            return str(ret)
+        if "dump_prefix" in self.parameters:
+            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+            if len(val) > 0:
+                return f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
+        return None
 
     def open_socket(self) -> None:
         self.ctx = zmq.asyncio.Context()
@@ -242,22 +263,7 @@ class Ingester(DistributedService):
 
         return zmqparts
 
-    def _cbor_dump(self, fd: BufferedWriter, data: InternalWorkerMessage) -> None:
-        self._logger.debug("writing dump to %s for event number %d", fd, data.event_number)
-        try:
-            cbor2.dump(
-                CBORTag(55799, data),
-                fd,
-                default=message_encoder,
-            )
-            fd.flush()
-            os.fsync(fd.fileno())
-        except Exception as e:
-            self._logger.error("cound not dump %s", e.__repr__())
-        self._logger.debug("written dump")
-
-    @with_dumpfile
-    async def work(self, dump_file: Optional[BufferedWriter]) -> None:
+    async def work(self) -> None:
         """
         The heavy liftig function of an ingester. It consumes a generator `run_source()` which
         should be implemented for a specific protocol.
@@ -266,14 +272,15 @@ class Ingester(DistributedService):
         Optionally the worker dumps the internal messages to disk. This is useful for development of workers with actual data captured.
         """
         self._logger.info("started ingester work task")
+        dumper = Dumper(self._final_dump_path())
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
             return
         swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(self, "software_trigger", lambda: None)()
+        took = []
+        empties = []
         try:
-            took = []
-            empties = []
             while True:
                 empty = False
                 if self.assignment_queue.empty():
@@ -282,19 +289,14 @@ class Ingester(DistributedService):
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
                 if empty:
                     empties.append(work_assignment.event_number)
-
                 zmqparts = await self._get_zmqparts(
                     work_assignment, sourcegens, swtriggen
                 )
-                if dump_file:
-                    self._cbor_dump(
-                        dump_file,
-                        InternalWorkerMessage(
-                            event_number=work_assignment.event_number,
-                            streams={k: v.get_bytes() for k, v in zmqparts.items()},
-                            )
+                dumper.write_dump(lambda: InternalWorkerMessage(
+                        event_number=work_assignment.event_number,
+                        streams={k: v.get_bytes() for k, v in zmqparts.items()},
                         )
-
+                    )
                 workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
                     for worker in workers:
@@ -322,6 +324,7 @@ class Ingester(DistributedService):
             self._logger.info("stopping worker")
             for stream in self.active_streams:
                 await self.stop_source(stream)
+            del dumper
 
     async def run_source(
         self, stream: StreamName
