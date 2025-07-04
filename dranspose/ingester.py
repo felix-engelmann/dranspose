@@ -279,7 +279,7 @@ class Ingester(DistributedService):
             return
         swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(self, "software_trigger", lambda: None)()
         time_spent_per_assignment = []
-        time_spent_waiting = 0
+        time_spent_waiting = 0.0
         try:
             while True:
                 waiting = self.assignment_queue.empty()
