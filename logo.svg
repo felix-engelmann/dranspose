@@ -4,13 +4,13 @@
 
   <!-- Connections between first and second layers -->
   <line x1="50" y1="50" x2="80" y2="50" stroke="#000" stroke-width="2.5"/>
-  <line x1="50" y1="50" x2="80" y2="100" stroke="#000"/>
-  <line x1="50" y1="50" x2="80" y2="150" stroke="#000"/>
-  <line x1="50" y1="100" x2="80" y2="50" stroke="#000"/>
-  <line x1="50" y1="100" x2="80" y2="100" stroke="#000"/>
-  <line x1="50" y1="100" x2="80" y2="150" stroke="#000"/>
-  <line x1="50" y1="150" x2="80" y2="50" stroke="#000"/>
-  <line x1="50" y1="150" x2="80" y2="100" stroke="#000"/>
+  <line x1="50" y1="50" x2="80" y2="100" stroke="#000" stroke-width="1.5"/>
+  <line x1="50" y1="50" x2="80" y2="150" stroke="#000" stroke-width="1.5"/>
+  <line x1="50" y1="100" x2="80" y2="50" stroke="#000" stroke-width="1.5"/>
+  <line x1="50" y1="100" x2="80" y2="100" stroke="#000" stroke-width="1.5"/>
+  <line x1="50" y1="100" x2="80" y2="150" stroke="#000" stroke-width="1.5"/>
+  <line x1="50" y1="150" x2="80" y2="50" stroke="#000" stroke-width="1.5"/>
+  <line x1="50" y1="150" x2="80" y2="100" stroke="#000" stroke-width="1.5"/>
   <line x1="50" y1="150" x2="80" y2="150" stroke="#000" stroke-width="2.5"/>
 
   <!-- Arc connections from second layer to final point (thicker) -->
