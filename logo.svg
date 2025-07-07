@@ -23,6 +23,14 @@
   <circle cx="50" cy="100" r="5" fill="purple" stroke="black" stroke-width="2"/>
   <circle cx="50" cy="150" r="5" fill="purple" stroke="black" stroke-width="2"/>
 
+  <!-- Serif-like arrows for first layer -->
+  <line x1="45" y1="45" x2="40" y2="40" stroke="black" stroke-width="1.5"/>
+
+  <line x1="45" y1="95" x2="40" y2="90" stroke="black" stroke-width="1.5"/>
+  <line x1="45" y1="105" x2="40" y2="110" stroke="black" stroke-width="1.5"/>
+
+  <line x1="45" y1="155" x2="40" y2="160" stroke="black" stroke-width="1.5"/>
+
   <!-- Second layer of nodes (blue) -->
   <circle cx="80" cy="50" r="5" fill="blue" stroke="black" stroke-width="2"/>
   <circle cx="80" cy="100" r="5" fill="blue" stroke="black" stroke-width="2"/>
