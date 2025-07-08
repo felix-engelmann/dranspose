@@ -1,9 +1,11 @@
 import asyncio
 import time
 import os
+import functools
 from io import BufferedWriter
-from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator
+from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator, Callable
 from uuid import UUID
+import logging
 
 import cbor2
 import redis.exceptions as rexceptions
@@ -29,6 +31,37 @@ from dranspose.protocol import (
     WorkAssignmentList,
     WorkerName,
 )
+
+class Dumper:
+    def __init__(self, dump_path: str | None) -> None:
+        self.dump_path = dump_path
+        self.fh: BufferedWriter | None = None
+        self._logger = logging.getLogger("dumper")
+
+    def write_dump(self, message: Callable[[], Any] | Any) -> None:
+        if self.dump_path is None:
+            return
+        if callable(message):
+            message = message()
+        if not self.fh:
+            self.fh = open(self.dump_path, "ba")
+            self._logger.info("dump file %s opened", self.dump_path)
+        self._logger.debug("writing dump to %s", self.dump_path)
+        try:
+            cbor2.dump(
+                CBORTag(55799, message),
+                self.fh,
+                default=message_encoder,
+            )
+            self.fh.flush()
+            os.fsync(self.fh.fileno())
+        except Exception as e:
+            self._logger.error("cound not dump %s", e.__repr__())
+        self._logger.debug("written dump")
+
+    def __del__(self) -> None:
+        if self.fh:
+            self.fh.close()
 
 
 class IngesterSettings(DistributedSettings):
@@ -79,7 +112,15 @@ class Ingester(DistributedService):
         self.state: IngesterState
         self.active_streams: list[StreamName] = []
 
-        self.dump_file: Optional[BufferedWriter] = None
+    def _final_dump_path(self) -> str | None:
+        """ Determines the filepath to write the dump to, if one should be written. Returns None otherwise. """
+        if ret := self._ingester_settings.dump_path:
+            return str(ret)
+        if "dump_prefix" in self.parameters:
+            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
+            if len(val) > 0:
+                return f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
+        return None
 
     def open_socket(self) -> None:
         self.ctx = zmq.asyncio.Context()
@@ -137,10 +178,6 @@ class Ingester(DistributedService):
         This hook is called when all events of a trigger map were ingested. It is useful for e.g. closing open files.
         """
         self._logger.info("finishing work")
-        if self.dump_file:
-            self.dump_file.close()
-            self._logger.info("closed dump file at finish %s", self.dump_file)
-            self.dump_file = None
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
@@ -232,61 +269,32 @@ class Ingester(DistributedService):
         should be implemented for a specific protocol.
         It then assembles all streams for this ingester and forwards them to the assigned workers.
 
-        Optionally the worker dumps the internal messages to disk. This is useful to develop workers with actual data captured.
+        Optionally the worker dumps the internal messages to disk. This is useful for development of workers with actual data captured.
         """
         self._logger.info("started ingester work task")
+        dumper = Dumper(self._final_dump_path())
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
             return
-        swtriggen: Iterator[dict[StreamName, StreamData]] | None = None
-        if hasattr(self, "software_trigger"):
-            swtriggen = self.software_trigger()
-        self.dump_file = None
-        self.dump_filename = self._ingester_settings.dump_path
-        if self.dump_filename is None and "dump_prefix" in self.parameters:
-            val = self.parameters[ParameterName("dump_prefix")].data.decode("utf8")
-            if len(val) > 0:
-                self.dump_filename = f"{val}{self._ingester_settings.ingester_name}-{self.state.mapping_uuid}.cbors"
-        if self.dump_filename:
-            self.dump_file = open(self.dump_filename, "ab")
-            self._logger.info(
-                "dump file %s opened at %s",
-                self.dump_filename,
-                self.dump_file,
-            )
+        swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(self, "software_trigger", lambda: None)()
+        time_spent_per_assignment = []
+        time_spent_waiting = 0.0
         try:
-            took = []
-            empties = []
             while True:
-                empty = False
-                if self.assignment_queue.empty():
-                    empty = True
-                start = time.perf_counter()
+                waiting = self.assignment_queue.empty()
+                start_time = time.perf_counter()
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
-                if empty:
-                    empties.append(work_assignment.event_number)
-
+                if waiting:
+                    time_spent_waiting += time.perf_counter() - start_time
                 zmqparts = await self._get_zmqparts(
                     work_assignment, sourcegens, swtriggen
                 )
-
-                if self.dump_file:
-                    self._logger.debug("writing dump to path %s", self.dump_filename)
-                    allstr = InternalWorkerMessage(
+                dumper.write_dump(lambda: InternalWorkerMessage(
                         event_number=work_assignment.event_number,
                         streams={k: v.get_bytes() for k, v in zmqparts.items()},
-                    )
-                    try:
-                        cbor2.dump(
-                            CBORTag(55799, allstr),
-                            self.dump_file,
-                            default=message_encoder,
                         )
-                    except Exception as e:
-                        self._logger.error("cound not dump %s", e.__repr__())
-                    self._logger.debug("written dump")
-
+                    )
                 workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
                     for worker in workers:
@@ -298,28 +306,24 @@ class Ingester(DistributedService):
                 self._logger.debug("workermessages %s", workermessages)
                 await self._send_workermessages(workermessages)
                 end = time.perf_counter()
-                took.append(end - start)
-                if len(took) > 1000:
+                time_spent_per_assignment.append(end - start_time)
+                if len(time_spent_per_assignment) > 1000:
                     self._logger.info(
-                        "forwarding took avg %lf, min %f max %f",
-                        sum(took) / len(took),
-                        min(took),
-                        max(took),
+                        "forwarding took avg %lf, min %f max %f. waiting time %f%",
+                        sum(time_spent_per_assignment) / len(time_spent_per_assignment),
+                        min(time_spent_per_assignment),
+                        max(time_spent_per_assignment),
+                        time_spent_waiting / sum(time_spent_per_assignment) * 100
                     )
-                    self._logger.info("waiting for queue %d of 1000", len(empties))
-                    took = []
-                    empties = []
+                    # reset counters
+                    time_spent_per_assignment = []
+                    time_spent_waiting = 0
                 self.state.processed_events += 1
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
             for stream in self.active_streams:
                 await self.stop_source(stream)
-            if self.dump_file:
-                self._logger.info(
-                    "closing dump file %s at cancelled work", self.dump_file
-                )
-                self.dump_file.close()
-                self.dump_file = None
+            del dumper
 
     async def run_source(
         self, stream: StreamName
