@@ -293,6 +293,8 @@ async def test_replay_gzip(
     stop_event.set()
 
     thread.join()
+    await asyncio.sleep(0.1)
+    logging.info("thread joined")
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
@@ -363,6 +365,8 @@ async def test_replay_pklparam(
     stop_event.set()
 
     thread.join()
+    await asyncio.sleep(0.1)
+    logging.info("thread joined")
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
@@ -432,3 +436,5 @@ async def test_replay_cborparam(
     stop_event.set()
 
     thread.join()
+    await asyncio.sleep(0.1)
+    logging.info("thread joined")
