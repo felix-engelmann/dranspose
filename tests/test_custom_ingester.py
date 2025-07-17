@@ -34,7 +34,7 @@ async def test_ingester(
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pcap: Callable[[int], Coroutine[None, None, None]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -111,8 +111,8 @@ async def test_ingester(
     asyncio.create_task(stream_pcap(ntrig))
 
     asyncio.create_task(
-        stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        stream_cbors(
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 

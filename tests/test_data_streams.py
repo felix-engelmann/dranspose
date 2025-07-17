@@ -1,4 +1,5 @@
 import pickle
+import cbor2
 
 from dranspose.data.albaem import AlbaemPacket
 from dranspose.data.contrast import (
@@ -17,10 +18,10 @@ from dranspose.data.xspress3 import XspressPacket, XspressImage, XspressStart
 
 
 def test_contrast_stream() -> None:
-    with open("tests/data/contrast-dump.pkls", "rb") as f:
+    with open("tests/data/contrast-dump.cbors", "rb") as f:
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 assert len(frames) == 1
                 data = pickle.loads(frames[0])
                 pkg = ContrastPacket.validate_python(data)
@@ -240,12 +241,12 @@ def test_contrast_stream() -> None:
 
 
 def test_xspress3_stream() -> None:
-    with open("tests/data/xspress3-dump.pkls", "rb") as f:
+    with open("tests/data/xspress3-dump.cbors", "rb") as f:
         skip = 0
         frame = 0
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 assert len(frames) == 1
                 if skip > 0:
                     skip += 1
@@ -274,11 +275,11 @@ def test_xspress3_stream() -> None:
 
 
 def test_albaem_stream() -> None:
-    with open("tests/data/albaem-dump.pkls", "rb") as f:
+    with open("tests/data/albaem-dump.cbors", "rb") as f:
         message_id = 1
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 assert len(frames) == 1
                 pkg = AlbaemPacket.validate_json(frames[0])
                 assert pkg.message_id == message_id
@@ -289,10 +290,10 @@ def test_albaem_stream() -> None:
 
 
 def test_eiger_legacy_stream() -> None:
-    with open("tests/data/eiger-small.pkls", "rb") as f:
+    with open("tests/data/eiger-small.cbors", "rb") as f:
         while True:
             try:
-                frames = pickle.load(f)
+                frames = cbor2.load(f)
                 pkg = EigerLegacyPacket.validate_json(frames[0])
                 if isinstance(pkg, EigerLegacyHeader):
                     assert pkg.header_detail == "all"

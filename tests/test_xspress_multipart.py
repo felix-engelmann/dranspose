@@ -31,7 +31,7 @@ async def test_multipart(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -79,10 +79,10 @@ async def test_multipart(
     context = zmq.asyncio.Context()
 
     asyncio.create_task(
-        stream_pkls(
+        stream_cbors(
             context,
             9999,
-            PosixPath("tests/data/xspress3-multipart.pkls"),
+            PosixPath("tests/data/xspress3-multipart.cbors"),
             0.001,
             zmq.PUB,
         )

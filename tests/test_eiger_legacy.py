@@ -31,7 +31,7 @@ async def test_eiger_legacy(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -76,10 +76,10 @@ async def test_eiger_legacy(
     context = zmq.asyncio.Context()
 
     asyncio.create_task(
-        stream_pkls(
+        stream_cbors(
             context,
             22005,
-            PosixPath("tests/data/eiger-small.pkls"),
+            PosixPath("tests/data/eiger-small.cbors"),
             0.001,
             zmq.PUSH,
             begin=0,  # type: ignore[call-arg]
