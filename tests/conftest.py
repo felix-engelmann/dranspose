@@ -3,7 +3,6 @@ import gzip
 import json
 import logging
 import os
-import pickle
 import queue
 import random
 import struct
@@ -480,17 +479,18 @@ async def stream_cbors() -> Callable[
                 await asyncio.sleep(0.1)
         base, ext = os.path.splitext(filename)
         if ext == ".gz":
-            f = gzip.open(filename, "rb")
             _, ext = os.path.splitext(base)
+            assert (
+                "cbor" in ext
+            ), f"gz file does not appear to be a cbor file: {filename}"
+            f = gzip.open(filename, "rb")
         else:
+            assert "cbor" in ext, f"file does not appear to be a cbor file: {filename}"
             f = open(filename, "rb")
         i = 0
         while True:
             try:
-                if "cbor" in ext:
-                    frames = cbor2.load(f)
-                else:
-                    frames = pickle.load(f)
+                frames = cbor2.load(f)
                 send = True
                 if i < (begin or 0):
                     send = False
