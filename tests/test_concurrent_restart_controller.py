@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 import aiohttp
 import pytest
@@ -25,7 +26,8 @@ async def test_restart() -> None:
     og_server = uvicorn.Server(config=og_config)
     og_task = asyncio.create_task(og_server.serve())
 
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    r = redis.from_url(redis_url, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         running = False

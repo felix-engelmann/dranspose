@@ -1011,8 +1011,9 @@ def sample_table_to_html(
 
 
 async def sample_redis(filename: str) -> None:
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-    r_raw = redis.Redis(host="localhost", port=6379, decode_responses=False, protocol=3)
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    r = redis.from_url(redis_url, decode_responses=True, protocol=3)
+    r_raw = redis.from_url(redis_url, decode_responses=False, protocol=3)
     table: dict[str, Any] = {}
     try:
         tick = 0

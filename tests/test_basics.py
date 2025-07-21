@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from typing import Awaitable, Callable, Any, Coroutine, Optional
+import os
 
 import aiohttp
 
@@ -51,7 +52,8 @@ async def test_simple(
         )
     )
 
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    r = redis.from_url(redis_url, decode_responses=True, protocol=3)
 
     async with aiohttp.ClientSession() as session:
         await wait_for_controller(
@@ -210,16 +212,18 @@ async def test_map(
                     for i in range(1, ntrig)
                 ],
                 "slow": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        ),
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i + 1)
-                        ).model_dump(mode="json"),
-                    ]
-                    if i % 4 == 0
-                    else None
+                    (
+                        [
+                            VirtualWorker(
+                                constraint=VirtualConstraint(2 * i)
+                            ).model_dump(mode="json"),
+                            VirtualWorker(
+                                constraint=VirtualConstraint(2 * i + 1)
+                            ).model_dump(mode="json"),
+                        ]
+                        if i % 4 == 0
+                        else None
+                    )
                     for i in range(1, ntrig)
                 ],
             },
