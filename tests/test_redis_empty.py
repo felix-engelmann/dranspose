@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pytest
 
@@ -8,8 +9,9 @@ import redis.asyncio as redis
 
 @pytest.mark.asyncio
 async def test_distributed() -> None:
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-    raw_redis = redis.from_url("redis://localhost:6379/0?protocol=3")
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    r = redis.from_url(redis_url, decode_responses=True, protocol=3)
+    raw_redis = redis.from_url(redis_url, decode_responses=False, protocol=3)
 
     keys = await r.keys("dranspose:*")
     logging.info("keys %s", keys)
