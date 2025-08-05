@@ -1,9 +1,8 @@
 import asyncio
 import time
 import os
-import functools
 from io import BufferedWriter
-from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator, Callable
+from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator
 from uuid import UUID
 import logging
 
@@ -31,6 +30,7 @@ from dranspose.protocol import (
     WorkAssignmentList,
     WorkerName,
 )
+
 
 class Dumper:
     def __init__(self, dump_path: str) -> None:
@@ -109,7 +109,7 @@ class Ingester(DistributedService):
         self.active_streams: list[StreamName] = []
 
     def _final_dump_path(self) -> str | None:
-        """ Determines the filepath to write the dump to, if one should be written. Returns None otherwise. """
+        """Determines the filepath to write the dump to, if one should be written. Returns None otherwise."""
         if ret := self._ingester_settings.dump_path:
             return str(ret)
         if "dump_prefix" in self.parameters:
@@ -150,18 +150,16 @@ class Ingester(DistributedService):
         self._logger.info("all subtasks running")
         await self.register()
 
-    async def restart_work(
-        self, new_uuid: UUID4, active_streams: list[StreamName]
-    ) -> None:
+    async def restart_work(self, uuid: UUID4, active_streams: list[StreamName]) -> None:
         """
         Restarts all work related tasks to make sure no old state is present in a new scan.
 
         Arguments:
-            new_uuid: The uuid of the new mapping
+            uuid: The uuid of the new mapping
         """
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.assign_task)
-        self.state.mapping_uuid = new_uuid
+        self.state.mapping_uuid = uuid
         self.active_streams = list(set(active_streams).intersection(self.state.streams))
         self.assignment_queue = asyncio.Queue()
         self.work_task = asyncio.create_task(self.work())
@@ -275,7 +273,9 @@ class Ingester(DistributedService):
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
             return
-        swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(self, "software_trigger", lambda: None)()
+        swtriggen: Iterator[dict[StreamName, StreamData]] | None = getattr(
+            self, "software_trigger", lambda: None
+        )()
         time_spent_per_assignment = []
         time_spent_waiting = 0.0
         try:
@@ -289,11 +289,12 @@ class Ingester(DistributedService):
                     work_assignment, sourcegens, swtriggen
                 )
                 if dumper:
-                    dumper.write_dump(InternalWorkerMessage(
+                    dumper.write_dump(
+                        InternalWorkerMessage(
                             event_number=work_assignment.event_number,
                             streams={k: v.get_bytes() for k, v in zmqparts.items()},
-                            )
                         )
+                    )
                 workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
                     for worker in workers:
@@ -312,7 +313,7 @@ class Ingester(DistributedService):
                         sum(time_spent_per_assignment) / len(time_spent_per_assignment),
                         min(time_spent_per_assignment),
                         max(time_spent_per_assignment),
-                        time_spent_waiting / sum(time_spent_per_assignment) * 100
+                        time_spent_waiting / sum(time_spent_per_assignment) * 100,
                     )
                     # reset counters
                     time_spent_per_assignment = []
