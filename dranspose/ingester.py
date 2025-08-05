@@ -33,16 +33,12 @@ from dranspose.protocol import (
 )
 
 class Dumper:
-    def __init__(self, dump_path: str | None) -> None:
+    def __init__(self, dump_path: str) -> None:
         self.dump_path = dump_path
-        self.fh: BufferedWriter | None = None
+        self.fh: BufferedWriter = open(dump_path, "ba")
         self._logger = logging.getLogger("dumper")
 
-    def write_dump(self, message: Callable[[], Any] | Any) -> None:
-        if self.dump_path is None:
-            return
-        if callable(message):
-            message = message()
+    def write_dump(self, message: InternalWorkerMessage) -> None:
         if not self.fh:
             self.fh = open(self.dump_path, "ba")
             self._logger.info("dump file %s opened", self.dump_path)
@@ -272,7 +268,9 @@ class Ingester(DistributedService):
         Optionally the worker dumps the internal messages to disk. This is useful for development of workers with actual data captured.
         """
         self._logger.info("started ingester work task")
-        dumper = Dumper(self._final_dump_path())
+        dumper = None
+        if path := self._final_dump_path():
+            dumper = Dumper(path)
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
@@ -290,11 +288,12 @@ class Ingester(DistributedService):
                 zmqparts = await self._get_zmqparts(
                     work_assignment, sourcegens, swtriggen
                 )
-                dumper.write_dump(lambda: InternalWorkerMessage(
-                        event_number=work_assignment.event_number,
-                        streams={k: v.get_bytes() for k, v in zmqparts.items()},
+                if dumper:
+                    dumper.write_dump(InternalWorkerMessage(
+                            event_number=work_assignment.event_number,
+                            streams={k: v.get_bytes() for k, v in zmqparts.items()},
+                            )
                         )
-                    )
                 workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
                     for worker in workers:
