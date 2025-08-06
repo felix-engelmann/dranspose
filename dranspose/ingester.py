@@ -305,8 +305,8 @@ class Ingester(DistributedService):
                         workermessages[worker].streams[stream] = zmqparts[stream]
                 self._logger.debug("workermessages %s", workermessages)
                 await self._send_workermessages(workermessages)
-                end = time.perf_counter()
-                time_spent_per_assignment.append(end - start_time)
+                end_time = time.perf_counter()
+                time_spent_per_assignment.append(end_time - start_time)
                 if len(time_spent_per_assignment) > 1000:
                     self._logger.info(
                         "forwarding took avg %lf, min %f max %f. waiting time %f%",
