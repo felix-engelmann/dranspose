@@ -49,15 +49,15 @@ class Dumper:
                 self.fh,
                 default=message_encoder,
             )
-            self.fh.flush()
-            os.fsync(self.fh.fileno())
         except Exception as e:
             self._logger.error("cound not dump %s", e.__repr__())
         self._logger.debug("written dump")
 
-    def __del__(self) -> None:
-        if self.fh:
-            self.fh.close()
+    def close(self) -> None:
+        self._logger.debug("flushing and closing dumper")
+        self.fh.flush()
+        os.fsync(self.fh.fileno())
+        self.fh.close()
 
 
 class IngesterSettings(DistributedSettings):
@@ -323,7 +323,9 @@ class Ingester(DistributedService):
             self._logger.info("stopping worker")
             for stream in self.active_streams:
                 await self.stop_source(stream)
-            del dumper
+        finally:
+            if dumper:
+                dumper.close()
 
     async def run_source(
         self, stream: StreamName
