@@ -33,10 +33,10 @@ from dranspose.protocol import (
 
 
 class Dumper:
-    def __init__(self, dump_path: str) -> None:
+    def __init__(self, dump_path: str, logger_name="dumper") -> None:
         self.dump_path = dump_path
         self.fh: BufferedWriter = open(dump_path, "ba")
-        self._logger = logging.getLogger("dumper")
+        self._logger = logging.getLogger(logger_name)
 
     def write_dump(self, message: InternalWorkerMessage) -> None:
         if not self.fh:
@@ -268,7 +268,7 @@ class Ingester(DistributedService):
         self._logger.info("started ingester work task")
         dumper = None
         if path := self._final_dump_path():
-            dumper = Dumper(path)
+            dumper = Dumper(path, logger_name=f"dumper-{self._logger.name}")
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
