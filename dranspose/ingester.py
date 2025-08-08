@@ -54,9 +54,7 @@ class Dumper:
         self._logger.debug("written dump")
 
     def close(self) -> None:
-        self._logger.debug("flushing and closing dumper")
-        self.fh.flush()
-        os.fsync(self.fh.fileno())
+        self._logger.debug("closing dumper")
         self.fh.close()
 
 
@@ -107,6 +105,7 @@ class Ingester(DistributedService):
         )
         self.state: IngesterState
         self.active_streams: list[StreamName] = []
+        self.dumper: Dumper | None = None
 
     def _final_dump_path(self) -> str | None:
         """Determines the filepath to write the dump to, if one should be written. Returns None otherwise."""
@@ -172,6 +171,8 @@ class Ingester(DistributedService):
         This hook is called when all events of a trigger map were ingested. It is useful for e.g. closing open files.
         """
         self._logger.info("finishing work")
+        if self.dumper:
+            self.dumper.close()
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
@@ -263,12 +264,14 @@ class Ingester(DistributedService):
         should be implemented for a specific protocol.
         It then assembles all streams for this ingester and forwards them to the assigned workers.
 
-        Optionally the worker dumps the internal messages to disk. This is useful for development of workers with actual data captured.
+        Optionally the worker dumps the internal messages to disk. This is useful for developing workers with actual data captured.
         """
         self._logger.info("started ingester work task")
-        dumper = None
         if path := self._final_dump_path():
-            dumper = Dumper(path, logger_name=f"dumper-{self._logger.name}")
+            if self.dumper:
+                self.dumper.close()
+                del self.dumper
+            self.dumper = Dumper(path, logger_name=f"dumper-{self._logger.name}")
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
@@ -277,19 +280,18 @@ class Ingester(DistributedService):
             self, "software_trigger", lambda: None
         )()
         time_spent_per_assignment = []
-        time_spent_waiting = 0.0
+        times_waiting_for_assignment = 0
         try:
             while True:
-                waiting = self.assignment_queue.empty()
                 start_time = time.perf_counter()
+                if self.assignment_queue.empty():
+                    times_waiting_for_assignment += 1
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
-                if waiting:
-                    time_spent_waiting += time.perf_counter() - start_time
                 zmqparts = await self._get_zmqparts(
                     work_assignment, sourcegens, swtriggen
                 )
-                if dumper:
-                    dumper.write_dump(
+                if self.dumper:
+                    self.dumper.write_dump(
                         InternalWorkerMessage(
                             event_number=work_assignment.event_number,
                             streams={k: v.get_bytes() for k, v in zmqparts.items()},
@@ -309,11 +311,11 @@ class Ingester(DistributedService):
                 time_spent_per_assignment.append(end_time - start_time)
                 if len(time_spent_per_assignment) > 1000:
                     self._logger.info(
-                        "forwarding took avg %lf, min %f max %f. waiting time %f%",
+                        "forwarding took avg %lf, min %f max %f. had to wait for %f/1000 assignments",
                         sum(time_spent_per_assignment) / len(time_spent_per_assignment),
                         min(time_spent_per_assignment),
                         max(time_spent_per_assignment),
-                        time_spent_waiting / sum(time_spent_per_assignment) * 100,
+                        times_waiting_for_assignment,
                     )
                     # reset counters
                     time_spent_per_assignment = []
@@ -324,8 +326,8 @@ class Ingester(DistributedService):
             for stream in self.active_streams:
                 await self.stop_source(stream)
         finally:
-            if dumper:
-                dumper.close()
+            if self.dumper:
+                self.dumper.close()
 
     async def run_source(
         self, stream: StreamName
