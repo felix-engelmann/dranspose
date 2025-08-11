@@ -319,7 +319,7 @@ class Ingester(DistributedService):
                     )
                     # reset counters
                     time_spent_per_assignment = []
-                    time_spent_waiting = 0
+                    times_waiting_for_assignment = 0
                 self.state.processed_events += 1
         except asyncio.exceptions.CancelledError:
             self._logger.info("stopping worker")
