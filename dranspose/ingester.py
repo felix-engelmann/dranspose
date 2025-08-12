@@ -270,7 +270,7 @@ class Ingester(DistributedService):
         if path := self._final_dump_path():
             if self.dumper:
                 self.dumper.close()
-                del self.dumper
+                self.dumper = None
             self.dumper = Dumper(path, logger_name=f"dumper-{self._logger.name}")
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
@@ -328,6 +328,7 @@ class Ingester(DistributedService):
         finally:
             if self.dumper:
                 self.dumper.close()
+                self.dumper = None
 
     async def run_source(
         self, stream: StreamName
