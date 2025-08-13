@@ -424,3 +424,73 @@ async def test_dump_bin_parameters(
         assert pars_dict["test_null"] == pars["test_null"]
 
     context.destroy()
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_dump_and_not_dump(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_small_xrd: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    dump_path = tmp_path / "first_run.cbors"
+    # Set up services
+    await reducer(None)
+    await create_worker(WorkerName("w1"))
+    ing = await create_ingester(
+        ZmqPullSingleIngester(
+            settings=ZmqPullSingleSettings(
+                ingester_streams=[StreamName("xrd")],
+                upstream_url=Url("tcp://localhost:9999"),
+                ingester_url=Url("tcp://localhost:10010"),
+                dump_path=dump_path,
+            ),
+        )
+    )
+
+    # Create mapping
+    ntrig = 10
+    mapping = {
+            "xrd": [
+                [ VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json") ]
+                for i in range(1, ntrig)
+            ],
+        }
+    await wait_for_controller(streams={StreamName("xrd")})
+
+    context = zmq.asyncio.Context()
+
+    # Run first scan
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post("http://localhost:5000/api/v1/mapping", json=mapping)
+        assert resp.status == 200
+    asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
+    await wait_for_finish()
+
+    ing._ingester_settings.dump_path = None
+    time_between_scans = datetime.now(timezone.utc)
+
+    # Run second scan
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post("http://localhost:5000/api/v1/mapping", json=mapping)
+        assert resp.status == 200
+    asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
+    await wait_for_finish()
+
+    # Check dump
+    with open(dump_path, "rb") as f:
+        evs = []
+        while True:
+            try:
+                dat = cbor2.load(f, tag_hook=message_tag_hook)
+                if isinstance(dat, InternalWorkerMessage):
+                    evs.append(dat.event_number)
+                    assert dat.created_at < time_between_scans
+            except EOFError:
+                break
+
+    assert evs == list(range(0, ntrig + 1))
+
+    context.destroy()
