@@ -33,15 +33,12 @@ from dranspose.protocol import (
 
 
 class Dumper:
-    def __init__(self, dump_path: str, logger_name="dumper") -> None:
+    def __init__(self, dump_path: str, logger_name: str = "dumper") -> None:
         self.dump_path = dump_path
         self.fh: BufferedWriter = open(dump_path, "ba")
         self._logger = logging.getLogger(logger_name)
 
     def write_dump(self, message: InternalWorkerMessage) -> None:
-        if not self.fh:
-            self.fh = open(self.dump_path, "ba")
-            self._logger.info("dump file %s opened", self.dump_path)
         self._logger.debug("writing dump to %s", self.dump_path)
         try:
             cbor2.dump(
@@ -173,6 +170,7 @@ class Ingester(DistributedService):
         self._logger.info("finishing work")
         if self.dumper:
             self.dumper.close()
+            self.dumper = None
 
         await self.redis.xadd(
             RedisKeys.ready(self.state.mapping_uuid),
@@ -270,7 +268,6 @@ class Ingester(DistributedService):
         if path := self._final_dump_path():
             if self.dumper:
                 self.dumper.close()
-                self.dumper = None
             self.dumper = Dumper(path, logger_name=f"dumper-{self._logger.name}")
         sourcegens = {stream: self.run_source(stream) for stream in self.active_streams}
         if len(sourcegens) == 0:
