@@ -502,7 +502,7 @@ async def stream_cbors() -> Callable[
                     await asyncio.sleep(frame_time)
             except (cbor2.CBORDecodeEOF, EOFError):
                 break
-                assert i > 0, f"CBOR file [{filename}] had no frames"
+        assert i > 0, f"CBOR file [{filename}] had no frames"
         f.close()
         socket.close()
 
