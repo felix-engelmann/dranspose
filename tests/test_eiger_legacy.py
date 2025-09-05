@@ -22,7 +22,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -55,37 +55,18 @@ async def test_eiger_legacy(
     )
 
     await wait_for_controller(streams={StreamName("eiger")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 3
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
+    ntrig = 3
+    await set_uniform_sequence({StreamName("eiger")}, ntrig)
+    with zmq.asyncio.Context() as context:
+        asyncio.create_task(
+            stream_cbors(
+                context,
+                22005,
+                PosixPath("tests/data/eiger-small.cbors"),
+                0.001,
+                zmq.PUSH,
+                begin=0,  # type: ignore[call-arg]
+            )
         )
-        assert resp.status == 200
-        await resp.json()
-
-    context = zmq.asyncio.Context()
-
-    asyncio.create_task(
-        stream_cbors(
-            context,
-            22005,
-            PosixPath("tests/data/eiger-small.cbors"),
-            0.001,
-            zmq.PUSH,
-            begin=0,  # type: ignore[call-arg]
-        )
-    )
-
-    content = await wait_for_finish()
-
+        content = await wait_for_finish()
     print(content)

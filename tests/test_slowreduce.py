@@ -21,7 +21,7 @@ import zmq
 from pydantic_core import Url
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_finish, wait_for_controller
+from tests.utils import wait_for_finish, wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -68,30 +68,11 @@ async def test_slowreduce(
         load = await st.json()
         assert load == {}
 
-        ntrig = 4
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
-
-    context = zmq.asyncio.Context()
-
-    asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
-
-    await wait_for_finish()
-
-    context.destroy()
+    ntrig = 4
+    await set_uniform_sequence({StreamName("eiger")}, ntrig)
+    with zmq.asyncio.Context() as context:
+        asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
+        await wait_for_finish()
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5001/api/v1/result/")

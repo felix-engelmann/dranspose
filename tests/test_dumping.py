@@ -27,7 +27,12 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import (
+    wait_for_controller,
+    wait_for_finish,
+    set_uniform_sequence,
+    monopart_sequence,
+)
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
@@ -97,7 +102,8 @@ async def test_dump(
     )
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
-        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix,
+                     str(p_prefix).encode("utf8"))
 
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/dump_prefix",
@@ -106,9 +112,7 @@ async def test_dump(
         assert resp.status == 200
 
         ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
+        payload = monopart_sequence({
                 "eiger": [
                     [
                         VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
@@ -149,7 +153,10 @@ async def test_dump(
                     else None
                     for i in range(1, ntrig)
                 ],
-            },
+        })
+        resp = await session.post(
+            "http://localhost:5000/api/v1/sequence",
+            json=payload
         )
         assert resp.status == 200
         uuid = await resp.json()
@@ -229,7 +236,8 @@ async def test_dump_xrd(
     await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
-        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix,
+                     str(p_prefix).encode("utf8"))
 
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/dump_prefix",
@@ -237,21 +245,8 @@ async def test_dump_xrd(
         )
         assert resp.status == 200
 
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "xrd": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
+    ntrig = 10
+    await set_uniform_sequence({StreamName("xrd")}, ntrig)
 
     context = zmq.asyncio.Context()
 
@@ -293,7 +288,8 @@ async def test_dump_map_and_parameters(
     await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
-        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix,
+                     str(p_prefix).encode("utf8"))
 
         pars = {
             "dump_prefix": str(p_prefix).encode("utf8"),
@@ -307,23 +303,8 @@ async def test_dump_map_and_parameters(
             )
             assert resp.status == 200
 
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "xrd": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        uuid = await resp.json()
-
+    ntrig = 10
+    uuid = await set_uniform_sequence({StreamName("xrd")}, ntrig)
     context = zmq.asyncio.Context()
 
     async with aiohttp.ClientSession() as session:
@@ -384,22 +365,8 @@ async def test_dump_bin_parameters(
             )
             assert resp.status == 200
 
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "xrd": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        uuid = await resp.json()
+    ntrig = 10
+    uuid = await set_uniform_sequence({StreamName("xrd")}, ntrig)
 
     context = zmq.asyncio.Context()
 
@@ -424,6 +391,7 @@ async def test_dump_bin_parameters(
         assert pars_dict["test_null"] == pars["test_null"]
 
     context.destroy()
+
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
 @pytest.mark.asyncio
@@ -452,20 +420,12 @@ async def test_dump_and_not_dump(
 
     # Create mapping
     ntrig = 10
-    mapping = {
-            "xrd": [
-                [ VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json") ]
-                for i in range(1, ntrig)
-            ],
-        }
     await wait_for_controller(streams={StreamName("xrd")})
 
     context = zmq.asyncio.Context()
 
     # Run first scan
-    async with aiohttp.ClientSession() as session:
-        resp = await session.post("http://localhost:5000/api/v1/mapping", json=mapping)
-        assert resp.status == 200
+    await set_uniform_sequence({StreamName("xrd")}, ntrig)
     asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
     await wait_for_finish()
 
@@ -473,9 +433,7 @@ async def test_dump_and_not_dump(
     time_between_scans = datetime.now(timezone.utc)
 
     # Run second scan
-    async with aiohttp.ClientSession() as session:
-        resp = await session.post("http://localhost:5000/api/v1/mapping", json=mapping)
-        assert resp.status == 200
+    await set_uniform_sequence({StreamName("xrd")}, ntrig)
     asyncio.create_task(stream_small_xrd(context, 9999, ntrig - 1))
     await wait_for_finish()
 

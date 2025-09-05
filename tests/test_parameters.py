@@ -26,7 +26,7 @@ from dranspose.protocol import (
     EnsembleState,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -137,17 +137,7 @@ async def test_params(
             logging.warning("got state %s", state)
 
         ntrig = 20
-        mp = {
-            "contrast": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
-        }
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
-        )
-        assert resp.status == 200
+        await set_uniform_sequence({StreamName("contrast")}, ntrig)
 
         context = zmq.asyncio.Context()
 

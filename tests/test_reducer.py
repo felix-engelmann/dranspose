@@ -29,7 +29,7 @@ from dranspose.protocol import (
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_finish, wait_for_controller
+from tests.utils import wait_for_finish, wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -86,30 +86,9 @@ async def test_reduction(
         assert resp.status == 200
         await resp.json()
 
-        ntrig = 20
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "contrast": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-                "xspress3": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
+    ntrig = 20
+    await set_uniform_sequence({StreamName("contrast"), StreamName("xspress3")}, ntrig+1)
+    #                                                 +1 because we do range(1,ntrig) ^
 
     context = zmq.asyncio.Context()
 

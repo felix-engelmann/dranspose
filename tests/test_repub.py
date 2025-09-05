@@ -21,7 +21,7 @@ import zmq
 from pydantic_core import Url
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 async def consume_repub(ctx: zmq.Context[Any], num: int) -> int:
@@ -64,54 +64,14 @@ async def test_repub(
     )
 
     await wait_for_controller(streams={StreamName("eiger")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
+    ntrig = 10
+    await set_uniform_sequence({StreamName("eiger")}, ntrig)
 
-    context = zmq.asyncio.Context()
-
-    collector = asyncio.create_task(consume_repub(context, 2 * ntrig + 2))
-
-    asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
-
-    await wait_for_finish()
-
-    async with aiohttp.ClientSession() as session:
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
-
-    asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
-
-    await wait_for_finish()
-
-    await collector
-
-    context.destroy()
+    with zmq.asyncio.Context() as context:
+        collector = asyncio.create_task(consume_repub(context, 2 * ntrig + 2))
+        asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
+        await wait_for_finish()
+        await set_uniform_sequence({StreamName("eiger")}, ntrig)
+        asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
+        await wait_for_finish()
+        await collector

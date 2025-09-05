@@ -22,7 +22,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.parametrize(
@@ -81,20 +81,8 @@ async def test_lecroy(
     await wait_for_controller(
         streams={StreamName("lecroy")}, parameters={ParameterName("channel")}
     )
-    async with aiohttp.ClientSession() as session:
-        map = {
-            "lecroy": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(1, ntrig)
-            ],
-        }
-        logging.debug(f"Sending {map=}")
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=map,
-        )
-        assert resp.status == 200
-        await resp.json()
+    await set_uniform_sequence({StreamName("lecroy")}, ntrig)
+
 
     context = zmq.asyncio.Context()
 

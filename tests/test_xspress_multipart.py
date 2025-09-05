@@ -22,7 +22,7 @@ from dranspose.protocol import (
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -58,38 +58,18 @@ async def test_multipart(
     )
 
     await wait_for_controller(streams={StreamName("xspress3")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 5
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "xspress3": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-            },
+    ntrig = 5
+    await set_uniform_sequence({StreamName("xspress3")}, ntrig)
+
+    with zmq.asyncio.Context() as context:
+        asyncio.create_task(
+            stream_cbors(
+                context,
+                9999,
+                PosixPath("tests/data/xspress3-multipart.cbors"),
+                0.001,
+                zmq.PUB,
+            )
         )
-        assert resp.status == 200
-        await resp.json()
-
-    context = zmq.asyncio.Context()
-
-    asyncio.create_task(
-        stream_cbors(
-            context,
-            9999,
-            PosixPath("tests/data/xspress3-multipart.cbors"),
-            0.001,
-            zmq.PUB,
-        )
-    )
-
-    content = await wait_for_finish()
-
-    context.destroy()
-
+        content = await wait_for_finish()
     print(content)

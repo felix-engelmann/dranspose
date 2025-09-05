@@ -20,7 +20,7 @@ from dranspose.protocol import (
 from dranspose.worker import Worker
 
 from dranspose.ingesters.http_sardana import app as custom_app
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -37,22 +37,8 @@ async def test_sardana(
     await http_ingester(custom_app, 5002, {"ingester_streams": ["sardana"]})
 
     await wait_for_controller(streams={StreamName("sardana")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "sardana": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
+    ntrig = 10
+    await set_uniform_sequence({StreamName("sardana")}, ntrig)
 
     context = zmq.asyncio.Context()
 

@@ -21,7 +21,7 @@ from dranspose.protocol import (
 )
 
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.skipif(
@@ -47,44 +47,23 @@ async def test_restart_ingester(
     )
 
     await wait_for_controller(streams={StreamName("eiger")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
+    ntrig = 10
+    await set_uniform_sequence({StreamName("eiger")}, ntrig)
+
+    with zmq.asyncio.Context() as context:
+        asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
+        content = await wait_for_finish()
+        await asyncio.sleep(1)
+        await create_ingester(
+            ZmqPullSingleIngester(
+                settings=ZmqPullSingleSettings(
+                    ingester_streams=[StreamName("eiger")],
+                    upstream_url=Url("tcp://localhost:9999"),
+                    ingester_url=Url("tcp://localhost:10011"),
+                ),
+            )
         )
-        assert resp.status == 200
-
-    context = zmq.asyncio.Context()
-
-    asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
-
-    content = await wait_for_finish()
-
-    await asyncio.sleep(1)
-
-    await create_ingester(
-        ZmqPullSingleIngester(
-            settings=ZmqPullSingleSettings(
-                ingester_streams=[StreamName("eiger")],
-                upstream_url=Url("tcp://localhost:9999"),
-                ingester_url=Url("tcp://localhost:10011"),
-            ),
-        )
-    )
-    await ingester.close()
-
-    await asyncio.sleep(1)
-
-    context.destroy()
+        await ingester.close()
+        await asyncio.sleep(1)
 
     print(content)

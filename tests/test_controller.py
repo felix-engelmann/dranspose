@@ -14,7 +14,7 @@ from dranspose.protocol import (
     VirtualConstraint,
     StreamName,
 )
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, uniform_sequence, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -30,20 +30,10 @@ async def test_stream_not_available(controller: None) -> None:
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/status")
         assert st.status == 200
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
+    ntrig = 10
+    async with aiohttp.ClientSession() as session:
+        seq = uniform_sequence({StreamName("eiger")}, ntrig=ntrig)
+        resp = await session.post("http://localhost:5000/api/v1/sequence", json=seq)
         assert resp.status == 400
         response = await resp.json()
         assert {"detail": "streams {'eiger'} not available"} == response
@@ -64,19 +54,8 @@ async def test_not_enough_workers(
     await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
+        sequence = uniform_sequence({StreamName("eiger")}, ntrig)
+        resp = await session.post("http://localhost:5000/api/v1/sequence/", json=sequence)
         assert resp.status == 400
         response = await resp.json()
         assert {"detail": "only 0 workers available, but 1 required"} == response

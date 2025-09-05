@@ -23,7 +23,7 @@ from dranspose.protocol import (
     VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -83,20 +83,7 @@ async def test_empty_params(
         logging.warning("params %s", params)
 
         ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
+        await set_uniform_sequence({StreamName("eiger")}, ntrig)
 
         context = zmq.asyncio.Context()
 
