@@ -21,7 +21,7 @@ import zmq
 from pydantic_core import Url
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_finish, wait_for_controller
+from tests.utils import wait_for_finish, wait_for_controller, vworker, monopart_sequence
 
 
 async def consume_round_robin(ctx: zmq.Context[Any], ports: list[int], num: int) -> int:
@@ -90,32 +90,15 @@ async def test_roundrobin(
     await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i % 3)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
+        sequence = monopart_sequence({ "eiger": [[vworker(i % 3)] for i in range(1, ntrig)] })
+        resp = await session.post("http://localhost:5000/api/v1/sequence", json=sequence)
         assert resp.status == 200
         await resp.json()
 
-    context = zmq.asyncio.Context()
-
-    collector = asyncio.create_task(
-        consume_round_robin(context, [5556, 5557, 5558], ntrig - 1 + 2 * 3)
-    )
-
-    asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
-
-    await wait_for_finish()
-
-    await collector
-
-    context.destroy()
+    with zmq.asyncio.Context() as context:
+        collector = asyncio.create_task(
+            consume_round_robin(context, [5556, 5557, 5558], ntrig - 1 + 2 * 3)
+        )
+        asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
+        await wait_for_finish()
+        await collector

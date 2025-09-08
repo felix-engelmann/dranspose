@@ -7,13 +7,11 @@ import pytest
 import zmq.asyncio
 
 from dranspose.protocol import (
-    VirtualWorker,
-    VirtualConstraint,
     WorkerName,
     StreamName,
 )
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, vworker, monopart_sequence
 
 rust = pytest.mark.skipif("not config.getoption('rust')")
 
@@ -46,20 +44,10 @@ async def test_rust_basic(
         logging.info("startup done")
 
         ntrig = 50000
-        mapping = {
-            "eiger": [
-                [
-                    VirtualWorker(constraint=VirtualConstraint(i // 10)).model_dump(
-                        mode="json"
-                    )
-                ]
-                for i in range(1, ntrig)
-            ],
-        }
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mapping,
-        )
+        sequence = monopart_sequence({
+            "eiger": [ [vworker(i // 10)] for i in range(1, ntrig) ],
+        })
+        resp = await session.post("http://localhost:5000/api/v1/sequence", json=sequence)
         assert resp.status == 200
 
     context = zmq.asyncio.Context()

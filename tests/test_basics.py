@@ -21,15 +21,19 @@ from dranspose.protocol import (
     RedisKeys,
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 import redis.asyncio as redis
 
 from dranspose.worker import Worker
 
-from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
+from tests.utils import (
+    wait_for_controller,
+    wait_for_finish,
+    set_uniform_sequence,
+    monopart_sequence,
+    vworker,
+)
 
 
 @pytest.mark.asyncio
@@ -164,51 +168,18 @@ async def test_map(
         print("startup done")
         ntrig = 10
         resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-                "orca": [
-                    [
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i + 1)
-                        ).model_dump(mode="json")
-                    ]
-                    for i in range(1, ntrig)
-                ],
-                "alba": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        ),
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i + 1)
-                        ).model_dump(mode="json"),
-                    ]
-                    for i in range(1, ntrig)
-                ],
+            "http://localhost:5000/api/v1/sequence",
+            json=monopart_sequence({
+                "eiger": [ [ vworker(2 * i) ] for i in range(1, ntrig) ],
+                "orca": [ [ vworker(2 * i + 1) ] for i in range(1, ntrig) ],
+                "alba": [ [ vworker(2 * i), vworker(2 * i + 1) ] for i in range(1, ntrig) ],
                 "slow": [
-                    (
-                        [
-                            VirtualWorker(
-                                constraint=VirtualConstraint(2 * i)
-                            ).model_dump(mode="json"),
-                            VirtualWorker(
-                                constraint=VirtualConstraint(2 * i + 1)
-                            ).model_dump(mode="json"),
-                        ]
-                        if i % 4 == 0
-                        else None
-                    )
+                    [ vworker(2 * i), vworker(2 * i + 1) ]
+                    if i % 4 == 0
+                    else None
                     for i in range(1, ntrig)
                 ],
-            },
+            }),
         )
         assert resp.status == 200
 

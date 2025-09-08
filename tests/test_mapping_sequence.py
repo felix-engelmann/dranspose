@@ -81,7 +81,7 @@ async def test_sequence(
 
     await wait_for_finish()
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/mapping")
+        st = await session.get("http://localhost:5000/api/v1/sequence")
         content = await st.json()
         assert content == {
             "parts": {

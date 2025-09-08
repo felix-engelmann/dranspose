@@ -17,13 +17,11 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
     EnsembleState,
 )
 
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, vworker, monopart_sequence
 
 
 @pytest.mark.asyncio
@@ -60,18 +58,9 @@ async def test_simple(
     await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 100
-        mapping = {
-            "eiger": [
-                [
-                    VirtualWorker(constraint=VirtualConstraint(i // 10)).model_dump(
-                        mode="json"
-                    )
-                ]
-                for i in range(1, ntrig)
-            ],
-        }
+        mapping = monopart_sequence({ "eiger": [[vworker(i // 10)] for i in range(1, ntrig)] })
         resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
+            "http://localhost:5000/api/v1/sequence",
             json=mapping,
         )
         assert resp.status == 200

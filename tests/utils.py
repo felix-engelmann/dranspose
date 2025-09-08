@@ -93,9 +93,11 @@ async def wait_for_finish(
         return content
 
 
-def vworker(constraint: int, tags: Optional[set[str]] = None) -> dict[str, Any]:
+def vworker(constraint: Optional[int] = None, tags: Optional[set[str]] = None) -> dict[str, Any]:
     """ this is just syntactic sugar to define a virtual worker"""
-    vw = VirtualWorker(constraint=VirtualConstraint(constraint))
+    vw = VirtualWorker()
+    if constraint is not None:
+        vw.constraint = VirtualConstraint(constraint)
     if tags is not None:
         vw.tags = {WorkerTag(t) for t in tags}
     return vw.model_dump(mode="json")

@@ -308,7 +308,7 @@ async def test_dump_map_and_parameters(
     context = zmq.asyncio.Context()
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/mapping")
+        st = await session.get("http://localhost:5000/api/v1/sequence")
         mapping = await st.json()
         logging.debug("mapping %s", mapping)
 
@@ -371,7 +371,7 @@ async def test_dump_bin_parameters(
     context = zmq.asyncio.Context()
 
     async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5000/api/v1/mapping")
+        st = await session.get("http://localhost:5000/api/v1/sequence")
         mapping = await st.json()
         logging.debug("mapping %s", mapping)
 
