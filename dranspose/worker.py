@@ -212,6 +212,42 @@ class Worker(DistributedService):
             t.add_done_callback(done_callback)
             self._ingester_tasks.append(t)
 
+    async def _run_payload(self, tick_wait_until, event):
+        tick = False
+        # we internally cache when the redis will expire to reduce hitting redis on every event
+        if tick_wait_until - time.time() < 0:
+            if hasattr(self.worker, "get_tick_interval"):
+                wait_ms = int(self.worker.get_tick_interval(self.parameters) * 1000)
+                dist_clock = await self.redis.set(
+                    RedisKeys.clock(self.state.mapping_uuid),
+                    "🕙",
+                    px=wait_ms,
+                    nx=True,
+                )
+                if dist_clock is True:
+                    tick = True
+                else:
+                    expire_ms = await self.redis.pttl(
+                        RedisKeys.clock(self.state.mapping_uuid)
+                    )
+                    tick_wait_until = time.time() + (expire_ms / 1000)
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                self.worker.process_event,
+                event,
+                self.parameters,
+                tick,
+            )
+        except Exception as e:
+            self._logger.error(
+                "custom worker failed: %s\n%s",
+                e.__repr__(),
+                traceback.format_exc(),
+            )
+        return tick_wait_until, result
+
     async def work(self) -> None:
         self._logger.info("started work task")
 
@@ -246,6 +282,7 @@ class Worker(DistributedService):
 
                 self._logger.debug("looking for streams %s at event %d", streamset, evn)
                 self.new_data = asyncio.Future()
+                terminate = False
                 while set(self.stream_queues.get(evn, {}).keys()) != streamset:
                     self._logger.debug(
                         "keys did not match %s, %s, wait again",
@@ -253,8 +290,12 @@ class Worker(DistributedService):
                         streamset,
                     )
                     self._logger.debug("current queue is %s", self.stream_queues)
-                    await self.new_data
+                    terminate = await self.new_data
+                    if terminate is True:
+                        break
                     self.new_data = asyncio.Future()
+                if terminate:
+                    break
                 self.new_data = None
 
                 perf_got_work = time.perf_counter()
@@ -265,41 +306,10 @@ class Worker(DistributedService):
                 self._logger.debug("received work %s", event)
                 result = None
                 if self.worker:
-                    tick = False
-                    # we internally cache when the redis will expire to reduce hitting redis on every event
-                    if tick_wait_until - time.time() < 0:
-                        if hasattr(self.worker, "get_tick_interval"):
-                            wait_ms = int(
-                                self.worker.get_tick_interval(self.parameters) * 1000
-                            )
-                            dist_clock = await self.redis.set(
-                                RedisKeys.clock(self.state.mapping_uuid),
-                                "🕙",
-                                px=wait_ms,
-                                nx=True,
-                            )
-                            if dist_clock is True:
-                                tick = True
-                            else:
-                                expire_ms = await self.redis.pttl(
-                                    RedisKeys.clock(self.state.mapping_uuid)
-                                )
-                                tick_wait_until = time.time() + (expire_ms / 1000)
-                    try:
-                        loop = asyncio.get_event_loop()
-                        result = await loop.run_in_executor(
-                            None,
-                            self.worker.process_event,
-                            event,
-                            self.parameters,
-                            tick,
-                        )
-                    except Exception as e:
-                        self._logger.error(
-                            "custom worker failed: %s\n%s",
-                            e.__repr__(),
-                            traceback.format_exc(),
-                        )
+                    tick_wait_until, result = await self._run_payload(
+                        tick_wait_until, event
+                    )
+
                 perf_custom_code = time.perf_counter()
                 self._logger.debug("got result %s", result)
                 if result is not None:
@@ -395,6 +405,8 @@ class Worker(DistributedService):
     async def restart_work(
         self, new_uuid: UUID4, active_streams: list[StreamName]
     ) -> None:
+        if self.new_data is not None:
+            self.new_data.set_result(True)
         self._logger.info("resetting config %s", new_uuid)
         await cancel_and_wait(self.work_task)
         self._logger.info("clean up in sockets")
@@ -402,14 +414,6 @@ class Worker(DistributedService):
         self._logger.info("stop receiving")
         for t in self._ingester_tasks:
             await cancel_and_wait(t)
-        for iname, ing in self._ingesters.items():
-            while True:
-                res = await ing.socket.poll(timeout=0.001)
-                if res == zmq.POLLIN:
-                    await ing.socket.recv_multipart(copy=False)
-                    self._logger.debug("discarded internal message from %s", iname)
-                else:
-                    break
 
         self.assignment_queue = asyncio.Queue()
         self.state.mapping_uuid = new_uuid
@@ -526,6 +530,8 @@ class Worker(DistributedService):
                         e.__repr__(),
                         traceback.format_exc(),
                     )
+        if self.new_data is not None:
+            self.new_data.set_result(True)
         await cancel_and_wait(self.manage_ingester_task)
         await cancel_and_wait(self.manage_receiver_task)
         await cancel_and_wait(self.metrics_task)
