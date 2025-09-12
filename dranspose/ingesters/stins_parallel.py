@@ -39,14 +39,14 @@ class StinsParallelIngester(Ingester):
         if len(self.active_streams) == 0:
             self._logger.warning("this ingester has no active streams, stopping worker")
             return
-        sourcegen = self.run_source(self.active_streams[0])
+        sourcegen = self.run_source_part(self.active_streams[0])
         try:
             while True:
                 nextiwm: InternalWorkerMessage = await anext(sourcegen)
 
                 work_assignment: WorkAssignment = await self.assignment_queue.get()
                 while work_assignment.event_number < nextiwm.event_number:
-                    work_assignment: WorkAssignment = await self.assignment_queue.get()
+                    work_assignment = await self.assignment_queue.get()
 
                 workermessages: dict[WorkerName, InternalWorkerMessage] = {}
                 for stream, workers in work_assignment.assignments.items():
@@ -61,7 +61,7 @@ class StinsParallelIngester(Ingester):
             for stream in self.active_streams:
                 await self.stop_source(stream)
 
-    async def run_source(
+    async def run_source_part(
         self, stream: StreamName
     ) -> AsyncGenerator[InternalWorkerMessage, None]:
         self.in_socket = self.ctx.socket(zmq.PULL)

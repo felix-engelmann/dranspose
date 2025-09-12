@@ -89,7 +89,7 @@ class Worker(DistributedService):
             tuple[EventNumber, set[StreamName]]
         ] = asyncio.Queue()
         self.dequeue_task: Optional[Task[tuple[EventNumber, set[StreamName]]]] = None
-        self.new_data: Future[None] | None = None
+        self.new_data: Future[bool] | None = None
         self.stream_queues: dict[EventNumber, dict[StreamName, StreamData]] = {}
 
         self.param_descriptions = []
@@ -202,7 +202,7 @@ class Worker(DistributedService):
             )
             if self.new_data is not None:
                 if not self.new_data.done():
-                    self.new_data.set_result(None)
+                    self.new_data.set_result(False)
 
     def start_receive_ingesters(self) -> None:
         self._logger.info("starting ingester receiving tasks")
@@ -212,40 +212,44 @@ class Worker(DistributedService):
             t.add_done_callback(done_callback)
             self._ingester_tasks.append(t)
 
-    async def _run_payload(self, tick_wait_until, event):
-        tick = False
-        # we internally cache when the redis will expire to reduce hitting redis on every event
-        if tick_wait_until - time.time() < 0:
-            if hasattr(self.worker, "get_tick_interval"):
-                wait_ms = int(self.worker.get_tick_interval(self.parameters) * 1000)
-                dist_clock = await self.redis.set(
-                    RedisKeys.clock(self.state.mapping_uuid),
-                    "🕙",
-                    px=wait_ms,
-                    nx=True,
-                )
-                if dist_clock is True:
-                    tick = True
-                else:
-                    expire_ms = await self.redis.pttl(
-                        RedisKeys.clock(self.state.mapping_uuid)
+    async def _run_payload(
+        self, tick_wait_until: float, event: EventData
+    ) -> tuple[float, ResultData | None]:
+        result = None
+        if self.worker:
+            tick = False
+            # we internally cache when the redis will expire to reduce hitting redis on every event
+            if tick_wait_until - time.time() < 0:
+                if hasattr(self.worker, "get_tick_interval"):
+                    wait_ms = int(self.worker.get_tick_interval(self.parameters) * 1000)
+                    dist_clock = await self.redis.set(
+                        RedisKeys.clock(self.state.mapping_uuid),
+                        "🕙",
+                        px=wait_ms,
+                        nx=True,
                     )
-                    tick_wait_until = time.time() + (expire_ms / 1000)
-        try:
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                self.worker.process_event,
-                event,
-                self.parameters,
-                tick,
-            )
-        except Exception as e:
-            self._logger.error(
-                "custom worker failed: %s\n%s",
-                e.__repr__(),
-                traceback.format_exc(),
-            )
+                    if dist_clock is True:
+                        tick = True
+                    else:
+                        expire_ms = await self.redis.pttl(
+                            RedisKeys.clock(self.state.mapping_uuid)
+                        )
+                        tick_wait_until = time.time() + (expire_ms / 1000)
+            try:
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None,
+                    self.worker.process_event,
+                    event,
+                    self.parameters,
+                    tick,
+                )
+            except Exception as e:
+                self._logger.error(
+                    "custom worker failed: %s\n%s",
+                    e.__repr__(),
+                    traceback.format_exc(),
+                )
         return tick_wait_until, result
 
     async def work(self) -> None:
@@ -304,11 +308,10 @@ class Worker(DistributedService):
 
                 perf_assembled_event = time.perf_counter()
                 self._logger.debug("received work %s", event)
-                result = None
-                if self.worker:
-                    tick_wait_until, result = await self._run_payload(
-                        tick_wait_until, event
-                    )
+
+                tick_wait_until, result = await self._run_payload(
+                    tick_wait_until, event
+                )
 
                 perf_custom_code = time.perf_counter()
                 self._logger.debug("got result %s", result)

@@ -23,6 +23,7 @@ from dranspose.protocol import (
     WorkerName,
     VirtualWorker,
     VirtualConstraint,
+    IngesterName,
 )
 
 from dranspose.worker import Worker, WorkerSettings
@@ -59,7 +60,7 @@ async def test_parallel(
     ing2 = await create_ingester(
         StinsParallelIngester(
             settings=StinsParallelSettings(
-                ingester_name="eiger-2",
+                ingester_name=IngesterName("eiger-2"),
                 ingester_streams=[StreamName("eiger")],
                 upstream_url=Url("tcp://localhost:9999"),
                 ingester_url=Url("tcp://localhost:10011"),
