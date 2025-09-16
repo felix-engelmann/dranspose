@@ -192,6 +192,11 @@ class DistributedService(abc.ABC):
                                             "parsed parameter value %s",
                                             self.parameters[name].value,
                                         )
+                            except ConnectionError as e:
+                                self._logger.warning(
+                                    "cannot connect to fetch parameters %s",
+                                    e.__repr__(),
+                                )
                             except Exception as e:
                                 self._logger.error(
                                     "failed to get parameters %s", e.__repr__()

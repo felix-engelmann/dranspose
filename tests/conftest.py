@@ -5,6 +5,7 @@ import logging
 import os
 import queue
 import random
+import socket
 import struct
 import threading
 import time
@@ -108,6 +109,16 @@ async def fail_on_error_log(
         pytest.fail("Test failed due to log message starting with 'ERROR'")
 
 
+def is_port_available(port, host="0.0.0.0"):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
 @pytest_asyncio.fixture()
 async def controller() -> AsyncIterator[None]:
     config = uvicorn.Config(app, port=5000, log_level="debug")
@@ -118,7 +129,13 @@ async def controller() -> AsyncIterator[None]:
     yield
     server.should_exit = True
     await server_task
-    await asyncio.sleep(0.1)
+    timeout = 5
+    while (timeout := timeout - 1) > 0 and not (available := is_port_available(5000)):
+        logging.warning("needed to wait for port to become available")
+        await asyncio.sleep(1)
+
+    if not available:
+        pytest.fail("could not stop controller within 5 seconds")
 
 
 @dataclass
