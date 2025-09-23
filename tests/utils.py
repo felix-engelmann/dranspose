@@ -108,6 +108,10 @@ def monopart_sequence(mapping: dict[str, Any]) -> dict[str, Any]:
 
 
 def uniform_sequence(streams: set[StreamName], ntrig: int) -> dict[str, Any]:
+    """
+    QUIRK ALERT: note that this actually expects ntrig-1 triggers,
+    since it starts at 1.
+    """
     return monopart_sequence(
         {
             stream_name: [[vworker(i)] for i in range(1, ntrig)]
@@ -129,5 +133,9 @@ async def set_sequence(sequence: dict[Any, Any]) -> str:
 
 
 async def set_uniform_sequence(streams: set[StreamName], ntrig: int) -> str:
+    """
+    QUIRK ALERT: note that this actually expects ntrig-1 triggers,
+    since it starts at 1.
+    """
     sequence = uniform_sequence(streams, ntrig)
     return await set_sequence(sequence)
