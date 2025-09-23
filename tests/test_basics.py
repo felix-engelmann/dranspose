@@ -58,9 +58,7 @@ async def test_simple(
 
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     r = redis.from_url(redis_url, decode_responses=True, protocol=3)
-    await wait_for_controller(
-        streams={StreamName("eiger")}, workers={WorkerName("w1")}
-    )
+    await wait_for_controller(streams={StreamName("eiger")}, workers={WorkerName("w1")})
     ntrig = 10
     uuid = await set_uniform_sequence(streams={StreamName("eiger")}, ntrig=ntrig)
     updates = await r.xread({RedisKeys.updates(): 0})
@@ -169,17 +167,19 @@ async def test_map(
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
-            json=monopart_sequence({
-                "eiger": [ [ vworker(2 * i) ] for i in range(1, ntrig) ],
-                "orca": [ [ vworker(2 * i + 1) ] for i in range(1, ntrig) ],
-                "alba": [ [ vworker(2 * i), vworker(2 * i + 1) ] for i in range(1, ntrig) ],
-                "slow": [
-                    [ vworker(2 * i), vworker(2 * i + 1) ]
-                    if i % 4 == 0
-                    else None
-                    for i in range(1, ntrig)
-                ],
-            }),
+            json=monopart_sequence(
+                {
+                    "eiger": [[vworker(2 * i)] for i in range(1, ntrig)],
+                    "orca": [[vworker(2 * i + 1)] for i in range(1, ntrig)],
+                    "alba": [
+                        [vworker(2 * i), vworker(2 * i + 1)] for i in range(1, ntrig)
+                    ],
+                    "slow": [
+                        [vworker(2 * i), vworker(2 * i + 1)] if i % 4 == 0 else None
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
 

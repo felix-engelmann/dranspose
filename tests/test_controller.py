@@ -10,11 +10,9 @@ from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleSettings,
 )
 from dranspose.protocol import (
-    VirtualWorker,
-    VirtualConstraint,
     StreamName,
 )
-from tests.utils import wait_for_controller, uniform_sequence, set_uniform_sequence
+from tests.utils import wait_for_controller, uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -55,7 +53,9 @@ async def test_not_enough_workers(
     async with aiohttp.ClientSession() as session:
         ntrig = 10
         sequence = uniform_sequence({StreamName("eiger")}, ntrig)
-        resp = await session.post("http://localhost:5000/api/v1/sequence/", json=sequence)
+        resp = await session.post(
+            "http://localhost:5000/api/v1/sequence/", json=sequence
+        )
         assert resp.status == 400
         response = await resp.json()
         assert {"detail": "only 0 workers available, but 1 required"} == response

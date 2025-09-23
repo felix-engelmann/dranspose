@@ -58,7 +58,9 @@ async def test_simple(
     await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 100
-        mapping = monopart_sequence({ "eiger": [[vworker(i // 10)] for i in range(1, ntrig)] })
+        mapping = monopart_sequence(
+            {"eiger": [[vworker(i // 10)] for i in range(1, ntrig)]}
+        )
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
             json=mapping,

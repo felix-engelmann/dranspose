@@ -102,8 +102,7 @@ async def test_dump(
     )
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
-        logging.info("prefix is %s encoded: %s", p_prefix,
-                     str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/dump_prefix",
@@ -112,7 +111,8 @@ async def test_dump(
         assert resp.status == 200
 
         ntrig = 10
-        payload = monopart_sequence({
+        payload = monopart_sequence(
+            {
                 "eiger": [
                     [
                         VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
@@ -153,11 +153,9 @@ async def test_dump(
                     else None
                     for i in range(1, ntrig)
                 ],
-        })
-        resp = await session.post(
-            "http://localhost:5000/api/v1/sequence",
-            json=payload
+            }
         )
+        resp = await session.post("http://localhost:5000/api/v1/sequence", json=payload)
         assert resp.status == 200
         uuid = await resp.json()
 
@@ -236,8 +234,7 @@ async def test_dump_xrd(
     await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
-        logging.info("prefix is %s encoded: %s", p_prefix,
-                     str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/dump_prefix",
@@ -288,8 +285,7 @@ async def test_dump_map_and_parameters(
     await wait_for_controller(streams={StreamName("xrd")})
     async with aiohttp.ClientSession() as session:
         p_prefix = tmp_path / "dump_"
-        logging.info("prefix is %s encoded: %s", p_prefix,
-                     str(p_prefix).encode("utf8"))
+        logging.info("prefix is %s encoded: %s", p_prefix, str(p_prefix).encode("utf8"))
 
         pars = {
             "dump_prefix": str(p_prefix).encode("utf8"),

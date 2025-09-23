@@ -44,10 +44,14 @@ async def test_rust_basic(
         logging.info("startup done")
 
         ntrig = 50000
-        sequence = monopart_sequence({
-            "eiger": [ [vworker(i // 10)] for i in range(1, ntrig) ],
-        })
-        resp = await session.post("http://localhost:5000/api/v1/sequence", json=sequence)
+        sequence = monopart_sequence(
+            {
+                "eiger": [[vworker(i // 10)] for i in range(1, ntrig)],
+            }
+        )
+        resp = await session.post(
+            "http://localhost:5000/api/v1/sequence", json=sequence
+        )
         assert resp.status == 200
 
     context = zmq.asyncio.Context()

@@ -3,7 +3,6 @@ import os
 from pathlib import PosixPath
 from typing import Awaitable, Callable, Coroutine, Optional, Any
 
-import aiohttp
 import zmq.asyncio
 
 import pytest
@@ -17,8 +16,6 @@ from dranspose.ingesters.zmqpull_eiger_legacy import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings

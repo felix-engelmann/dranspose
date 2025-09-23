@@ -7,8 +7,6 @@ from dranspose.protocol import (
     StreamName,
     WorkerName,
     WorkerTimes,
-    VirtualWorker,
-    VirtualConstraint,
     EventNumber,
     SystemLoadType,
 )
@@ -97,7 +95,6 @@ async def test_simple(
     with zmq.asyncio.Context() as context:
         asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
         await wait_for_finish()
-
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5000/api/v1/status")

@@ -54,14 +54,14 @@ async def test_simple(
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
-            json=monopart_sequence({
-                "eiger": [
-                    []
-                    if 3 < i < 8
-                    else [vworker(constraint=i, tags=["debug"])]
-                    for i in range(1, ntrig)
-                ],
-            }),
+            json=monopart_sequence(
+                {
+                    "eiger": [
+                        [] if 3 < i < 8 else [vworker(constraint=i, tags=["debug"])]
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
 

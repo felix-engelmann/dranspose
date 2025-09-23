@@ -16,9 +16,7 @@ from dranspose.ingesters.zmqsub_lecroy import ZmqSubLecroyIngester, ZmqSubLecroy
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
     ParameterName,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings
@@ -82,7 +80,6 @@ async def test_lecroy(
         streams={StreamName("lecroy")}, parameters={ParameterName("channel")}
     )
     await set_uniform_sequence({StreamName("lecroy")}, ntrig)
-
 
     context = zmq.asyncio.Context()
 

@@ -6,7 +6,6 @@ import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 import zmq.asyncio
 
-import aiohttp
 import pytest
 from pydantic_core import Url
 
@@ -19,8 +18,6 @@ from dranspose.ingesters.zmqsub_contrast import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
 from examples.dummy.sw_trig_ingester import SoftTriggerPcapIngester
@@ -73,8 +70,7 @@ async def test_ingester(
     )
 
     await wait_for_controller(streams={StreamName("contrast"), StreamName("pcap")})
-    await set_uniform_sequence(["contrast", "pcap", "dummy"], ntrig=ntrig-1)
-
+    await set_uniform_sequence(["contrast", "pcap", "dummy"], ntrig=ntrig - 1)
 
     context = zmq.asyncio.Context()
 

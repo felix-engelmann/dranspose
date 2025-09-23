@@ -21,6 +21,7 @@ from dranspose.protocol import (
 from dranspose.worker import Worker
 from tests.utils import wait_for_controller, wait_for_finish, vworker, monopart_sequence
 
+
 @pytest.mark.asyncio
 async def test_simple(
     controller: None,
@@ -45,11 +46,13 @@ async def test_simple(
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
-            json=monopart_sequence({
-                "eiger": [[vworker(i)] for i in range(1, ntrig - 5)]
-                + [None]
-                + [[vworker(i)] for i in range(ntrig - 5, ntrig)],
-            }),
+            json=monopart_sequence(
+                {
+                    "eiger": [[vworker(i)] for i in range(1, ntrig - 5)]
+                    + [None]
+                    + [[vworker(i)] for i in range(ntrig - 5, ntrig)],
+                }
+            ),
         )
         assert resp.status == 200
 

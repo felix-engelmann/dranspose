@@ -59,17 +59,19 @@ async def test_outside(
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
-            json=monopart_sequence({
-                "eiger": [
-                    [
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i),
-                            tags={WorkerTag("debug")},
-                        ).model_dump(mode="json")
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            })
+            json=monopart_sequence(
+                {
+                    "eiger": [
+                        [
+                            VirtualWorker(
+                                constraint=VirtualConstraint(2 * i),
+                                tags={WorkerTag("debug")},
+                            ).model_dump(mode="json")
+                        ]
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
 

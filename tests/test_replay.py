@@ -26,8 +26,6 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.replay import replay
@@ -110,17 +108,19 @@ async def dump_data(
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
-            json=monopart_sequence({
-                "eiger": [ [ vworker(2 * i) ] for i in range(1, ntrig) ],
-                "orca": [ [ vworker(2 * i + 1) ] for i in range(1, ntrig) ],
-                "alba": [ [ vworker(2 * i), vworker(2 * i + 1) ] for i in range(1, ntrig) ],
-                "slow": [
-                    [ vworker(2 * i), vworker(2 * i + 1) ]
-                    if i % 4 == 0
-                    else None
-                    for i in range(1, ntrig)
-                ],
-            }),
+            json=monopart_sequence(
+                {
+                    "eiger": [[vworker(2 * i)] for i in range(1, ntrig)],
+                    "orca": [[vworker(2 * i + 1)] for i in range(1, ntrig)],
+                    "alba": [
+                        [vworker(2 * i), vworker(2 * i + 1)] for i in range(1, ntrig)
+                    ],
+                    "slow": [
+                        [vworker(2 * i), vworker(2 * i + 1)] if i % 4 == 0 else None
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
         uuid = await resp.json()

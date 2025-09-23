@@ -13,8 +13,6 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker
 from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
@@ -42,13 +40,8 @@ async def test_stop_scans(
     ntrig = 30
     await set_uniform_sequence({StreamName("eiger")}, ntrig)
     context = zmq.asyncio.Context()
-
-    # asyncio.create_task()
-
     async with aiohttp.ClientSession() as session:
-        resp = await session.post(
-            "http://localhost:5000/api/v1/stop",
-        )
+        await session.post("http://localhost:5000/api/v1/stop")
 
     await wait_for_finish()
 

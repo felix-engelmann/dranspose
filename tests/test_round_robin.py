@@ -5,8 +5,6 @@ from typing import Awaitable, Callable, Any, Coroutine, Optional
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqpull_single import (
@@ -90,8 +88,12 @@ async def test_roundrobin(
     await wait_for_controller(streams={StreamName("eiger")})
     async with aiohttp.ClientSession() as session:
         ntrig = 10
-        sequence = monopart_sequence({ "eiger": [[vworker(i % 3)] for i in range(1, ntrig)] })
-        resp = await session.post("http://localhost:5000/api/v1/sequence", json=sequence)
+        sequence = monopart_sequence(
+            {"eiger": [[vworker(i % 3)] for i in range(1, ntrig)]}
+        )
+        resp = await session.post(
+            "http://localhost:5000/api/v1/sequence", json=sequence
+        )
         assert resp.status == 200
         await resp.json()
 

@@ -1,7 +1,6 @@
 import asyncio
 from typing import Awaitable, Callable, Coroutine, Optional
 
-import aiohttp
 
 import pytest
 from pydantic_core import Url
@@ -11,8 +10,6 @@ from dranspose.ingesters.tcp_positioncap import TcpPcapIngester, TcpPcapSettings
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings

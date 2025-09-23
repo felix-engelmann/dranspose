@@ -5,15 +5,12 @@ from typing import Awaitable, Callable, Any, Coroutine, Optional
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
 )
-import aiohttp
 
 import pytest
 import zmq.asyncio

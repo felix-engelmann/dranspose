@@ -1,7 +1,6 @@
 import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
-import aiohttp
 
 import pytest
 import zmq.asyncio
@@ -12,8 +11,6 @@ from pydantic import HttpUrl
 from dranspose.ingester import Ingester
 from dranspose.protocol import (
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
     StreamName,
 )
 

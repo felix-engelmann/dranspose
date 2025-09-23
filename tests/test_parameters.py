@@ -21,8 +21,6 @@ from dranspose.parameters import ParameterList
 from dranspose.protocol import (
     WorkerName,
     StreamName,
-    VirtualWorker,
-    VirtualConstraint,
     EnsembleState,
 )
 from dranspose.worker import Worker, WorkerSettings

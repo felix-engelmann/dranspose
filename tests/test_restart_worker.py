@@ -16,8 +16,6 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
     EnsembleState,
 )
 

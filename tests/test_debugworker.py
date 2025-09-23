@@ -21,9 +21,6 @@ from dranspose.middlewares import stream1
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
-    WorkerTag,
 )
 
 from dranspose.worker import Worker
@@ -81,14 +78,16 @@ async def test_debug(
         ntrig = 10
         resp = await session.post(
             "http://localhost:5000/api/v1/sequence",
-            json=monopart_sequence({
-                "eiger": [
-                    [vworker(2 * i)]
-                    if i % 4 != 0
-                    else [vworker(2 * i), vworker(tags={"debug"})]
-                    for i in range(1, ntrig)
-                ],
-            }),
+            json=monopart_sequence(
+                {
+                    "eiger": [
+                        [vworker(2 * i)]
+                        if i % 4 != 0
+                        else [vworker(2 * i), vworker(tags={"debug"})]
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
         await resp.json()

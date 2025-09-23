@@ -3,7 +3,6 @@ import logging
 from asyncio import StreamReader, StreamWriter
 from typing import Awaitable, Callable, Coroutine, Optional, Any
 
-import aiohttp
 
 import pytest
 import zmq
@@ -19,8 +18,6 @@ from dranspose.ingesters.tcp_positioncap import TcpPcapIngester, TcpPcapSettings
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings

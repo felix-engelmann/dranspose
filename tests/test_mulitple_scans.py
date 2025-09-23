@@ -22,8 +22,6 @@ from dranspose.ingesters.zmqsub_xspress3 import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
 from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence

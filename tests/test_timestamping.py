@@ -6,8 +6,6 @@ from typing import Awaitable, Callable, Any, Coroutine, Optional
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqpull_single import (
@@ -66,7 +64,6 @@ async def test_timestamps(
     with zmq.asyncio.Context() as context:
         asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
         await wait_for_finish()
-
 
     async with aiohttp.ClientSession() as session:
         st = await session.get("http://localhost:5001/api/v1/result/")

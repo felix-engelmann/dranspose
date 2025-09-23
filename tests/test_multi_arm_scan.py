@@ -21,8 +21,6 @@ from dranspose.ingesters.tcp_positioncap import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker
 from tests.utils import wait_for_controller, wait_for_finish, monopart_sequence, vworker

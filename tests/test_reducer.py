@@ -25,8 +25,6 @@ from dranspose.ingesters.zmqsub_xspress3 import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
 from tests.utils import wait_for_finish, wait_for_controller, set_uniform_sequence
@@ -87,7 +85,9 @@ async def test_reduction(
         await resp.json()
 
     ntrig = 20
-    await set_uniform_sequence({StreamName("contrast"), StreamName("xspress3")}, ntrig+1)
+    await set_uniform_sequence(
+        {StreamName("contrast"), StreamName("xspress3")}, ntrig + 1
+    )
     #                                                 +1 because we do range(1,ntrig) ^
 
     context = zmq.asyncio.Context()

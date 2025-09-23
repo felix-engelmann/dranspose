@@ -1,7 +1,6 @@
 import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
-import aiohttp
 
 import pytest
 import zmq.asyncio
@@ -16,8 +15,6 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker

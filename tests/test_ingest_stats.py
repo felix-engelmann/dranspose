@@ -17,8 +17,6 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
     EnsembleState,
 )
 
@@ -81,4 +79,3 @@ async def test_map(
             logging.info("state is \n%s", "\n".join(msg))
 
     print(content)
-

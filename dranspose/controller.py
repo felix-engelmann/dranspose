@@ -804,7 +804,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/mapping")
     async def get_mapping(request: Request) -> dict[str, Any]:
-        """ alias for backwards compatability """
+        """alias for backwards compatability"""
         return await get_sequence(request)
 
     @app.get("/api/v1/sequence")
