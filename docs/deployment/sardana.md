@@ -47,7 +47,8 @@ class dranspose(Macro):
                 mapping["sardana"] = [[{"constraint":i}] if 
                                       i%burst==burst-1 else 
                                       None for i in range(burst*steps)]
-                req = requests.post(f"{url}/api/v1/mapping", json=mapping)
+                sequence = {"parts" : {"main": mapping}, "sequence": ["main"]}
+                req = requests.post(f"{url}/api/v1/sequence", json=sequence)
                 self.output(f"{req.status_code}, msg: {req.content}")
 ```
 

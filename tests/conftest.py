@@ -437,9 +437,9 @@ async def stream_eiger() -> (
         for frameno in range(nframes):
             img = np.zeros((width, height), dtype=np.uint16)
             for _ in range(20):
-                img[random.randint(0, width - 1)][random.randint(0, height - 1)] = (
-                    random.randint(0, 10)
-                )
+                img[random.randint(0, width - 1)][
+                    random.randint(0, height - 1)
+                ] = random.randint(0, 10)
             extra = {"timestamps": {"dummy": datetime.now(timezone.utc).isoformat()}}
             await acq.image(img, img.shape, frameno, extra_fields=extra)
             await asyncio.sleep(frame_time)
@@ -521,9 +521,9 @@ async def stream_orca() -> (
         for frameno in range(nframes):
             img = np.zeros((width, height), dtype=np.uint16)
             for _ in range(20):
-                img[random.randint(0, width - 1)][random.randint(0, height - 1)] = (
-                    random.randint(0, 10)
-                )
+                img[random.randint(0, width - 1)][
+                    random.randint(0, height - 1)
+                ] = random.randint(0, 10)
             await acq.image(img, img.shape, frameno)
             await asyncio.sleep(0.1)
         await acq.close()

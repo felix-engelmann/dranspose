@@ -1,7 +1,6 @@
 import asyncio
 from typing import Awaitable, Callable, Coroutine, Optional
 
-import aiohttp
 
 import pytest
 from pydantic_core import Url
@@ -11,12 +10,14 @@ from dranspose.ingesters.tcp_positioncap import TcpPcapIngester, TcpPcapSettings
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_finish, wait_for_controller
+from tests.utils import (
+    wait_for_finish,
+    wait_for_controller,
+    set_uniform_sequence,
+)
 
 
 @pytest.mark.asyncio
@@ -66,26 +67,8 @@ async def test_pcapingester(
     )
 
     await wait_for_controller(streams={StreamName("pcap")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "pcap": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
-
+    ntrig = 10
+    await set_uniform_sequence({StreamName("pcap")}, ntrig)
     asyncio.create_task(stream_pcap(ntrig - 1))
-
     content = await wait_for_finish()
-
     print(content)
