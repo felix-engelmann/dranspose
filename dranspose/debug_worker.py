@@ -5,7 +5,6 @@ from collections import deque
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Any
 
-import zmq
 from fastapi import FastAPI
 from starlette.responses import Response
 
@@ -29,13 +28,15 @@ class DebugWorker(Worker):
         while True:
             self.dequeue_task = None
             self.dequeue_task = asyncio.create_task(self.assignment_queue.get())
-            ingesterset = await self.dequeue_task
-            done = await self.poll_internals(ingesterset)
-            if set(done) != {zmq.POLLIN}:
-                self._logger.warning("not all sockets are pollIN %s", done)
-                continue
+            evn, streamset = await self.dequeue_task
 
-            event = await self.build_event(ingesterset)
+            self.new_data = asyncio.Future()
+            while set(self.stream_queues.get(evn, {}).keys()) != streamset:
+                await self.new_data
+                self.new_data = asyncio.Future()
+            self.new_data = None
+
+            event = EventData(event_number=evn, streams=self.stream_queues[evn])
             self._logger.debug("adding event %s to buffer", event)
             self.buffer.append(event)
 
