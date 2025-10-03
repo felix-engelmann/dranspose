@@ -30,11 +30,10 @@ class DebugWorker(Worker):
             self.dequeue_task = asyncio.create_task(self.assignment_queue.get())
             evn, streamset = await self.dequeue_task
 
-            self.new_data = asyncio.Future()
+            self.new_data.clear()
             while set(self.stream_queues.get(evn, {}).keys()) != streamset:
-                await self.new_data
-                self.new_data = asyncio.Future()
-            self.new_data = None
+                await self.new_data.wait()
+                self.new_data.clear()
 
             event = EventData(event_number=evn, streams=self.stream_queues[evn])
             self._logger.debug("adding event %s to buffer", event)
