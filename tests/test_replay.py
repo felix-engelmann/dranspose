@@ -17,7 +17,6 @@ import zmq.asyncio
 import zmq
 from pydantic_core import Url
 
-from dranspose.event import EventData
 from dranspose.ingester import Ingester
 from dranspose.ingesters.zmqpull_single import (
     ZmqPullSingleIngester,
@@ -215,8 +214,8 @@ async def test_replay_gzip(
     thread = threading.Thread(
         target=replay,
         args=(
-            "examples.test.worker:TestWorker",
-            "examples.test.reducer:TestReducer",
+            "tests.aux_payloads:TestWorker",
+            "tests.aux_payloads:TestReducer",
             [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors.gz"],
             None,
             par_file,
@@ -229,35 +228,35 @@ async def test_replay_gzip(
     done_event.wait()
     logging.info("replay done")
 
-    async with aiohttp.ClientSession() as session:
+    def work_pre() -> None:
         ntrig = 10
-        st = await session.get("http://localhost:5010/api/v1/result/")
-        content = await st.content.read()
-        result = pickle.loads(content)[0]
-        assert list(result["results"].keys()) == list(range(ntrig + 1))
-        logging.warning(
-            "params in reducer is %s", result["results"][5][0].streams.keys()
-        )
-        ev5: EventData = result["results"][5][0]
-        assert ev5.event_number == 5
-        assert ev5.streams[StreamName("eiger")].typ == "STINS"
-        eiger_frame_header = ev5.streams[StreamName("eiger")].frames[0]
-        eiger_frame_payload = ev5.streams[StreamName("eiger")].frames[1]
-        assert isinstance(eiger_frame_header, bytes)
-        assert isinstance(eiger_frame_payload, bytes)
-        assert eiger_frame_header.startswith(
-            b'{"htype": "image", "frame": 4, "shape": [1475, 831], "type": "uint16", "compression": "none", "msg_number": 5, "timestamps": {"dummy": "'
-        )
-        assert len(eiger_frame_payload) > 4500
-        assert ev5.streams[StreamName("orca")].typ == "STINS"
-        orca_frame_header = ev5.streams[StreamName("orca")].frames[0]
-        orca_frame_payload = ev5.streams[StreamName("orca")].frames[1]
-        assert isinstance(orca_frame_header, bytes)
-        assert isinstance(orca_frame_payload, bytes)
-        assert orca_frame_header.startswith(
-            b'{"htype": "image", "frame": 4, "shape": [2000, 4000], "type": "uint16", "compression": "none", "msg_number": 5}'
-        )
-        assert len(orca_frame_payload) > 4500
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info("file %s", list(f.keys()))
+        logging.warning("map %s", f["results"])
+        logging.warning("res keys %s", list(f["results"].keys()))
+        assert list(f.keys()) == ["results", "parameters"]
+        assert list(f["results"].keys()) == list(map(str, range(ntrig + 1)))
+        logging.info("streams in ev 5: %s", list(f["results/5"].keys()))
+        logging.info("header of eiger %s", list(f["results/5/eiger"].keys()))
+        detector = f["results/5/eiger"]
+        assert detector["htype"][()] == b"image"
+        assert detector["frame"][()] == 4
+        assert np.array_equal(detector["shape"][:], [1475, 831])
+        assert detector["type"][()] == b"uint16"
+        assert detector["compression"][()] == b"none"
+        assert detector["msg_number"][()] == 5
+        assert "dummy" in list(detector["timestamps"].keys())
+        detector = f["results/3/orca"]
+        assert detector["htype"][()] == b"image"
+        assert detector["frame"][()] == 2
+        assert np.array_equal(detector["shape"][:], [2000, 4000])
+        assert detector["type"][()] == b"uint16"
+        assert detector["compression"][()] == b"none"
+        assert detector["msg_number"][()] == 3
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work_pre)
+
     logging.info("shut down server")
     stop_event.set()
 

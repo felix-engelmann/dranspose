@@ -9,7 +9,9 @@ class FluorescenceReducer:
         self, state: ReducerState | None = None, **kwargs: dict[str, Any]
     ) -> None:
         self.number = 0
-        self.publish: dict[str, dict[str, Any]] = {"map": {}}
+        self.publish: dict[str, dict[str, Any]] = {
+            "map": {"x": [], "y": [], "data": {}}
+        }
         if state is not None and state.mapreduce_version is not None:
             self.publish["version"] = state.mapreduce_version.model_dump(mode="json")
 
@@ -26,9 +28,12 @@ class FluorescenceReducer:
     ) -> None:
         print(result)
         if result.payload:
-            self.publish["map"][result.payload["position"]] = result.payload[
-                "concentations"
-            ]
+            self.publish["map"]["x"].append(result.payload["position"][0])
+            self.publish["map"]["y"].append(result.payload["position"][1])
+            for key, val in result.payload["concentations"].items():
+                if key not in self.publish["map"]["data"]:
+                    self.publish["map"]["data"][key] = []
+                self.publish["map"]["data"][key].append(val)
 
     def finish(self, parameters: dict | None = None) -> None:
         print("finished dummy reducer work")

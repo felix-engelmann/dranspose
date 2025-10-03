@@ -12,7 +12,8 @@ class TestReducer:
         self, result: ResultData, parameters: dict | None = None
     ) -> None:
         logging.info("parameters are %s", parameters)
-        self.publish["results"][result.event_number] = result.payload
+        # logging.warning("payload %s", result.payload[0].model_dump())
+        self.publish["results"][str(result.event_number)] = result.payload
         self.publish["parameters"][result.event_number] = parameters
 
     def finish(self, parameters: dict | None = None) -> None:
