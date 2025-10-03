@@ -6,7 +6,6 @@ import asyncio
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 import zmq.asyncio
 
-import aiohttp
 import pytest
 from pydantic_core import Url
 
@@ -19,12 +18,10 @@ from dranspose.ingesters.zmqsub_contrast import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
 from examples.dummy.sw_trig_ingester import SoftTriggerPcapIngester
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -34,7 +31,7 @@ async def test_ingester(
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_pcap: Callable[[int], Coroutine[None, None, None]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -73,46 +70,15 @@ async def test_ingester(
     )
 
     await wait_for_controller(streams={StreamName("contrast"), StreamName("pcap")})
-    async with aiohttp.ClientSession() as session:
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "contrast": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-                "pcap": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-                "dummy": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
+    await set_uniform_sequence(["contrast", "pcap", "dummy"], ntrig=ntrig - 1)
 
     context = zmq.asyncio.Context()
 
     asyncio.create_task(stream_pcap(ntrig))
 
     asyncio.create_task(
-        stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        stream_cbors(
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 

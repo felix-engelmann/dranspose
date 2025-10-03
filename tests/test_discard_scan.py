@@ -22,12 +22,10 @@ from dranspose.middlewares.stream1 import parse
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    WorkerTag,
 )
 
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, vworker, monopart_sequence
 
 
 @pytest.mark.asyncio
@@ -55,17 +53,15 @@ async def test_simple(
     async with aiohttp.ClientSession() as session:
         ntrig = 10
         resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    []
-                    if 3 < i < 8
-                    else [
-                        VirtualWorker(tags={WorkerTag("debug")}).model_dump(mode="json")
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
+            "http://localhost:5000/api/v1/sequence",
+            json=monopart_sequence(
+                {
+                    "eiger": [
+                        [] if 3 < i < 8 else [vworker(constraint=i, tags=["debug"])]
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
 

@@ -16,13 +16,11 @@ from dranspose.ingesters.zmqsub_lecroy import ZmqSubLecroyIngester, ZmqSubLecroy
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
     ParameterName,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.parametrize(
@@ -55,7 +53,7 @@ async def test_lecroy(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -81,25 +79,12 @@ async def test_lecroy(
     await wait_for_controller(
         streams={StreamName("lecroy")}, parameters={ParameterName("channel")}
     )
-    async with aiohttp.ClientSession() as session:
-        map = {
-            "lecroy": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(1, ntrig)
-            ],
-        }
-        logging.debug(f"Sending {map=}")
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=map,
-        )
-        assert resp.status == 200
-        await resp.json()
+    await set_uniform_sequence({StreamName("lecroy")}, ntrig)
 
     context = zmq.asyncio.Context()
 
     asyncio.create_task(
-        stream_pkls(
+        stream_cbors(
             context,
             22004,
             PosixPath(filename),

@@ -3,7 +3,6 @@ import os
 from pathlib import PosixPath
 from typing import Awaitable, Callable, Coroutine, Optional, Any
 
-import aiohttp
 import zmq.asyncio
 
 import pytest
@@ -14,12 +13,10 @@ from dranspose.ingesters.zmqsub_pcap import ZmqSubPCAPIngester, ZmqSubPCAPSettin
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_finish, wait_for_controller
+from tests.utils import wait_for_finish, wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -28,7 +25,7 @@ async def test_pcap(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -52,36 +49,18 @@ async def test_pcap(
     )
 
     await wait_for_controller(streams={StreamName("pcap")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 1500
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "pcap": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-            },
+    ntrig = 1500
+    await set_uniform_sequence({StreamName("pcap")}, ntrig)
+
+    with zmq.asyncio.Context() as context:
+        asyncio.create_task(
+            stream_cbors(
+                context,
+                22004,
+                PosixPath("tests/data/pcap-zmq.cbors"),
+                0.001,
+                zmq.PUB,
+            )
         )
-        assert resp.status == 200
-        await resp.json()
-
-    context = zmq.asyncio.Context()
-
-    asyncio.create_task(
-        stream_pkls(
-            context,
-            22004,
-            PosixPath("tests/data/pcap-zmq.pkls"),
-            0.001,
-            zmq.PUB,
-        )
-    )
-
-    content = await wait_for_finish()
-
+        content = await wait_for_finish()
     print(content)

@@ -26,11 +26,9 @@ from dranspose.ingesters.zmqsub_xspress3 import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_finish, wait_for_controller
+from tests.utils import wait_for_finish, wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -39,7 +37,7 @@ async def test_reduction(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -54,7 +52,7 @@ async def test_reduction(
             ),
         )
     )
-    p_contrast = tmp_path / "contrast_ingest.pkls"
+    p_contrast = tmp_path / "contrast_ingest.cbors"
 
     await create_ingester(
         ZmqSubContrastIngester(
@@ -66,7 +64,7 @@ async def test_reduction(
             ),
         )
     )
-    p_xspress = tmp_path / "xspress_ingest.pkls"
+    p_xspress = tmp_path / "xspress_ingest.cbors"
     await create_ingester(
         ZmqSubXspressIngester(
             settings=ZmqSubXspressSettings(
@@ -87,45 +85,26 @@ async def test_reduction(
         assert resp.status == 200
         await resp.json()
 
-        ntrig = 20
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "contrast": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-                "xspress3": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
+    ntrig = 20
+    await set_uniform_sequence(
+        {StreamName("contrast"), StreamName("xspress3")}, ntrig + 1
+    )
+    #                                                 +1 because we do range(1,ntrig) ^
 
     context = zmq.asyncio.Context()
 
     asyncio.create_task(
-        stream_pkls(
+        stream_cbors(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
     )
     asyncio.create_task(
-        stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        stream_cbors(
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 

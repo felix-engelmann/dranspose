@@ -21,12 +21,10 @@ from dranspose.parameters import ParameterList
 from dranspose.protocol import (
     WorkerName,
     StreamName,
-    VirtualWorker,
-    VirtualConstraint,
     EnsembleState,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller
+from tests.utils import wait_for_controller, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -35,7 +33,7 @@ async def test_params(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -137,22 +135,12 @@ async def test_params(
             logging.warning("got state %s", state)
 
         ntrig = 20
-        mp = {
-            "contrast": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
-        }
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
-        )
-        assert resp.status == 200
+        await set_uniform_sequence({StreamName("contrast")}, ntrig)
 
         context = zmq.asyncio.Context()
 
-        await stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        await stream_cbors(
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
 
         st = await session.get("http://localhost:5000/api/v1/progress")

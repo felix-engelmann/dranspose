@@ -33,7 +33,7 @@ class TestWorker:
     def __init__(self, *args, **kwargs):
         pass
     
-    def process_event(self, event, parameters=None):
+    def process_event(self, event, *args, parameters=None, **kwargs):
         pass
 ```
 
@@ -41,6 +41,7 @@ The reducer is similar and only requires a `process_result` function. e.g. in `s
 ```python
 # src/reducer.py
 class TestReducer:
+
     def __init__(self, *args, **kwargs):
         pass
     
@@ -73,9 +74,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class TestWorker:
+
     def __init__(self, *args, **kwargs):
         pass
-    def process_event(self, event, parameters=None):
+
+    def process_event(self, event, *args, parameters=None, **kwargs):
         logger.debug("event is %s", event)
 ```
 
@@ -105,9 +108,11 @@ from dranspose.middlewares.stream1 import parse as parse_stins
 logger = logging.getLogger(__name__)
 
 class TestWorker:
+
     def __init__(self, *args, **kwargs):
         pass
-    def process_event(self, event, parameters=None):
+
+    def process_event(self, event, *args, parameters=None, **kwargs):
         if "xrd" in event.streams:
             acq = parse_stins(event.streams["xrd"])
             logger.debug("acquisition is %s", acq)
@@ -149,9 +154,11 @@ from dranspose.data.stream1 import Stream1Data
 logger = logging.getLogger(__name__)
 
 class TestWorker:
+
     def __init__(self, *args, **kwargs):
         pass
-    def process_event(self, event, parameters=None):
+        
+    def process_event(self, event, *args, parameters=None, **kwargs):
         if "xrd" in event.streams:
             acq = parse_stins(event.streams["xrd"])
             if isinstance(acq, Stream1Data):
@@ -185,8 +192,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 class TestReducer:
+
     def __init__(self, *args, **kwargs):
         pass
+
     def process_result(self, result, parameters=None):
         logger.debug("result is %s", result)
 ```
@@ -268,9 +277,11 @@ from dranspose.data.stream1 import Stream1Data, Stream1Start, Stream1End
 logger = logging.getLogger(__name__)
 
 class TestWorker:
+
     def __init__(self, *args, **kwargs):
         pass
-    def process_event(self, event, parameters=None):
+
+    def process_event(self, event, *args, parameters=None, **kwargs):
         logger.debug(event)
         if "xrd" in event.streams:
             acq = parse_stins(event.streams["xrd"])
@@ -307,9 +318,11 @@ class Result:
     intensity: float
 
 class TestWorker:
+
     def __init__(self, *args, **kwargs):
         pass
-    def process_event(self, event, parameters=None):
+
+    def process_event(self, event, *args, parameters=None, **kwargs):
         logger.debug(event)
         if "xrd" in event.streams:
             acq = parse_stins(event.streams["xrd"])
@@ -464,7 +477,7 @@ class TestWorker:
         ]
         return params
 
-    def process_event(self, event, parameters=None):
+    def process_event(self, event, *args, parameters=None, **kwargs):
         logger.debug(event)
         if "xrd" in event.streams:
             acq = parse_stins(event.streams["xrd"])
@@ -589,7 +602,7 @@ class TestWorker:
         ]
         return params
 
-    def process_event(self, event, parameters=None):
+    def process_event(self, event, *args, parameters=None, **kwargs):
         logger.debug(event)
         if "xrd" in event.streams:
             acq = parse_stins(event.streams["xrd"])

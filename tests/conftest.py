@@ -3,7 +3,6 @@ import gzip
 import json
 import logging
 import os
-import pickle
 import queue
 import random
 import struct
@@ -159,9 +158,9 @@ class ExternalDistributed:
 
 
 @pytest_asyncio.fixture
-async def create_worker() -> AsyncIterator[
-    Callable[[WorkerName], Coroutine[None, None, Worker]]
-]:
+async def create_worker() -> (
+    AsyncIterator[Callable[[WorkerName], Coroutine[None, None, Worker]]]
+):
     workers: list[AsyncDistributed | ThreadDistributed] = []
 
     async def _make_worker(name: WorkerName | Worker, threaded: bool = False) -> Worker:
@@ -425,9 +424,9 @@ async def workload_generator(
 
 
 @pytest_asyncio.fixture
-async def stream_eiger() -> Callable[
-    [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
-]:
+async def stream_eiger() -> (
+    Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]]
+):
     async def _make_eiger(
         ctx: zmq.Context[Any], port: int, nframes: int, frame_time: float = 0.1
     ) -> None:
@@ -451,7 +450,7 @@ async def stream_eiger() -> Callable[
 
 
 @pytest_asyncio.fixture
-async def stream_pkls() -> Callable[
+async def stream_cbors() -> Callable[
     [
         zmq.Context[Any],
         int,
@@ -463,7 +462,7 @@ async def stream_pkls() -> Callable[
     ],
     Coroutine[Any, Any, None],
 ]:
-    async def _make_pkls(
+    async def _make_cbors(
         ctx: zmq.Context[Any],
         port: int,
         filename: os.PathLike[Any] | str,
@@ -480,17 +479,18 @@ async def stream_pkls() -> Callable[
                 await asyncio.sleep(0.1)
         base, ext = os.path.splitext(filename)
         if ext == ".gz":
-            f = gzip.open(filename, "rb")
             _, ext = os.path.splitext(base)
+            assert (
+                "cbor" in ext
+            ), f"gz file does not appear to be a cbor file: {filename}"
+            f = gzip.open(filename, "rb")
         else:
+            assert "cbor" in ext, f"file does not appear to be a cbor file: {filename}"
             f = open(filename, "rb")
         i = 0
         while True:
             try:
-                if "cbor" in ext:
-                    frames = cbor2.load(f)
-                else:
-                    frames = pickle.load(f)
+                frames = cbor2.load(f)
                 send = True
                 if i < (begin or 0):
                     send = False
@@ -500,18 +500,19 @@ async def stream_pkls() -> Callable[
                 if send:
                     await socket.send_multipart(frames)
                     await asyncio.sleep(frame_time)
-            except EOFError:
+            except (cbor2.CBORDecodeEOF, EOFError):
                 break
+                assert i > 0, f"CBOR file [{filename}] had no frames"
         f.close()
         socket.close()
 
-    return _make_pkls
+    return _make_cbors
 
 
 @pytest_asyncio.fixture
-async def stream_orca() -> Callable[
-    [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
-]:
+async def stream_orca() -> (
+    Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]]
+):
     async def _make_orca(ctx: zmq.Context[Any], port: int, nframes: int) -> None:
         socket = AcquisitionSocket(ctx, Url(f"tcp://*:{port}"))
         acq = await socket.start(filename="")
@@ -532,9 +533,9 @@ async def stream_orca() -> Callable[
 
 
 @pytest_asyncio.fixture
-async def stream_small() -> Callable[
-    [zmq.Context[Any], int | str, int], Coroutine[Any, Any, None]
-]:
+async def stream_small() -> (
+    Callable[[zmq.Context[Any], int | str, int], Coroutine[Any, Any, None]]
+):
     async def _make_alba(
         ctx: zmq.Context[Any], port: int | str, nframes: int, frame_time: float = 0.1
     ) -> None:
@@ -564,9 +565,9 @@ async def stream_small() -> Callable[
 
 
 @pytest_asyncio.fixture
-async def stream_small_xrd() -> Callable[
-    [zmq.Context[Any], int | str, int], Coroutine[Any, Any, None]
-]:
+async def stream_small_xrd() -> (
+    Callable[[zmq.Context[Any], int | str, int], Coroutine[Any, Any, None]]
+):
     async def _make_xrd(
         ctx: zmq.Context[Any], port: int | str, nframes: int, frame_time: float = 0.1
     ) -> None:
@@ -611,9 +612,9 @@ async def stream_small_xrd() -> Callable[
 
 
 @pytest_asyncio.fixture
-async def time_beacon() -> Callable[
-    [zmq.Context[Any], int, int], Coroutine[Any, Any, None]
-]:
+async def time_beacon() -> (
+    Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]]
+):
     async def _make_time(
         ctx: zmq.Context[Any],
         port: int,
@@ -735,9 +736,9 @@ async def stream_sardana() -> Callable[[HttpUrl, int], Coroutine[Any, Any, None]
 
 
 @pytest_asyncio.fixture
-async def stream_pcap() -> AsyncIterator[
-    Callable[[int, int, int], Coroutine[None, None, None]]
-]:
+async def stream_pcap() -> (
+    AsyncIterator[Callable[[int, int, int], Coroutine[None, None, None]]]
+):
     server_tasks = []
 
     async def _make_pcap(
@@ -1010,8 +1011,9 @@ def sample_table_to_html(
 
 
 async def sample_redis(filename: str) -> None:
-    r = redis.Redis(host="localhost", port=6379, decode_responses=True, protocol=3)
-    r_raw = redis.Redis(host="localhost", port=6379, decode_responses=False, protocol=3)
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    r = redis.from_url(redis_url, decode_responses=True, protocol=3)
+    r_raw = redis.from_url(redis_url, decode_responses=False, protocol=3)
     table: dict[str, Any] = {}
     try:
         tick = 0

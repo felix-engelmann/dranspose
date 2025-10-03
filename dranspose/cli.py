@@ -319,18 +319,23 @@ def run() -> None:
         parser.print_help()
     else:
         if args.subcommand != "replay":
-            logging_redis = redis.from_url(
-                f"{settings.redis_dsn}?decode_responses=True&protocol=3"
-            )
-
             root_logger = logging.getLogger()
-            handler = RedisStreamLogHandler(
-                redis_client=logging_redis,
-                stream_name="dranspose_logs",
-                maxlen=1000,
-                fields=["msg", "lineno", "name", "created", "levelname"],
-            )
-            root_logger.addHandler(handler)
+            try:
+                logging_redis = redis.from_url(
+                    f"{settings.redis_dsn}?decode_responses=True&protocol=3"
+                )
+                handler = RedisStreamLogHandler(
+                    redis_client=logging_redis,
+                    stream_name="dranspose_logs",
+                    maxlen=1000,
+                    fields=["msg", "lineno", "name", "created", "levelname"],
+                )
+                root_logger.addHandler(handler)
+            except ConnectionError:
+                root_logger.critical(
+                    f"Can't connect to {settings.redis_dsn}. Is redis running?"
+                )
+                exit(1)
         args.func(args)
 
 

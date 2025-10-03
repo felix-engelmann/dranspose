@@ -23,11 +23,9 @@ from dranspose.ingesters.zmqsub_xspress3 import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -36,7 +34,7 @@ async def test_short_scans(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_pkls: Callable[
+    stream_cbors: Callable[
         [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
         Coroutine[Any, Any, None],
     ],
@@ -70,6 +68,8 @@ async def test_short_scans(
     )
 
     await wait_for_controller(streams={StreamName("contrast"), StreamName("xspress3")})
+
+    ntrig = 30
     async with aiohttp.ClientSession() as session:
         resp = await session.post(
             "http://localhost:5000/api/v1/parameter/roi1",
@@ -77,39 +77,22 @@ async def test_short_scans(
         )
         assert resp.status == 200
         await resp.json()
-
-        ntrig = 30
-        mp = {
-            "contrast": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
-            "xspress3": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
-        }
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
-        )
-        assert resp.status == 200
-        await resp.json()
+    await set_uniform_sequence({StreamName("contrast"), StreamName("xspress3")}, ntrig)
 
     context = zmq.asyncio.Context()
 
     asyncio.create_task(
-        stream_pkls(
+        stream_cbors(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
     )
     asyncio.create_task(
-        stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        stream_cbors(
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 
@@ -166,55 +149,40 @@ async def test_short_scans(
         assert len(result["map"].keys()) == 20
 
     for _ in range(2):
-        await stream_pkls(
+        await stream_cbors(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
 
     # second scan
     ntrig = 20
-    mp = {
-        "contrast": [
-            [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-            for i in range(ntrig)
-        ],
-        "xspress3": [
-            [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-            for i in range(ntrig)
-        ],
-    }
-    async with aiohttp.ClientSession() as session:
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
-        )
-        assert resp.status == 200
-        await resp.json()
 
-    await stream_pkls(
+    await set_uniform_sequence({StreamName("contrast"), StreamName("xspress3")}, ntrig)
+
+    await stream_cbors(
         context,
         9999,
-        PosixPath("tests/data/xspress3mini-dump20.pkls"),
+        PosixPath("tests/data/xspress3mini-dump20.cbors"),
         0.001,
         zmq.PUB,
         begin=30,  # type: ignore[call-arg]
     )
 
     asyncio.create_task(
-        stream_pkls(
+        stream_cbors(
             context,
             9999,
-            PosixPath("tests/data/xspress3mini-dump20.pkls"),
+            PosixPath("tests/data/xspress3mini-dump20.cbors"),
             0.001,
             zmq.PUB,
         )
     )
     asyncio.create_task(
-        stream_pkls(
-            context, 5556, PosixPath("tests/data/contrast-dump.pkls"), 0.001, zmq.PUB
+        stream_cbors(
+            context, 5556, PosixPath("tests/data/contrast-dump.cbors"), 0.001, zmq.PUB
         )
     )
 
