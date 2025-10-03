@@ -3,7 +3,6 @@ import os
 from pathlib import PosixPath
 from typing import Awaitable, Callable, Coroutine, Optional, Any
 
-import aiohttp
 import zmq.asyncio
 
 import pytest
@@ -14,12 +13,10 @@ from dranspose.ingesters.zmqsub_albaem import ZmqSubAlbaemIngester, ZmqSubAlbaem
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -45,23 +42,7 @@ async def test_albaem(
     )
 
     await wait_for_controller(streams={StreamName("albaem")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 5
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "albaem": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
+    await set_uniform_sequence(streams={StreamName("albaem")}, ntrig=5)
 
     context = zmq.asyncio.Context()
 
