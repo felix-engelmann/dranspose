@@ -89,7 +89,8 @@ class Worker(DistributedService):
             tuple[EventNumber, set[StreamName]]
         ] = asyncio.Queue()
         self.dequeue_task: Optional[Task[tuple[EventNumber, set[StreamName]]]] = None
-        self.new_data: Future[bool] | None = None
+        self.new_data = asyncio.Event()
+        self.should_terminate = False
         self.stream_queues: dict[EventNumber, dict[StreamName, StreamData]] = {}
 
         self.param_descriptions = []
@@ -200,9 +201,7 @@ class Worker(DistributedService):
             self._logger.debug(
                 "added streams %s at event %d", msg.streams.keys(), msg.event_number
             )
-            if self.new_data is not None:
-                if not self.new_data.done():
-                    self.new_data.set_result(False)
+            self.new_data.set()
 
     def start_receive_ingesters(self) -> None:
         self._logger.info("starting ingester receiving tasks")
@@ -269,6 +268,7 @@ class Worker(DistributedService):
                 )
 
         await self.notify_worker_ready()
+        self.should_terminate = False
         try:
             proced = 0
             completed = []
@@ -285,8 +285,7 @@ class Worker(DistributedService):
                 perf_got_assignments = time.perf_counter()
 
                 self._logger.debug("looking for streams %s at event %d", streamset, evn)
-                self.new_data = asyncio.Future()
-                terminate = False
+                self.new_data.clear()
                 while set(self.stream_queues.get(evn, {}).keys()) != streamset:
                     self._logger.debug(
                         "keys did not match %s, %s, wait again",
@@ -294,13 +293,12 @@ class Worker(DistributedService):
                         streamset,
                     )
                     self._logger.debug("current queue is %s", self.stream_queues)
-                    terminate = await self.new_data
-                    if terminate is True:
+                    await self.new_data.wait()
+                    if self.should_terminate:
                         break
-                    self.new_data = asyncio.Future()
-                if terminate:
+                    self.new_data.clear()
+                if self.should_terminate:
                     break
-                self.new_data = None
 
                 perf_got_work = time.perf_counter()
 
@@ -408,8 +406,8 @@ class Worker(DistributedService):
     async def restart_work(
         self, new_uuid: UUID4, active_streams: list[StreamName]
     ) -> None:
-        if self.new_data is not None:
-            self.new_data.set_result(True)
+        self.should_terminate = True
+        self.new_data.set()
         self._logger.info("resetting config %s", new_uuid)
         await cancel_and_wait(self.work_task)
         self._logger.info("clean up in sockets")
@@ -533,8 +531,8 @@ class Worker(DistributedService):
                         e.__repr__(),
                         traceback.format_exc(),
                     )
-        if self.new_data is not None:
-            self.new_data.set_result(True)
+        self.should_terminate = True
+        self.new_data.set()
         await cancel_and_wait(self.manage_ingester_task)
         await cancel_and_wait(self.manage_receiver_task)
         await cancel_and_wait(self.metrics_task)
