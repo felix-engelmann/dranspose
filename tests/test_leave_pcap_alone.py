@@ -3,7 +3,6 @@ import logging
 from asyncio import StreamReader, StreamWriter
 from typing import Awaitable, Callable, Coroutine, Optional, Any
 
-import aiohttp
 
 import pytest
 import zmq
@@ -19,12 +18,10 @@ from dranspose.ingesters.tcp_positioncap import TcpPcapIngester, TcpPcapSettings
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 async def handle_client(reader: StreamReader, writer: StreamWriter) -> None:
@@ -70,29 +67,10 @@ async def test_pcapingester(
     )
 
     await wait_for_controller(streams={StreamName("pcap"), StreamName("eiger")})
-    async with aiohttp.ClientSession() as session:
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
-        await resp.json()
-
-    context = zmq.asyncio.Context()
-    await stream_eiger(context, 9999, ntrig - 1)
-
-    content = await wait_for_finish()
-
-    await cancel_and_wait(task)
-    context.destroy()
+    ntrig = 10
+    await set_uniform_sequence({StreamName("eiger")}, ntrig)
+    with zmq.asyncio.Context() as context:
+        await stream_eiger(context, 9999, ntrig - 1)
+        content = await wait_for_finish()
+        await cancel_and_wait(task)
     print(content)

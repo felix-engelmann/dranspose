@@ -21,11 +21,9 @@ from dranspose.ingesters.tcp_positioncap import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, monopart_sequence, vworker
 
 
 @pytest.mark.asyncio
@@ -61,21 +59,13 @@ async def test_multiple_scans(
     async with aiohttp.ClientSession() as session:
         ntrig = 20
         mp = {
-            "eiger": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                if i % 12 < 10
-                else None
-                for i in range(ntrig)
-            ],
-            "pcap": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
+            "eiger": [[vworker(i)] if i % 12 < 10 else None for i in range(ntrig)],
+            "pcap": [[vworker(i)] for i in range(ntrig)],
         }
         logging.info("map is %s", mp)
         resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
+            "http://localhost:5000/api/v1/sequence",
+            json=monopart_sequence(mp),
         )
         assert resp.status == 200
         await resp.json()

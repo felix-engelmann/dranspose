@@ -332,7 +332,9 @@ def run() -> None:
                 )
                 root_logger.addHandler(handler)
             except ConnectionError:
-                root_logger.critical(f"Can't connect to {settings.redis_dsn}. Is redis running?")
+                root_logger.critical(
+                    f"Can't connect to {settings.redis_dsn}. Is redis running?"
+                )
                 exit(1)
         args.func(args)
 

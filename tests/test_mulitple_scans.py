@@ -22,11 +22,9 @@ from dranspose.ingesters.zmqsub_xspress3 import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -76,24 +74,8 @@ async def test_multiple_scans(
         )
         assert resp.status == 200
         await resp.json()
-
-        ntrig = 20
-        mp = {
-            "contrast": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
-            "xspress3": [
-                [VirtualWorker(constraint=VirtualConstraint(i)).model_dump(mode="json")]
-                for i in range(ntrig)
-            ],
-        }
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
-        )
-        assert resp.status == 200
-        await resp.json()
+    ntrig = 20
+    await set_uniform_sequence({StreamName("contrast"), StreamName("xspress3")}, ntrig)
 
     context = zmq.asyncio.Context()
 
@@ -159,13 +141,7 @@ async def test_multiple_scans(
         )
 
     # second scan
-    async with aiohttp.ClientSession() as session:
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json=mp,
-        )
-        assert resp.status == 200
-        await resp.json()
+    await set_uniform_sequence({StreamName("contrast"), StreamName("xspress3")}, ntrig)
 
     await stream_cbors(
         context,

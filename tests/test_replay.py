@@ -26,13 +26,11 @@ from dranspose.ingesters.zmqpull_single import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
 )
 
 from dranspose.replay import replay
 from dranspose.worker import Worker
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import wait_for_controller, wait_for_finish, vworker, monopart_sequence
 
 
 async def dump_data(
@@ -109,49 +107,20 @@ async def dump_data(
 
         ntrig = 10
         resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-                "orca": [
-                    [
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i + 1)
-                        ).model_dump(mode="json")
-                    ]
-                    for i in range(1, ntrig)
-                ],
-                "alba": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        ),
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i + 1)
-                        ).model_dump(mode="json"),
-                    ]
-                    for i in range(1, ntrig)
-                ],
-                "slow": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        ),
-                        VirtualWorker(
-                            constraint=VirtualConstraint(2 * i + 1)
-                        ).model_dump(mode="json"),
-                    ]
-                    if i % 4 == 0
-                    else None
-                    for i in range(1, ntrig)
-                ],
-            },
+            "http://localhost:5000/api/v1/sequence",
+            json=monopart_sequence(
+                {
+                    "eiger": [[vworker(2 * i)] for i in range(1, ntrig)],
+                    "orca": [[vworker(2 * i + 1)] for i in range(1, ntrig)],
+                    "alba": [
+                        [vworker(2 * i), vworker(2 * i + 1)] for i in range(1, ntrig)
+                    ],
+                    "slow": [
+                        [vworker(2 * i), vworker(2 * i + 1)] if i % 4 == 0 else None
+                        for i in range(1, ntrig)
+                    ],
+                }
+            ),
         )
         assert resp.status == 200
         uuid = await resp.json()
