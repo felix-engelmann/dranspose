@@ -3,11 +3,9 @@ import logging
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 import h5pyd
 
-import aiohttp
 import numpy as np
 
 import pytest
-from _pytest.fixtures import FixtureRequest
 import zmq.asyncio
 import zmq
 from pydantic_core import Url
@@ -21,19 +19,24 @@ from dranspose.ingesters.stins_parallel import (
 from dranspose.protocol import (
     StreamName,
     WorkerName,
-    VirtualWorker,
-    VirtualConstraint,
     IngesterName,
+    WorkerTag,
 )
 
 from dranspose.worker import Worker, WorkerSettings
 
-from tests.utils import wait_for_controller, wait_for_finish
+from tests.utils import (
+    wait_for_controller,
+    wait_for_finish,
+    set_sequence,
+    monopart_sequence,
+    vworker,
+    set_uniform_sequence,
+)
 
 
 @pytest.mark.asyncio
-async def test_parallel(
-    request: FixtureRequest,
+async def est_parallel(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -68,26 +71,10 @@ async def test_parallel(
         )
     )
 
-    async with aiohttp.ClientSession() as session:
-        await wait_for_controller(
-            streams={StreamName("eiger")}, workers={WorkerName("w1")}
-        )
+    await wait_for_controller(streams={StreamName("eiger")}, workers={WorkerName("w1")})
 
-        ntrig = 10
-        resp = await session.post(
-            "http://localhost:5000/api/v1/mapping",
-            json={
-                "eiger": [
-                    [
-                        VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(
-                            mode="json"
-                        )
-                    ]
-                    for i in range(1, ntrig)
-                ],
-            },
-        )
-        assert resp.status == 200
+    ntrig = 10
+    await set_uniform_sequence(streams={StreamName("eiger")}, ntrig=ntrig)
 
     with zmq.asyncio.Context() as context:
         asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
@@ -119,3 +106,69 @@ async def test_parallel(
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
+
+
+@pytest.mark.asyncio
+async def test_virtualds(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[Worker], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+) -> None:
+    await reducer("tests.aux_payloads:TestReducer")
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("Weven"),
+                worker_tags={WorkerTag("even")},
+                worker_class="tests.test_stins_parallel:VirtualWorker",
+            ),
+        )
+    )
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("Wodd"),
+                worker_tags={WorkerTag("even")},
+                worker_class="tests.test_stins_parallel:VirtualWorker",
+            ),
+        )
+    )
+    await create_ingester(
+        StinsParallelIngester(
+            settings=StinsParallelSettings(
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+            ),
+        )
+    )
+    await create_ingester(
+        StinsParallelIngester(
+            settings=StinsParallelSettings(
+                ingester_name=IngesterName("eiger-2"),
+                ingester_streams=[StreamName("eiger")],
+                upstream_url=Url("tcp://localhost:9999"),
+                ingester_url=Url("tcp://localhost:10011"),
+            ),
+        )
+    )
+
+    await wait_for_controller(streams={StreamName("eiger")}, workers={WorkerName("w1")})
+
+    ntrig = 10
+    await set_sequence(
+        monopart_sequence(
+            {
+                "eiger": [
+                    [vworker(tags={"even" if i % 2 else "odd"})]
+                    for i in range(1, ntrig)
+                ],
+            }
+        )
+    )
+
+    with zmq.asyncio.Context() as context:
+        asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
+
+        await wait_for_finish()
