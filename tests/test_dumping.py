@@ -425,6 +425,7 @@ async def test_dump_bin_parameters(
 
     context.destroy()
 
+
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
 @pytest.mark.asyncio
 async def test_dump_and_not_dump(
@@ -453,11 +454,11 @@ async def test_dump_and_not_dump(
     # Create mapping
     ntrig = 10
     mapping = {
-            "xrd": [
-                [ VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json") ]
-                for i in range(1, ntrig)
-            ],
-        }
+        "xrd": [
+            [VirtualWorker(constraint=VirtualConstraint(2 * i)).model_dump(mode="json")]
+            for i in range(1, ntrig)
+        ],
+    }
     await wait_for_controller(streams={StreamName("xrd")})
 
     context = zmq.asyncio.Context()

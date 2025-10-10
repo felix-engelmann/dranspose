@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import logging
-from typing import Awaitable, Callable, Optional, Any
+from typing import Awaitable, Callable, Optional
 
 import aiohttp
 import numpy as np
@@ -12,22 +12,7 @@ import zmq
 from psutil._common import snicaddr, snetio
 
 from dranspose.workload_generator import Statistics, NetworkConfig
-
-
-async def consume(
-    ctx: zmq.Context[Any], num: int, typ: int = zmq.PULL, port: int = 9999
-) -> int:
-    s = ctx.socket(typ)
-    logging.info("created socket")
-    s.connect(f"tcp://127.0.0.1:{port}")
-    if typ == zmq.SUB:
-        s.setsockopt(zmq.SUBSCRIBE, b"")
-    logging.info("connected socket to port %s", port)
-    for _ in range(num):
-        data = await s.recv_multipart(copy=False)
-        logging.debug("received data %s", data)
-
-    return num
+from utils import consume_zmq
 
 
 @pytest.mark.parametrize("srv,cli", [(zmq.PUSH, zmq.PULL), (zmq.PUB, zmq.SUB)])
@@ -52,7 +37,7 @@ async def test_debugger(
         state = await st.json()
         logging.info("gen state %s", state)
 
-        task = asyncio.create_task(consume(ctx, nframes + 2, typ=cli))
+        task = asyncio.create_task(consume_zmq(ctx, nframes + 2, typ=cli))
         logging.info("created consumer task")
 
         st = await session.post(

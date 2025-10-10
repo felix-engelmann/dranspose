@@ -3,6 +3,7 @@ import logging
 from typing import Optional, Any
 
 import aiohttp
+import zmq
 
 from pydantic_core import Url
 
@@ -82,3 +83,29 @@ async def wait_for_finish(
                 logging.error("stalled at progress %s", content)
                 raise TimeoutError("processing stalled")
         return content
+
+
+async def consume_zmq(
+    ctx: zmq.Context[Any],
+    num: int,
+    typ: int = zmq.PULL,
+    port: int = 9999,
+    return_data=False,
+) -> int | list[list[bytes]]:
+    s = ctx.socket(typ)
+    logging.info("created socket")
+    s.connect(f"tcp://127.0.0.1:{port}")
+    if typ == zmq.SUB:
+        s.setsockopt(zmq.SUBSCRIBE, b"")
+    logging.info("connected socket to port %s", port)
+    pkgs = []
+    for _ in range(num):
+        if return_data:
+            data = await s.recv_multipart()
+            pkgs.append(data)
+        else:
+            data = await s.recv_multipart(copy=False)
+            pkgs.append(len(data))
+            logging.debug("received data %s", data)
+
+    return pkgs
