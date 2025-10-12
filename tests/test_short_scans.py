@@ -168,7 +168,7 @@ async def test_short_scans(
         PosixPath("tests/data/xspress3mini-dump20.cbors"),
         0.001,
         zmq.PUB,
-        begin=30,  # type: ignore[call-arg]
+        begin=10,  # type: ignore[call-arg]
     )
 
     asyncio.create_task(

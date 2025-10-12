@@ -38,14 +38,8 @@ async def test_cbor(
 @pytest.mark.parametrize(
     "begin,end",
     [
-        (
-            3,
-            None,
-        ),
-        (
-            None,
-            4,
-        ),
+        (3, None),
+        (None, 4),
         (2, 5),
     ],
 )
