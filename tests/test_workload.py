@@ -12,7 +12,7 @@ import zmq
 from psutil._common import snicaddr, snetio
 
 from dranspose.workload_generator import Statistics, NetworkConfig
-from utils import consume_zmq
+from tests.utils import consume_zmq
 
 
 @pytest.mark.parametrize("srv,cli", [(zmq.PUSH, zmq.PULL), (zmq.PUB, zmq.SUB)])
