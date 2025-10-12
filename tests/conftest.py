@@ -497,12 +497,15 @@ async def stream_cbors() -> Callable[
                 if end:
                     if i >= end:
                         send = False
+                i += 1
                 if send:
                     await socket.send_multipart(frames)
+                    # logging.debug("created message %s", frames)
                     await asyncio.sleep(frame_time)
             except (cbor2.CBORDecodeEOF, EOFError):
+                logging.info("all messages read from cbor, total: %d", i)
                 break
-                assert i > 0, f"CBOR file [{filename}] had no frames"
+        assert i > 0, f"CBOR file [{filename}] had no frames"
         f.close()
         socket.close()
 
