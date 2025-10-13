@@ -4,18 +4,17 @@ import logging
 import pickle
 import traceback
 from contextlib import asynccontextmanager, nullcontext
-from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple
+from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple, Annotated
 
 import zmq.asyncio
-from fastapi import FastAPI, HTTPException
-from pydantic import UUID4
-from starlette.responses import Response
+from fastapi import FastAPI, Body
+from pydantic import UUID4, BaseModel
+from starlette.requests import Request
 
 from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.h5dict import router
-from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
     ReducerState,
@@ -53,10 +52,24 @@ class Reducer(DistributedService):
 
         self.custom = None
         self.custom_context: dict[Any, Any] = {}
+        self.parameter_class: type | None = None
+        self.parameter_object = None
         if self._reducer_settings.reducer_class:
             try:
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
                 self._logger.info("custom reducer class %s", self.custom)
+                try:
+                    pcl = self.custom.parameter_class
+                    if issubclass(pcl, BaseModel):
+                        self.parameter_class = pcl
+                        self.parameter_object = pcl()
+                    else:
+                        self._logger.error("parameter_class is not a BaseModel")
+                    self._logger.info("parameter class is %s", pcl)
+                except Exception as e:
+                    self._logger.warning(
+                        "could not create parameter class %s", e.__repr__()
+                    )
                 try:
                     self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
                 except AttributeError:
@@ -205,32 +218,53 @@ class Reducer(DistributedService):
         self.ctx.destroy(linger=0)
         self._logger.info("closed reducer")
 
-
-reducer: Reducer
+    async def get_params(self) -> Any:
+        return self.parameter_object
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
-    global reducer
-    reducer = Reducer()
-    run_task = asyncio.create_task(reducer.run())
+    app.state.reducer = Reducer()
+    run_task = asyncio.create_task(app.state.reducer.run())
     run_task.add_done_callback(done_callback)
 
     def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         data = {}
         lock = nullcontext()
-        if reducer.reducer is not None:
-            if hasattr(reducer.reducer, "publish"):
-                data = reducer.reducer.publish
-            if hasattr(reducer.reducer, "publish_rlock"):
-                lock = reducer.reducer.publish_rlock
+        if app.state.reducer.reducer is not None:
+            if hasattr(app.state.reducer.reducer, "publish"):
+                data = app.state.reducer.reducer.publish
+            if hasattr(app.state.reducer.reducer, "publish_rlock"):
+                lock = app.state.reducer.reducer.publish_rlock
         return data, lock
+
+    if app.state.reducer.parameter_class is not None:
+
+        async def set_params(
+            request: Request, data: Annotated[app.state.reducer.parameter_class, Body()]
+        ) -> dict[str, list[str]]:
+            update_data = data.model_dump(exclude_unset=True)
+            logger.debug("update data %s", update_data)
+            request.app.state.reducer.parameter_object = (
+                request.app.state.reducer.parameter_object.model_copy(
+                    update=update_data
+                )
+            )
+            return {"updated_keys": list(update_data.keys())}
+
+        app.add_api_route(
+            "/api/v1/parameters",
+            app.state.reducer.get_params,
+            methods=["GET"],
+            response_model=app.state.reducer.parameter_class,
+        )
+        app.add_api_route("/api/v1/parameters", set_params, methods=["POST"])
 
     app.state.get_data = get_data
     yield
     await cancel_and_wait(run_task)
-    await reducer.close()
+    await app.state.reducer.close()
     # Clean up the ML models and release the resources
 
 
@@ -242,32 +276,3 @@ app.include_router(router)
 @app.get("/api/v1/status")
 async def get_status() -> bool:
     return True
-
-
-@app.get("/api/v1/result/pickle")
-async def get_result() -> Any | bytes:
-    global reducer
-    data = b""
-    try:
-        if hasattr(reducer.reducer, "publish"):
-            data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
-    except pickle.PicklingError:
-        logging.warning("publishable data cannot be pickled")
-    return Response(data, media_type="application/x.pickle")
-
-
-@app.get("/api/v1/result/{path:path}")
-async def get_path(path: str) -> Any:
-    global reducer
-    if not hasattr(reducer.reducer, "publish"):
-        raise HTTPException(status_code=404, detail="no publishable data")
-    try:
-        if path == "":
-            path = "$"
-        jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
-        print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
-        data = pickle.dumps(ret)
-        return Response(data, media_type="application/x.pickle")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
