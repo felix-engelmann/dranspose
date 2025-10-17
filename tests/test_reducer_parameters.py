@@ -1,9 +1,14 @@
+import asyncio
 import logging
 from typing import Callable, Optional, Awaitable, Any
 
 import aiohttp
 import pytest
 from pydantic import BaseModel
+
+from dranspose.protocol import WorkerName, EnsembleState
+from dranspose.worker import Worker, WorkerSettings
+from tests.utils import wait_for_controller
 
 
 class PayloadParameters(BaseModel):
@@ -15,6 +20,18 @@ class PayloadParameters(BaseModel):
     isit: bool = False
     complex: tuple[int, int] | None = None
     crazy: dict[str, dict[int, str]] = {}
+
+
+class ParamWorker:
+    parameter_class = PayloadParameters
+
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    def process_event(
+        self, *args, parameters: PayloadParameters = None, **kwargs
+    ) -> None:
+        logging.info("worker got params %s", parameters)
 
 
 class ParamReducer:
@@ -43,7 +60,7 @@ async def test_params(
 
         logging.info("default params %s", params)
 
-        newparam = PayloadParameters(file_blob=b"\x12" * 100)
+        newparam = PayloadParameters(file_blob=b"\x12" * 100, crazy={"one": {3: "as"}})
         res = await session.post(
             "http://localhost:5001/api/v1/parameters",
             json=newparam.model_dump(mode="json"),
@@ -100,3 +117,40 @@ async def test_params(
             json={"crazy": {"alpha": {"should be int": "beta"}}},
         )
         assert res.status == 422
+
+
+@pytest.mark.asyncio
+async def est_transferclass() -> None:
+    logging.info("sig %s", PayloadParameters.__signature__)
+
+
+@pytest.mark.asyncio
+async def est_params_worker(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName | Worker], Awaitable[Worker]],
+) -> None:
+    await reducer("tests.test_reducer_parameters:ParamReducer")
+    await create_worker(
+        Worker(
+            settings=WorkerSettings(
+                worker_name=WorkerName("w1"),
+                worker_class="tests.test_reducer_parameters:ParamWorker",
+            ),
+        )
+    )
+
+    await wait_for_controller(workers={WorkerName("w1")})
+
+    await asyncio.sleep(2)
+
+    async with aiohttp.ClientSession() as session:
+        res = await session.post(
+            "http://localhost:5001/api/v1/parameters",
+            json={"crazy": {"alpha": {1: "beta"}}},
+        )
+        assert res.status == 200
+
+        st = await session.get("http://localhost:5000/api/v1/config")
+        conf = EnsembleState.model_validate(await st.json())
+        logging.info("state %s", conf)

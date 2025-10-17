@@ -99,6 +99,18 @@ class Worker(DistributedService):
                 self._logger.info("custom worker class %s", self.custom)
 
                 try:
+                    pcl = self.custom.parameter_class
+                    if issubclass(pcl, BaseModel):
+                        self.parameter_class = pcl
+                        self.parameter_object = pcl()
+                    else:
+                        self._logger.error("parameter_class is not a BaseModel")
+                    self._logger.info("parameter class is %s", pcl)
+                except Exception as e:
+                    self._logger.warning(
+                        "could not create parameter class %s", e.__repr__()
+                    )
+                try:
                     self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
                 except AttributeError:
                     self._logger.info(

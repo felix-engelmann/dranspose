@@ -101,6 +101,12 @@ class RedisKeys:
     @staticmethod
     @cache
     @validate_call
+    def parameter_updates() -> str:
+        return f"{RedisKeys.PREFIX}:parameter:updates"
+
+    @staticmethod
+    @cache
+    @validate_call
     def parameters(
         name: str,
         uuid: UUID4 | Literal["*"],
@@ -126,6 +132,11 @@ class ControllerUpdate(BaseModel):
     target_parameters_hash: Optional[HashDigest] = None
     active_streams: list[StreamName] = []
     finished: bool = False
+
+
+class ParameterUpdate(BaseModel):
+    parameter_hash_target: Optional[HashDigest] = None
+    update: Any = None
 
 
 class WorkParameter(BaseModel):
@@ -293,6 +304,8 @@ class DistributedState(BaseModel):
     dranspose_version: Optional[str] = None
     mapreduce_version: Optional[BuildGitMeta] = None
     parameters_hash: Optional[HashDigest] = None
+    parameter_signature: Optional[str] = None
+    parameter_hash: Optional[HashDigest] = None
     processed_events: int = 0
     event_rate: float = 0.0
 

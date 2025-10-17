@@ -630,6 +630,7 @@ class Controller:
         await cancel_and_wait(self.default_task)
         await cancel_and_wait(self.consistent_task)
         await self.redis.delete(RedisKeys.updates())
+        await self.redis.delete(RedisKeys.parameter_updates())
         logger.info("deleted updates redis stream")
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:

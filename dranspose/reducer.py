@@ -23,6 +23,7 @@ from dranspose.protocol import (
     ReducerUpdate,
     DistributedStateEnum,
     StreamName,
+    ParameterUpdate,
 )
 
 logger = logging.getLogger(__name__)
@@ -246,10 +247,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         ) -> dict[str, list[str]]:
             update_data = data.model_dump(exclude_unset=True)
             logger.debug("update data %s", update_data)
+            update_json = data.model_dump_json(exclude_unset=True)
+            logger.info("update json %s", update_json)
             request.app.state.reducer.parameter_object = (
                 request.app.state.reducer.parameter_object.model_copy(
                     update=update_data
                 )
+            )
+            update = ParameterUpdate(update=update_data)
+            await request.app.state.reducer.redis.xadd(
+                RedisKeys.parameter_updates(),
+                {"data": update.model_dump_json()},
             )
             return {"updated_keys": list(update_data.keys())}
 
