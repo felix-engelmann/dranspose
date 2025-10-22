@@ -28,6 +28,18 @@ To get past this, we commonly use multiple workers which are then assigned in an
 To scale more efficiently, it is possible to assign whole batches of events to a single worker.
 This means, the trigger map should assign multiple consecutive events to the same worker.
 This creates a batch assignment and sends a single, larger message through redis.
+Still, the `process_event` function of the worker is invoked for every event individually, so the analysis remains the same.
+
+A simple way to create such a batched trigger map is integer division:
+```python
+{'parts': 
+     {'main': 
+          {'det': 
+               [[{'constraint': i // 10}] for i in range(ntrig)]
+           }
+      },
+ 'sequence': ['main']}
+```
 
 ## Worker to Reducer
 
