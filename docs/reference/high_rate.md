@@ -23,7 +23,7 @@ flowchart TD
 ```
 
 A basic echo through two redis streams on a local redis achieves around 1200 roundtrips per second (c.f. test_redis_rate).
-To get past this, use multiple workers which are then assigned in an interleaved way.
+To get past this, we commonly use multiple workers which are then assigned in an interleaved way.
 
 To scale more efficiently, it is possible to assign whole batches of events to a single worker.
 This means, the trigger map should assign multiple consecutive events to the same worker.
