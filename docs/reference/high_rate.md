@@ -32,7 +32,7 @@ This creates a batch assignment and sends a single, larger message through redis
 ## Worker to Reducer
 
 Another rate limit stems from the invocation of `process_result` in the reducer. It is usually limited to around 1000 invocations per second and considerably less if the payload performs complex computation. The `timer` function can be used to minimize the computation load on `process_result`.
-A good way to prevent this bottleneck is to return `None` in `process_event` at the worker as often as possible.
+A good way to prevent this bottleneck is to return `None` in `process_event` at the worker as often as possible and return a batch of results from the worker at a lower rate.
 Only non-`None` values are sent to the reducer and are processed. `None` outputs from the worker mark the event as done.
 
 ## Single Ingester ZMQ
