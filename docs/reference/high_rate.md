@@ -16,7 +16,7 @@ flowchart TD
     worker_ready --> ready_redis[Worker: Write Ready to Redis]
     ready_redis --> contr_read[Controller: Read from Redis]
     contr_read --> assign[Controller: Assign worker]
-    assign --> write[Controller: Assignment to Redis]
+    assign --> write[Controller: Write Assignment to Redis]
     write --> worker_read[Worker: Read Assignment]
     worker_read --> receive[Worker: Receive Data]
     receive --> process_event
