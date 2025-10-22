@@ -13,7 +13,7 @@ Below is a diagram of the path required for every worker for every event it proc
 ```mermaid
 flowchart TD
     process_event[Worker: process_event] --> worker_ready[Worker: done]
-    worker_ready --> ready_redis[Worker: Ready to Redis]
+    worker_ready --> ready_redis[Worker: Write Ready to Redis]
     ready_redis --> contr_read[Controller: Read from Redis]
     contr_read --> assign[Controller: Assign worker]
     assign --> write[Controller: Assignment to Redis]
