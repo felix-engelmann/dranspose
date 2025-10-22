@@ -37,5 +37,5 @@ Only non-`None` values are sent to the reducer and are processed. `None` outputs
 
 ## Single Ingester ZMQ
 
-Independent of the redis, controller and python event loop, the zmq library enforces some hard limits how much frames it can receive per second.
+Independent of the redis, controller and python event loop, the zmq library enforces some hard limits how many frames it can receive per second.
 The single ZMQ ingester in rust may reach this limit. To achieve higher rates, more than one zmq PULL sockets need to connect to the upstream source.
