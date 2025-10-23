@@ -477,6 +477,8 @@ async def stream_cbors() -> Callable[
             for _ in range(3):
                 await socket.send_multipart([b"emptyness"])
                 await asyncio.sleep(0.1)
+        if begin is not None and end is not None:
+            assert end > begin
         base, ext = os.path.splitext(filename)
         if ext == ".gz":
             _, ext = os.path.splitext(base)

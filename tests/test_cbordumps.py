@@ -111,3 +111,23 @@ async def test_cbor_empty(
             await stream_cbors(context, 22004, PosixPath(tmpfile), 0.001, zmq.PUSH)
 
         await cancel_and_wait(task)
+
+
+@pytest.mark.asyncio
+async def test_end_begin(
+    stream_cbors: Callable[
+        [zmq.Context[Any], int, os.PathLike[Any] | str, float, int, int, int],
+        Coroutine[Any, Any, None],
+    ],
+) -> None:
+    with zmq.asyncio.Context() as context:
+        with pytest.raises(AssertionError):
+            await stream_cbors(
+                context,
+                22004,
+                PosixPath("tests/data/albaem-dump.cbors"),
+                0.001,
+                zmq.PUSH,
+                begin=5,
+                end=3,
+            )
