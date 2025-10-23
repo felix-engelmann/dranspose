@@ -41,7 +41,7 @@ class TestReducer:
             k: json.loads(v.frames[0]) if v.typ == "STINS" else "blob"
             for k, v in result.payload[0].streams.items()
         }
-        self.publish["parameters"][result.event_number] = parameters
+        self.publish["parameters"][str(result.event_number)] = parameters
 
     def finish(
         self, parameters: dict[ParameterName, WorkParameter] | None = None

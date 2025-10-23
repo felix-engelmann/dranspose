@@ -44,16 +44,12 @@ async def test_replay(
                 pass
         await asyncio.sleep(1)
 
-        def work() -> None:
-            f = h5pyd.File("http://localhost:5010/", "r")
-            logging.info(
-                f"file {list(f.keys())}",
-            )
-            logging.warning("int_param %s", f["params"]["int_param"])
-            assert f["params"]["int_param"][()] == 0
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, work)
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info(
+            f"file {list(f.keys())}",
+        )
+        logging.warning("int_param %s", f["params"]["int_param"])
+        assert f["params"]["int_param"][()] == 0
 
         resp = await session.post(
             "http://localhost:5010/api/v1/parameter/int_param",
@@ -63,16 +59,12 @@ async def test_replay(
 
         await asyncio.sleep(3)
 
-        def work2() -> None:
-            f = h5pyd.File("http://localhost:5010/", "r")
-            logging.info(
-                f"file {list(f.keys())}",
-            )
-            logging.warning("int_param %s", f["params"]["int_param"])
-            assert f["params"]["int_param"][()] == 42
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, work2)
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info(
+            f"file {list(f.keys())}",
+        )
+        logging.warning("int_param %s", f["params"]["int_param"])
+        assert f["params"]["int_param"][()] == 42
 
     done_event.wait()
 
