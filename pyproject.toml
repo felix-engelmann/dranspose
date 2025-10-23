@@ -27,6 +27,7 @@ dependencies = [
     "jsonpath-ng",
     "cbor2",
     "redis-logs",
+    "h5py",
 ]
 dynamic = ["version"]
 
