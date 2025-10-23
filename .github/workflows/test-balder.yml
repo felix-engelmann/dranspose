@@ -24,6 +24,11 @@ jobs:
         with:
           repository: maxiv-science/drp-balder
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          path: ../dranspose
+
       - name: Replace maxiv internal image
         run: |
           sed -i "s#harbor.maxiv.lu.se/dockerhub#docker.io#g" Dockerfile
@@ -48,4 +53,4 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm ${{ steps.meta.outputs.tags }} sh -c "python -m pip install pytest && pytest tests/* --log-cli-level=INFO"
+          docker run -v .:/payload -v ../dranspose:/dranspose --rm ${{ steps.meta.outputs.tags }} sh -c "python -m pip install pytest && cd /dranspose && python -m pip install . && cd /payload && pytest tests/* --log-cli-level=INFO"
