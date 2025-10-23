@@ -26,7 +26,7 @@ jobs:
 
       - name: Replace maxiv internal image
         run: |
-          sed "s#harbor.maxiv.lu.se/dockerhub#docker.io#g" Dockerfile
+          sed -i "s#harbor.maxiv.lu.se/dockerhub#docker.io#g" Dockerfile
 
       # Uses the `docker/login-action` action to log in to the Container registry registry using the account and password that will publish the packages. Once published, the packages are scoped to the account defined here.
       - name: Extract metadata (tags, labels) for Docker
