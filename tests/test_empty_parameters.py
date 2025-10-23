@@ -1,8 +1,8 @@
 import asyncio
 import logging
-import pickle
 from typing import Callable, Optional, Awaitable, Any, Coroutine
 
+import h5pyd
 import aiohttp
 import pytest
 import uvicorn
@@ -21,7 +21,7 @@ from dranspose.protocol import (
     StreamName,
 )
 from dranspose.worker import Worker, WorkerSettings
-from tests.utils import wait_for_controller, set_uniform_sequence
+from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
@@ -87,39 +87,38 @@ async def test_empty_params(
 
         asyncio.create_task(stream_eiger(context, 9999, ntrig - 1))
 
-        async with aiohttp.ClientSession() as session:
-            st = await session.get("http://localhost:5000/api/v1/progress")
-            content = await st.json()
-            while not content["finished"]:
-                await asyncio.sleep(0.3)
-                st = await session.get("http://localhost:5000/api/v1/progress")
-                content = await st.json()
+        await wait_for_finish()
 
-            st = await session.get("http://localhost:5001/api/v1/result/pickle")
-            content = await st.content.read()
-            result = pickle.loads(content)
-            logging.warning("content in reducer is %s", result["params"])
-            logging.warning("content in worker is %s", result["worker_params"])
-            resparams = result["params"]
+        def work() -> None:
+            f = h5pyd.File("http://localhost:5001/", "r")
+            logging.info(
+                f"file {list(f.keys())}",
+            )
+            logging.warning("version %s", list(f["params"].keys()))
+
+            logging.warning("str %s", f["params"]["bytes_param"])
             for t, v in [
-                (str, ""),
+                (str, b""),
                 (bytes, b""),
                 (int, 0),
                 (float, 0.0),
                 (bool, False),
             ]:
-                logging.info("param %s", resparams[f"{t.__name__}_param"])
-                assert resparams[f"{t.__name__}_param"].value == v
-            worparams = result["worker_params"]
+                logging.warning("param %s", f["params"][f"{t.__name__}_param"])
+                assert f["params"][f"{t.__name__}_param"][()] == v
+
             for t, v in [
-                (str, ""),
+                (str, b""),
                 (bytes, b""),
                 (int, 0),
                 (float, 0.0),
                 (bool, False),
             ]:
-                logging.info("work param %s", worparams[f"{t.__name__}_param"])
-                assert worparams[f"{t.__name__}_param"].value == v
+                logging.info("work param %s", f["worker_params"][f"{t.__name__}_param"])
+                assert f["worker_params"][f"{t.__name__}_param"][()] == v
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, work)
 
         context.destroy()
 

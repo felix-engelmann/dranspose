@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import pickle
+import h5pyd
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 from dranspose.protocol import (
@@ -65,16 +65,18 @@ async def test_timestamps(
         asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
         await wait_for_finish()
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5001/api/v1/result/")
-        content = await st.content.read()
-        result = pickle.loads(content)[0]
-        assert len(result["fast"]) == ntrig - 1
-        for t in result["fast"]:
+    def work() -> None:
+        f = h5pyd.File("http://localhost:5001/", "r")
+        logging.info("fast %s", f["fast"][:])
+        data = f["fast"][:]
+        assert len(data) == ntrig - 1
+        for t in data:
             assert len(t) == 2
             assert t[0] < t[1]
             if t[1] > 0.1:
                 logging.warning(
                     "the pipeline end to end latency is larger then 100ms: %s", t
                 )
-        logging.info("content is %s", result)
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work)

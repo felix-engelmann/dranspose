@@ -26,7 +26,6 @@ from dranspose.event import (
     message_tag_hook,
 )
 from dranspose.helpers.h5dict import router
-from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.protocol import (
     WorkerName,
     HashDigest,
@@ -82,23 +81,6 @@ def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
 reducer_app.state.get_data = get_data
 
 reducer_app.include_router(router)
-
-
-@reducer_app.get("/api/v1/result/{path:path}")
-async def get_path(path: str) -> Any:
-    global reducer
-    if reducer is None or not hasattr(reducer, "publish"):
-        raise HTTPException(status_code=404, detail="no publishable data")
-    try:
-        if path == "":
-            path = "$"
-        jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
-        print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.publish)]
-        data = pickle.dumps(ret)
-        return Response(data, media_type="application/x.pickle")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
 
 
 @reducer_app.post("/api/v1/parameter/{name}")

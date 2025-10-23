@@ -24,7 +24,6 @@ dependencies = [
     # "requests",
     "pydantic",
     "pydantic-settings",
-    "jsonpath-ng",
     "cbor2",
     "redis-logs",
     "h5py",
