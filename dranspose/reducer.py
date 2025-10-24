@@ -131,7 +131,9 @@ class Reducer(DistributedService):
                 if hasattr(self.reducer, "timer"):
                     try:
                         loop = asyncio.get_event_loop()
-                        delay = await loop.run_in_executor(None, self.reducer.timer)
+                        delay = await loop.run_in_executor(
+                            None, self.reducer.timer, self.parameters
+                        )
                     except Exception as e:
                         self._logger.error(
                             "custom reducer timer failed: %s\n%s",
