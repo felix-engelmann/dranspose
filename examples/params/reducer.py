@@ -14,5 +14,9 @@ class ParamReducer:
         self.publish["params"] = parameters
         self.publish["worker_params"] = result.payload
 
+    def timer(self, parameters=None):
+        logging.info("parameters are %s", parameters)
+        self.publish["params"] = parameters
+
     def finish(self, parameters=None):
-        print("finished dummy reducer work")
+        logging.info("finished dummy reducer work")
