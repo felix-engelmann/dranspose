@@ -4,16 +4,22 @@ This document keeps track of new features and breaking changes which need to be 
 
 ## 0.2.0
 
-### Mapping Endpoints
-
-The controller `/v1/api/mapping` endpoint is soon to be deprecated but still available. Please move to [`/api/v1/sequence`](https://dranspo.se/deployment/sardana/) to submit a trigger map to dranspose.
-
 ### Pickled Result
 
-The reducer and replay no longer expose the `self.publish` data via pickle at `/api/v1/result/*`
+!!! warning
+    This is a breaking change for viewers which fetch the data as pickle
+
+The reducer and replay no longer expose the `self.publish` data via pickle at `/api/v1/result/*`.
 To assure that data is fetchable via h5pyd, make sure the dictionary only has string keys and no "complex" python objects.
 
-### Reducer timer()
+### Mapping Endpoints
+
+The controller `/v1/api/mapping` endpoint is soon to be deprecated but still available. Please move to [`/api/v1/sequence`](../reference/internals/controller.md) to submit a trigger map to dranspose.
+
+### Reducer `timer()`
+
+!!! warning
+    The additional parameter is a breaking change for reducer payloads
 
 The `timer()` function of the reducer now receives a copy of the analysis parameters as an argument. Make sure to update the signature of the function if you implement it.
 
