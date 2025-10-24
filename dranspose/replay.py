@@ -186,7 +186,7 @@ def timer(red: Any) -> None:
     while True:
         delay = 1
         if hasattr(red, "timer"):
-            delay = red.timer()
+            delay = red.timer(reducer_app.state.parameters)
 
         time.sleep(delay)
 
