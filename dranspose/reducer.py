@@ -7,15 +7,13 @@ from contextlib import asynccontextmanager, nullcontext
 from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple
 
 import zmq.asyncio
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import UUID4
-from starlette.responses import Response
 
 from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.h5dict import router
-from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.protocol import (
     ReducerState,
@@ -244,32 +242,3 @@ app.include_router(router)
 @app.get("/api/v1/status")
 async def get_status() -> bool:
     return True
-
-
-@app.get("/api/v1/result/pickle")
-async def get_result() -> Any | bytes:
-    global reducer
-    data = b""
-    try:
-        if hasattr(reducer.reducer, "publish"):
-            data = pickle.dumps(reducer.reducer.publish)  # type: ignore [union-attr]
-    except pickle.PicklingError:
-        logging.warning("publishable data cannot be pickled")
-    return Response(data, media_type="application/x.pickle")
-
-
-@app.get("/api/v1/result/{path:path}")
-async def get_path(path: str) -> Any:
-    global reducer
-    if not hasattr(reducer.reducer, "publish"):
-        raise HTTPException(status_code=404, detail="no publishable data")
-    try:
-        if path == "":
-            path = "$"
-        jsonpath_expr = NumpyExtentedJsonPathParser(debug=False).parse(path)
-        print("expr", jsonpath_expr.__repr__())
-        ret = [match.value for match in jsonpath_expr.find(reducer.reducer.publish)]  # type: ignore [union-attr]
-        data = pickle.dumps(ret)
-        return Response(data, media_type="application/x.pickle")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
