@@ -42,3 +42,5 @@ sequenceDiagram
     Redis/Ready/uuid ->> Controller: wait for all components to finish
     
 ```
+
+<swagger-ui src="controller-api.json"/>
