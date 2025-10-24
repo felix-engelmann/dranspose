@@ -1,6 +1,6 @@
 # Version Upgrades
 
-This document keeps track of breaking changes which need to be applied to payloads.
+This document keeps track of new features and breaking changes which need to be applied to payloads and modifications to the external interface of the framework.
 
 ## 0.2.0
 
