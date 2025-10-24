@@ -6,7 +6,7 @@ This document keeps track of new features and breaking changes which need to be 
 
 ### Mapping Endpoints
 
-The controller `/v1/api/mapping` endpoint is soon to be deprecated but still available. Please move to `/api/v1/sequence`
+The controller `/v1/api/mapping` endpoint is soon to be deprecated but still available. Please move to [`/api/v1/sequence`](https://dranspo.se/deployment/sardana/) to submit a trigger map to dranspose.
 
 ### Pickled Result
 
