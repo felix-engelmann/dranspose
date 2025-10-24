@@ -366,3 +366,4 @@ def replay(
             stop_event.wait()
         except KeyboardInterrupt:
             pass
+        logger.info("replay finished")
