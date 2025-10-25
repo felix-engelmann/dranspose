@@ -551,7 +551,7 @@ GROUP "/" {
 For some applications the mean of a small rectangle might be sufficient, but more often it is interesting to analysse the full 2d image.
 One option is to azimuthally integrate the image to get the intensity on a radial.
 An approachable packet is the `azint` conda package.
-After installing it, it needs the detector geometry. Intially we will provide it fully manually by creating a `Detector` and a `Pony` instance.
+After installing it, it needs the detector geometry. Intially we will provide it fully manually by creating a `Detector` and a `Poni` instance.
 
 After creating an `AzimuthalIntegrator` instance, we send the radial axis of *q* values to the reducer to save them to the h5 file and prepare the dimensions of the dataset with values, having the same length.
 
