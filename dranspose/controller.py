@@ -355,7 +355,7 @@ class Controller:
     async def default_parameters(self) -> None:
         """The descriptions (and default values) for the parameters are defined
         in the worker's payload and published to redis. default_parameters
-        retieves the description and adds it to the list of parameters if
+        retrieves the description and adds it to the list of parameters if
         they are missing."""
         while True:
             try:
@@ -804,7 +804,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/mapping")
     async def get_mapping(request: Request) -> dict[str, Any]:
-        """alias for backwards compatability"""
+        """alias for backwards compatibility"""
         return await get_sequence(request)
 
     @app.get("/api/v1/sequence")

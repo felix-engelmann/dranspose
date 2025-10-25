@@ -23,7 +23,7 @@ class PositioncapParser:
         Parses a position capture packet
 
         Arguments:
-            data: a frame comming from pcap
+            data: a frame coming from pcap
 
         Returns:
             a position capture

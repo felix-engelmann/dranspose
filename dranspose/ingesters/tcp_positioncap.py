@@ -16,7 +16,7 @@ class TcpPcapSettings(IngesterSettings):
 
 class TcpPcapIngester(Ingester):
     """
-    A simple ingester class to comsume a stream from the streaming-receiver repub port
+    A simple ingester class to consume a stream from the streaming-receiver repub port
     """
 
     def __init__(self, settings: Optional[TcpPcapSettings] = None) -> None:

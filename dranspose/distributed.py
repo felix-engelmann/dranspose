@@ -182,7 +182,7 @@ class DistributedService(abc.ABC):
                                             Parameter.validate_json(desc)
                                         )
                                         self._logger.info(
-                                            "set paremter has a description %s",
+                                            "set parameter has a description %s",
                                             param_desc,
                                         )
                                         self.parameters[

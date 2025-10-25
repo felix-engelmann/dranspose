@@ -1,6 +1,6 @@
 # High Rate Scans
 
-There are a few critial roundtrips which can limit the rate of events dranspose can process.
+There are a few critical roundtrips which can limit the rate of events dranspose can process.
 
 Most of these bottlenecks are mitigated by clever triggermap and payload design.
 

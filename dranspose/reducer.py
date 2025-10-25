@@ -63,7 +63,7 @@ class Reducer(DistributedService):
                     )
                 except Exception as e:
                     self._logger.error(
-                        "custom worker parameter descripition is broken: %s",
+                        "custom worker parameter description is broken: %s",
                         e.__repr__(),
                     )
             except Exception as e:

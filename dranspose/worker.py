@@ -106,7 +106,7 @@ class Worker(DistributedService):
                     )
                 except Exception as e:
                     self._logger.error(
-                        "custom worker parameter descripition is broken: %s",
+                        "custom worker parameter description is broken: %s",
                         e.__repr__(),
                     )
 
@@ -444,7 +444,7 @@ class Worker(DistributedService):
                 raw_config = await self.redis.get(key)
                 if raw_config is None:
                     logging.warning(
-                        "ingester config key %s disappeard while updating", key
+                        "ingester config key %s disappeared while updating", key
                     )
                     continue
                 cfg = IngesterState.model_validate_json(raw_config)

@@ -12,7 +12,7 @@ def parse(data: StreamData) -> UnionType:
     Parses a sardana packet, which returns a dict
 
     Arguments:
-        data: a frame comming from sardana
+        data: a frame coming from sardana
 
     Returns:
         a SardanaPacket

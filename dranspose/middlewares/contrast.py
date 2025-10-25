@@ -12,7 +12,7 @@ def parse(data: StreamData) -> UnionType:
     Parses a contrast packet, which returns a dict, depending on the status of contrast
 
     Arguments:
-        data: a frame comming from contrast
+        data: a frame coming from contrast
 
     Returns:
         a ContrastPacket containing a.o. the current status

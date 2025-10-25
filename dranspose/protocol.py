@@ -26,7 +26,7 @@ Strongly typed worker tag (str)
 IngesterName = NewType("IngesterName", str)
 VirtualConstraint = NewType("VirtualConstraint", int)
 """
-Stronly typed constraint for workers (int)
+Strongly typed constraint for workers (int)
 """
 EventNumber = NewType("EventNumber", int)
 """

@@ -4,7 +4,7 @@ Sometimes, recording the data to develop an analysis in advance is not feasible.
 The replay module of dranspose usually reads from recorded data via cbors files.
 
 However, it is possible to provide custom streams instead of cbors.
-Special attention needs to be provided to create a stream which is similar to the one encounted at the experiment.
+Special attention needs to be provided to create a stream which is similar to the one encountered at the experiment.
 
 Instead of providing the `-f` parameter to replay, use `--source` or `-s` to provide a python class path, e.g.:
 
