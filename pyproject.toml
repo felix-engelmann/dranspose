@@ -53,6 +53,7 @@ docs = [
     "mkdocs",
     "mkdocstrings[python]",
     "mkdocs-material",
+    "mkdocs-swagger-ui-tag"
 ]
 bench = [
     "psutil",
