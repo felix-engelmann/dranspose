@@ -26,19 +26,12 @@ from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequen
 
 @pytest.mark.asyncio
 async def test_empty_params(
+    controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
     stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
 ) -> None:
-    config = uvicorn.Config(app, port=5000, log_level="debug")
-    server = uvicorn.Server(config)
-    server_task = asyncio.create_task(server.serve())
-    while server.started is False:
-        await asyncio.sleep(0.1)
-
-    logging.info("started controller")
-    await asyncio.sleep(1)
 
     await reducer("examples.params.reducer:ParamReducer")
     await create_worker(
@@ -122,6 +115,3 @@ async def test_empty_params(
 
         context.destroy()
 
-    server.should_exit = True
-    await server_task
-    await asyncio.sleep(0.1)
