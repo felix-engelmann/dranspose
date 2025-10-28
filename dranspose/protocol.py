@@ -2,11 +2,10 @@ import datetime
 import time
 import uuid
 from enum import Enum
-from typing import NewType, Literal, Annotated, Optional, TypeAlias, Iterable, Any
+from typing import NewType, Literal, Annotated, Optional, TypeAlias, Any
 
 from pydantic import UUID4, BaseModel, validate_call, UrlConstraints, Field, TypeAdapter
 
-from uuid import uuid4
 from functools import cache, cached_property
 
 from pydantic_core import Url
@@ -101,19 +100,8 @@ class RedisKeys:
     @staticmethod
     @cache
     @validate_call
-    def parameters(
-        name: str,
-        uuid: UUID4 | Literal["*"],
-    ) -> str:
-        return f"{RedisKeys.PREFIX}:parameters:{name}:{uuid}"
-
-    @staticmethod
-    @cache
-    @validate_call
-    def parameter_description(
-        name: str | Literal["*"] = "*",
-    ) -> str:
-        return f"{RedisKeys.PREFIX}:parameter_description:{name}"
+    def parameter_updates(channel: Literal["custom", "internal"]) -> str:
+        return f"{RedisKeys.PREFIX}:parameter-{channel}:updates"
 
 
 class ProtocolException(Exception):
@@ -128,37 +116,9 @@ class ControllerUpdate(BaseModel):
     finished: bool = False
 
 
-class WorkParameter(BaseModel):
-    name: str
-    data: bytes
-    value: Optional[int | str | bytes | float | bool] = None
-    uuid: UUID4 = Field(default_factory=uuid4)
-
-    def __repr_args__(self) -> Iterable[tuple[str | None, Any]]:
-        args = super().__repr_args__()
-        new_args = []
-        for name, val in args:
-            new_val = val
-            if name == "data" and len(val) > 100:
-                new_val = (
-                    val[:50]
-                    + f"... (total length {len(val)} bytes) ...".encode()
-                    + val[-50:]
-                )
-            if name == "value" and isinstance(val, str) and len(val) > 100:
-                new_val = (
-                    val[:50]
-                    + f"... (total length {len(val)} characters) ..."
-                    + val[-50:]
-                )
-            if name == "value" and isinstance(val, bytes) and len(val) > 100:
-                new_val = (
-                    val[:50]
-                    + f"... (total length {len(val)} bytes) ...".encode()
-                    + val[-50:]
-                )
-            new_args.append((name, new_val))
-        return new_args
+class ParameterUpdate(BaseModel):
+    parameter_hash_target: HashDigest
+    update: Any
 
 
 class WorkAssignment(BaseModel):
@@ -287,12 +247,22 @@ class BuildGitMeta(BaseModel):
     repository_url: Url
 
 
+class ParameterUpdateResponse(BaseModel):
+    updated_keys: list[str]
+    target_hash: HashDigest
+
+
+class ParameterState(BaseModel):
+    parameter_signature: Optional[str] = None
+    parameter_hash: Optional[HashDigest] = None
+
+
 class DistributedState(BaseModel):
     service_uuid: UUID4 = Field(default_factory=uuid.uuid4)
     mapping_uuid: Optional[UUID4] = None
     dranspose_version: Optional[str] = None
     mapreduce_version: Optional[BuildGitMeta] = None
-    parameters_hash: Optional[HashDigest] = None
+    parameters: dict[str, ParameterState] = {}
     processed_events: int = 0
     event_rate: float = 0.0
 
@@ -328,8 +298,6 @@ class EnsembleState(BaseModel):
     workers: list[WorkerState]
     reducer: Optional[ReducerState]
     controller_version: Optional[str] = None
-    parameters_version: dict[ParameterName, UUID4] = {}
-    parameters_hash: Optional[HashDigest] = None
 
     def get_streams(self) -> list[StreamName]:
         ingester_streams = set([s for i in self.ingesters for s in i.streams])

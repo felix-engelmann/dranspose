@@ -20,6 +20,7 @@ import redis.exceptions as rexceptions
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import InternalWorkerMessage, EventData, ResultData
 from dranspose.helpers.utils import done_callback, cancel_and_wait
+from dranspose.parameters import DistributedModel
 from dranspose.protocol import (
     WorkerState,
     RedisKeys,
@@ -89,24 +90,30 @@ class Worker(DistributedService):
         ] = asyncio.Queue()
         self.dequeue_task: Optional[Task[set[zmq._future._AsyncSocket]]] = None
 
-        self.param_descriptions = []
         self.custom = None
         self.custom_context: dict[Any, Any] = {}
         self.worker = None
+        self.custom_parameters = None
+        self.parameter_task = None
         if self._worker_settings.worker_class:
             try:
                 self.custom = utils.import_class(self._worker_settings.worker_class)
                 self._logger.info("custom worker class %s", self.custom)
 
                 try:
-                    self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
-                except AttributeError:
-                    self._logger.info(
-                        "custom worker class has no describe_parameters staticmethod"
-                    )
+                    if hasattr(self.custom, "parameter_class"):
+                        pcl = self.custom.parameter_class
+                        if issubclass(pcl, BaseModel):
+                            self.custom_parameters = DistributedModel(pcl, self.redis)
+                            self.parameter_task = asyncio.create_task(
+                                self.custom_parameters.subscribe(self.publish_config)
+                            )
+                        else:
+                            self._logger.error("parameter_class is not a BaseModel")
+                        self._logger.info("parameter class is %s", pcl)
                 except Exception as e:
                     self._logger.error(
-                        "custom worker parameter description is broken: %s",
+                        "custom worker parameter class is broken: %s",
                         e.__repr__(),
                     )
 
@@ -223,7 +230,7 @@ class Worker(DistributedService):
         if self.custom:
             try:
                 self.worker = self.custom(
-                    parameters=self.parameters,
+                    parameters=self.custom_parameters.data,
                     context=self.custom_context,
                     state=self.state,
                 )
@@ -265,7 +272,10 @@ class Worker(DistributedService):
                     if tick_wait_until - time.time() < 0:
                         if hasattr(self.worker, "get_tick_interval"):
                             wait_ms = int(
-                                self.worker.get_tick_interval(self.parameters) * 1000
+                                self.worker.get_tick_interval(
+                                    self.custom_parameters.data
+                                )
+                                * 1000
                             )
                             dist_clock = await self.redis.set(
                                 RedisKeys.clock(self.state.mapping_uuid),
@@ -286,7 +296,7 @@ class Worker(DistributedService):
                             None,
                             self.worker.process_event,
                             event,
-                            self.parameters,
+                            self.custom_parameters.data,
                             tick,
                         )
                     except Exception as e:
@@ -366,7 +376,7 @@ class Worker(DistributedService):
                 try:
                     loop = asyncio.get_event_loop()
                     await loop.run_in_executor(
-                        None, self.worker.finish, self.parameters
+                        None, self.worker.finish, self.custom_parameters.data
                     )
                 except Exception as e:
                     self._logger.error(

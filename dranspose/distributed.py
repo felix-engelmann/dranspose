@@ -10,16 +10,13 @@ from pydantic import UUID4, AliasChoices, Field, RedisDsn
 from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
-from dranspose.helpers.utils import parameters_hash, cancel_and_wait
-from dranspose.parameters import Parameter, ParameterType
+from dranspose.helpers.utils import cancel_and_wait
 from dranspose.protocol import (
     RedisKeys,
     ControllerUpdate,
     IngesterState,
     WorkerState,
     ReducerState,
-    ParameterName,
-    WorkParameter,
     BuildGitMeta,
     StreamName,
 )
@@ -65,9 +62,6 @@ class DistributedService(abc.ABC):
         self.redis = redis.from_url(
             f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3"
         )
-        self.raw_redis = redis.from_url(
-            f"{self._distributed_settings.redis_dsn}?protocol=3"
-        )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         self._logger.info("log handlers are %s", self._logger.handlers)
         try:
@@ -80,7 +74,6 @@ class DistributedService(abc.ABC):
             logging.info("cannot load build meta information: %s", e.__repr__())
         self.state.dranspose_version = version("dranspose")
         self._logger.info("running version %s", self.state.dranspose_version)
-        self.parameters: dict[ParameterName, WorkParameter] = {}
 
     def get_category(self) -> str:
         if isinstance(self.state, IngesterState):
@@ -97,27 +90,13 @@ class DistributedService(abc.ABC):
 
     async def publish_config(self) -> None:
         self._logger.debug("publish config %s", self.state)
-        async with self.redis.pipeline() as pipe:
-            await pipe.setex(
-                RedisKeys.config(self.get_category(), self.state.name),
-                10,
-                self.state.model_dump_json(),
-            )
-            if hasattr(self, "param_descriptions"):
-                for p in self.param_descriptions:
-                    self._logger.debug("register parameter %s", p)
-                    try:
-                        await pipe.setex(
-                            RedisKeys.parameter_description(p.name),
-                            10,
-                            p.model_dump_json(),
-                        )
-                    except Exception as e:
-                        self._logger.error(
-                            "failed to register parameter %s", e.__repr__()
-                        )
-
-            await pipe.execute()
+        if hasattr(self, "custom_parameters"):
+            self.state.parameters["payload"] = self.custom_parameters.state
+        await self.redis.setex(
+            RedisKeys.config(self.get_category(), self.state.name),
+            10,
+            self.state.model_dump_json(),
+        )
 
     async def register(self) -> None:
         """
@@ -150,58 +129,6 @@ class DistributedService(abc.ABC):
                             await self.restart_work(newuuid, update.active_streams)
                         except Exception as e:
                             self._logger.error("restart_work failed %s", e.__repr__())
-                    paramuuids = update.parameters_version
-                    for name in paramuuids:
-                        if (
-                            name not in self.parameters
-                            or self.parameters[name] != paramuuids[name]
-                        ):
-                            try:
-                                params = await self.raw_redis.get(
-                                    RedisKeys.parameters(name, paramuuids[name])
-                                )
-                                self._logger.debug(
-                                    "received binary parameters for %s", name
-                                )
-                                if params is not None:
-                                    self._logger.info(
-                                        "set parameter %s of length %s",
-                                        name,
-                                        len(params),
-                                    )
-                                    self.parameters[name] = WorkParameter(
-                                        name=name, uuid=paramuuids[name], data=params
-                                    )
-                                    # check if this parameter has a description and type
-                                    desc = await self.redis.get(
-                                        RedisKeys.parameter_description(name),
-                                    )
-                                    self._logger.debug("description is %s", desc)
-                                    if desc:
-                                        param_desc: ParameterType = (
-                                            Parameter.validate_json(desc)
-                                        )
-                                        self._logger.info(
-                                            "set parameter has a description %s",
-                                            param_desc,
-                                        )
-                                        self.parameters[
-                                            name
-                                        ].value = param_desc.from_bytes(params)
-                                        self._logger.debug(
-                                            "parsed parameter value %s",
-                                            self.parameters[name].value,
-                                        )
-                            except Exception as e:
-                                self._logger.error(
-                                    "failed to get parameters %s", e.__repr__()
-                                )
-                    self.state.parameters_hash = parameters_hash(self.parameters)
-                    self._logger.debug(
-                        "set local parameters to %s with hash %s",
-                        {n: p.uuid for n, p in self.parameters.items()},
-                        self.state.parameters_hash,
-                    )
                     if update.finished:
                         self._logger.info("finished messages")
                         await self.finish_work()
@@ -248,4 +175,3 @@ class DistributedService(abc.ABC):
             RedisKeys.config(self.get_category(), self.state.name),
         )
         await self.redis.aclose()
-        await self.raw_redis.aclose()

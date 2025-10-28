@@ -4,17 +4,19 @@ import logging
 import pickle
 import traceback
 from contextlib import asynccontextmanager, nullcontext
-from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple
+from typing import ContextManager, Optional, AsyncGenerator, Any, Tuple, Annotated
 
 import zmq.asyncio
-from fastapi import FastAPI
-from pydantic import UUID4
+from fastapi import FastAPI, Body
+from pydantic import UUID4, BaseModel
+from starlette.requests import Request
 
 from dranspose.helpers import utils
 from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.h5dict import router
 from dranspose.helpers.utils import done_callback, cancel_and_wait
+from dranspose.parameters import DistributedModel
 from dranspose.protocol import (
     ReducerState,
     ZmqUrl,
@@ -22,6 +24,7 @@ from dranspose.protocol import (
     ReducerUpdate,
     DistributedStateEnum,
     StreamName,
+    ParameterUpdateResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,19 +54,22 @@ class Reducer(DistributedService):
 
         self.custom = None
         self.custom_context: dict[Any, Any] = {}
+        self.custom_parameters: DistributedModel | None = None
         if self._reducer_settings.reducer_class:
             try:
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
                 self._logger.info("custom reducer class %s", self.custom)
                 try:
-                    self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
-                except AttributeError:
-                    self._logger.info(
-                        "custom worker class has no describe_parameters staticmethod"
-                    )
+                    if hasattr(self.custom, "parameter_class"):
+                        pcl = self.custom.parameter_class
+                        if issubclass(pcl, BaseModel):
+                            self.custom_parameters = DistributedModel(pcl, self.redis)
+                        else:
+                            self._logger.error("parameter_class is not a BaseModel")
+                        self._logger.info("parameter class is %s", pcl)
                 except Exception as e:
                     self._logger.error(
-                        "custom worker parameter description is broken: %s",
+                        "custom worker parameter class is broken: %s",
                         e.__repr__(),
                     )
             except Exception as e:
@@ -72,6 +78,8 @@ class Reducer(DistributedService):
                     e.__repr__(),
                     traceback.format_exc(),
                 )
+
+    # TODO: Maybe the reducer has to have a coroutine to assure that the distributed parameters are consistent
 
     async def run(self) -> None:
         self.work_task = asyncio.create_task(self.work())
@@ -87,7 +95,7 @@ class Reducer(DistributedService):
         self.reducer = None
         if self.custom:
             self.reducer = self.custom(
-                parameters=self.parameters,
+                parameters=self.custom_parameters.data,
                 context=self.custom_context,
                 state=self.state,
             )
@@ -100,7 +108,10 @@ class Reducer(DistributedService):
                 try:
                     loop = asyncio.get_event_loop()
                     await loop.run_in_executor(
-                        None, self.reducer.process_result, result, self.parameters
+                        None,
+                        self.reducer.process_result,
+                        result,
+                        self.custom_parameters.data,
                     )
                 except Exception as e:
                     self._logger.error(
@@ -130,7 +141,7 @@ class Reducer(DistributedService):
                     try:
                         loop = asyncio.get_event_loop()
                         delay = await loop.run_in_executor(
-                            None, self.reducer.timer, self.parameters
+                            None, self.reducer.timer, self.custom_parameters.data
                         )
                     except Exception as e:
                         self._logger.error(
@@ -200,37 +211,62 @@ class Reducer(DistributedService):
         await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.metrics_task)
+        await self.custom_parameters.aclose()
         await self.redis.delete(RedisKeys.config("reducer", self.state.name))
         await super().close()
         self.ctx.destroy(linger=0)
         self._logger.info("closed reducer")
 
 
-reducer: Reducer
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Load the ML model
-    global reducer
-    reducer = Reducer()
-    run_task = asyncio.create_task(reducer.run())
+    app.state.reducer = Reducer()
+    run_task = asyncio.create_task(app.state.reducer.run())
     run_task.add_done_callback(done_callback)
 
     def get_data() -> Tuple[dict[str, Any], ContextManager[None]]:
         data = {}
         lock = nullcontext()
-        if reducer.reducer is not None:
-            if hasattr(reducer.reducer, "publish"):
-                data = reducer.reducer.publish
-            if hasattr(reducer.reducer, "publish_rlock"):
-                lock = reducer.reducer.publish_rlock
+        if app.state.reducer.reducer is not None:
+            if hasattr(app.state.reducer.reducer, "publish"):
+                data = app.state.reducer.reducer.publish
+            if hasattr(app.state.reducer.reducer, "publish_rlock"):
+                lock = app.state.reducer.reducer.publish_rlock
         return data, lock
+
+    if app.state.reducer.custom_parameters is not None:
+
+        async def set_params(
+            request: Request,
+            data: Annotated[app.state.reducer.custom_parameters.model, Body()],
+        ) -> ParameterUpdateResponse:
+            update_data = data.model_dump(exclude_unset=True)
+            await request.app.state.reducer.custom_parameters.patch(update_data)
+            await request.app.state.reducer.publish_config()
+            resp = ParameterUpdateResponse(
+                updated_keys=list(update_data.keys()),
+                target_hash=request.app.state.reducer.custom_parameters.state.parameter_hash,
+            )
+            return resp
+
+        async def get_params(
+            request: Request,
+        ) -> app.state.reducer.custom_parameters.model:
+            return request.app.state.reducer.custom_parameters.data
+
+        app.add_api_route(
+            "/api/v1/parameters",
+            get_params,
+            methods=["GET"],
+            response_model=app.state.reducer.custom_parameters.model,
+        )
+        app.add_api_route("/api/v1/parameters", set_params, methods=["POST"])
 
     app.state.get_data = get_data
     yield
     await cancel_and_wait(run_task)
-    await reducer.close()
+    await app.state.reducer.close()
     # Clean up the ML models and release the resources
 
 
