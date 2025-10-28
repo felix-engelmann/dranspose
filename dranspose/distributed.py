@@ -1,5 +1,4 @@
 import abc
-import hashlib
 import logging
 import os
 import time
@@ -11,19 +10,15 @@ from pydantic import UUID4, AliasChoices, Field, RedisDsn
 from pydantic_core import Url
 from pydantic_settings import BaseSettings
 
-from dranspose.helpers.utils import parameters_hash, cancel_and_wait
+from dranspose.helpers.utils import cancel_and_wait
 from dranspose.protocol import (
     RedisKeys,
     ControllerUpdate,
     IngesterState,
     WorkerState,
     ReducerState,
-    ParameterName,
-    WorkParameter,
     BuildGitMeta,
     StreamName,
-    ParameterUpdate,
-    HashDigest,
 )
 import redis.exceptions as rexceptions
 import asyncio
@@ -67,9 +62,6 @@ class DistributedService(abc.ABC):
         self.redis = redis.from_url(
             f"{self._distributed_settings.redis_dsn}?decode_responses=True&protocol=3"
         )
-        self.raw_redis = redis.from_url(
-            f"{self._distributed_settings.redis_dsn}?protocol=3"
-        )
         self._logger = logging.getLogger(f"{__name__}+{self.state.name}")
         self._logger.info("log handlers are %s", self._logger.handlers)
         try:
@@ -82,7 +74,6 @@ class DistributedService(abc.ABC):
             logging.info("cannot load build meta information: %s", e.__repr__())
         self.state.dranspose_version = version("dranspose")
         self._logger.info("running version %s", self.state.dranspose_version)
-        self.parameters: dict[ParameterName, WorkParameter] = {}
 
     def get_category(self) -> str:
         if isinstance(self.state, IngesterState):
@@ -99,6 +90,8 @@ class DistributedService(abc.ABC):
 
     async def publish_config(self) -> None:
         self._logger.debug("publish config %s", self.state)
+        if hasattr(self, "custom_parameters"):
+            self.state.parameters["payload"] = self.custom_parameters.state
         await self.redis.setex(
             RedisKeys.config(self.get_category(), self.state.name),
             10,
@@ -111,22 +104,15 @@ class DistributedService(abc.ABC):
         It publishes the `state` every 1.3 seconds or faster if there are updates from the controller with a new trigger map or parameters.
         """
         latest_controller = await self.redis.xrevrange(RedisKeys.updates(), count=1)
-        latest_parameter = await self.redis.xrevrange(
-            RedisKeys.parameter_updates(), count=1
-        )
         last_controller = 0
-        last_parameter = 0
         if len(latest_controller) > 0:
             last_controller = latest_controller[0][0]
-        if len(latest_parameter) > 0:
-            last_parameter = latest_parameter[0][0]
         while True:
             await self.publish_config()
             try:
                 update_msgs = await self.redis.xread(
                     {
                         RedisKeys.updates(): last_controller,
-                        RedisKeys.parameter_updates(): last_parameter,
                     },
                     block=1300,
                 )
@@ -146,64 +132,9 @@ class DistributedService(abc.ABC):
                             await self.restart_work(newuuid, update.active_streams)
                         except Exception as e:
                             self._logger.error("restart_work failed %s", e.__repr__())
-                    paramuuids = update.parameters_version
-                    for name in paramuuids:
-                        if (
-                            name not in self.parameters
-                            or self.parameters[name] != paramuuids[name]
-                        ):
-                            try:
-                                params = await self.raw_redis.get(
-                                    RedisKeys.parameters(name, paramuuids[name])
-                                )
-                                self._logger.debug(
-                                    "received binary parameters for %s", name
-                                )
-                                if params is not None:
-                                    self._logger.info(
-                                        "set parameter %s of length %s",
-                                        name,
-                                        len(params),
-                                    )
-                                    self.parameters[name] = WorkParameter(
-                                        name=name, uuid=paramuuids[name], data=params
-                                    )
-                                    # check if this parameter has a description and type
-                            except Exception as e:
-                                self._logger.error(
-                                    "failed to get parameters %s", e.__repr__()
-                                )
-                    self.state.parameters_hash = parameters_hash(self.parameters)
-                    self._logger.debug(
-                        "set local parameters to %s with hash %s",
-                        {n: p.uuid for n, p in self.parameters.items()},
-                        self.state.parameters_hash,
-                    )
-                    if hasattr(self, "parameter_class"):
-                        self.state.parameter_signature = str(
-                            self.parameter_class.__signature__
-                        )
                     if update.finished:
                         self._logger.info("finished messages")
                         await self.finish_work()
-
-                if not isinstance(self.state, ReducerState) and hasattr(
-                    self, "parameter_object"
-                ):
-                    if RedisKeys.parameter_updates() in update_msgs:
-                        for update_msg in update_msgs[RedisKeys.parameter_updates()][0]:
-                            last_parameter = update_msg[0]
-                            update = ParameterUpdate.model_validate_json(
-                                update_msg[1]["data"]
-                            )
-                            logging.info("received parameter update: %s", update)
-                            self.parameter_object = self.parameter_object.model_copy(
-                                update=update.update
-                            )
-                    res = self.parameter_object.model_dump_json()
-                    m = hashlib.sha256()
-                    m.update(res.encode())
-                    self.state.parameter_hash = HashDigest(m.hexdigest())
 
             except rexceptions.ConnectionError:
                 break
@@ -247,4 +178,3 @@ class DistributedService(abc.ABC):
             RedisKeys.config(self.get_category(), self.state.name),
         )
         await self.redis.aclose()
-        await self.raw_redis.aclose()

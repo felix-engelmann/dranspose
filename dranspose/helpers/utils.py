@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import importlib
 import logging
 import os
@@ -8,21 +7,12 @@ import traceback
 from asyncio import Future, Task
 from typing import Any
 
-from dranspose.protocol import HashDigest, WorkParameter, ParameterName
-
 
 def import_class(path: str) -> type:
     sys.path.append(os.getcwd())
     module = importlib.import_module(path.split(":")[0])
     custom = getattr(module, path.split(":")[1])
     return custom
-
-
-def parameters_hash(parameters: dict[ParameterName, WorkParameter]) -> HashDigest:
-    m = hashlib.sha256()
-    for n in sorted(parameters):
-        m.update(parameters[n].uuid.bytes)
-    return HashDigest(m.hexdigest())
 
 
 def done_callback(futr: Future[None]) -> None:

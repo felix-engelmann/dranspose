@@ -16,10 +16,10 @@ import time
 import cbor2
 from pydantic import UUID4, ValidationError
 from starlette.requests import Request
-from starlette.responses import Response, FileResponse, StreamingResponse
+from starlette.responses import FileResponse, StreamingResponse
 
 from dranspose.distributed import DistributedSettings
-from dranspose.helpers.utils import parameters_hash, done_callback, cancel_and_wait
+from dranspose.helpers.utils import done_callback, cancel_and_wait
 from dranspose.mapping import MappingSequence, Map
 import redis.asyncio as redis
 import redis.exceptions as rexceptions
@@ -29,11 +29,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from dranspose.parameters import (
-    Parameter,
-    ParameterType,
-    StrParameter,
-)
 from dranspose.protocol import (
     IngesterState,
     WorkerState,
@@ -45,11 +40,9 @@ from dranspose.protocol import (
     StreamName,
     EventNumber,
     VirtualWorker,
-    WorkParameter,
     ControllerUpdate,
     ReducerState,
     WorkerTimes,
-    HashDigest,
     ParameterName,
     SystemLoadType,
     IntervalLoad,
@@ -81,8 +74,6 @@ class Controller:
         )
         self.mapping = MappingSequence(parts={}, sequence=[])
         self.mapping_update_lock = asyncio.Lock()
-        self.parameters: dict[ParameterName, WorkParameter] = {}
-        self.parameters_hash = parameters_hash(self.parameters)
         self.completed: dict[EventNumber, list[WorkerName]] = defaultdict(list)
         self.to_reduce: set[tuple[EventNumber, WorkerName]] = set()
         self.reduced: dict[EventNumber, list[WorkerName]] = defaultdict(list)
@@ -127,10 +118,6 @@ class Controller:
 
         self.assign_task = asyncio.create_task(self.assign_work())
         self.assign_task.add_done_callback(done_callback)
-        self.default_task = asyncio.create_task(self.default_parameters())
-        self.default_task.add_done_callback(done_callback)
-        self.consistent_task = asyncio.create_task(self.consistent_parameters())
-        self.consistent_task.add_done_callback(done_callback)
         self.lock_task = asyncio.create_task(self.hold_lock())
         self.lock_task.add_done_callback(done_callback)
 
@@ -178,18 +165,11 @@ class Controller:
             reducer = ReducerState.model_validate_json(reducer_json)
         dranspose_version = version("dranspose")
 
-        parameters_version: dict[ParameterName, UUID4] = {
-            n: p.uuid for n, p in self.parameters.items()
-        }
-        redis_param_keys = await self.redis.keys(RedisKeys.parameters("*", "*"))
-        logger.debug("redis param keys are %s", redis_param_keys)
         self.config_cache = EnsembleState(
             ingesters=ingesters,
             workers=workers,
             reducer=reducer,
             controller_version=dranspose_version,
-            parameters_version=parameters_version,
-            parameters_hash=self.parameters_hash,
         )
         self.config_fetch_time = time.time()
         return self.config_cache
@@ -310,135 +290,6 @@ class Controller:
                 await self.dump_map_and_parameters()
             self.assign_task = asyncio.create_task(self.assign_work())
             self.assign_task.add_done_callback(done_callback)
-
-    async def set_param(self, name: ParameterName, data: bytes) -> HashDigest:
-        """Writes a parameter in the controller's store, updates the controller's
-        hash, and updating the parameter hash. It also sends a controller update
-        to the Redis stream to notify other components of the new parameter."""
-
-        param = WorkParameter(name=name, data=data)
-        logger.debug("distributing parameter %s with uuid %s", param.name, param.uuid)
-        await self.redis.set(RedisKeys.parameters(name, param.uuid), param.data)
-        self.parameters[name] = param
-        logger.debug("stored parameter %s locally", name)
-        self.parameters_hash = parameters_hash(self.parameters)
-        logger.debug("parameter hash is now %s", self.parameters_hash)
-        cupd = ControllerUpdate(
-            mapping_uuid=self.mapping.uuid,
-            parameters_version={n: p.uuid for n, p in self.parameters.items()},
-            target_parameters_hash=self.parameters_hash,
-        )
-        logger.debug("send update %s", cupd)
-        await self.redis.xadd(
-            RedisKeys.updates(),
-            {"data": cupd.model_dump_json()},
-        )
-        return self.parameters_hash
-
-    async def describe_parameters(self) -> list[ParameterType]:
-        desc_keys = await self.redis.keys(RedisKeys.parameter_description())
-        param_json = await self.redis.mget(desc_keys)
-
-        params: list[ParameterType] = []
-        for i in param_json:
-            val: ParameterType = Parameter.validate_json(i)
-            params.append(val)
-
-        params.append(
-            StrParameter(
-                name=ParameterName("dump_prefix"),
-                description="Prefix to dump ingester values",
-            )
-        )
-        return sorted(params, key=lambda x: x.name)
-
-    async def default_parameters(self) -> None:
-        """The descriptions (and default values) for the parameters are defined
-        in the worker's payload and published to redis. default_parameters
-        retieves the description and adds it to the list of parameters if
-        they are missing."""
-        while True:
-            try:
-                desc_keys = await self.redis.keys(RedisKeys.parameter_description())
-                param_json = await self.redis.mget(desc_keys)
-                for i in param_json:
-                    if i is None:
-                        # this is a race condition where the key gets deleted between keys and mget
-                        continue
-                    val: ParameterType = Parameter.validate_json(i)
-                    if val.name not in self.parameters:
-                        logger.info(
-                            "set parameter %s to default %s, (type %s)",
-                            val.name,
-                            val.default,
-                            val.__class__,
-                        )
-                        await self.set_param(
-                            val.name, val.__class__.to_bytes(val.default)
-                        )
-                await asyncio.sleep(2)
-            except asyncio.exceptions.CancelledError:
-                break
-
-    async def consistent_parameters(self) -> None:
-        while True:
-            try:
-                # make sure self.parameters is present in redis
-
-                key_names = []
-                for name, param in self.parameters.items():
-                    key_names.append(RedisKeys.parameters(name, param.uuid))
-                if len(key_names) > 0:
-                    ex_key_no = await self.redis.exists(*key_names)
-                    logger.debug(
-                        "check for param values in redis, %d exist of %d: %s",
-                        ex_key_no,
-                        len(key_names),
-                        key_names,
-                    )
-                    if ex_key_no < len(key_names):
-                        logger.warning(
-                            "the redis parameters don't match the controller parameters, rewriting"
-                        )
-                        async with self.redis.pipeline() as pipe:
-                            for name, param in self.parameters.items():
-                                await pipe.set(
-                                    RedisKeys.parameters(name, param.uuid), param.data
-                                )
-                            await pipe.execute()
-
-                consistent = []
-                cfg = await self.get_configs()
-                if cfg.reducer and cfg.reducer.parameters_hash != self.parameters_hash:
-                    consistent.append(("reducer", cfg.reducer.parameters_hash))
-                for wo in cfg.workers:
-                    if wo.parameters_hash != self.parameters_hash:
-                        consistent.append((wo.name, wo.parameters_hash))
-                for ing in cfg.ingesters:
-                    if ing.parameters_hash != self.parameters_hash:
-                        consistent.append((ing.name, ing.parameters_hash))
-
-                if len(consistent) > 0:
-                    logger.info(
-                        "inconsistent parameters %s, redistribute hash %s",
-                        consistent,
-                        self.parameters_hash,
-                    )
-                    cupd = ControllerUpdate(
-                        mapping_uuid=self.mapping.uuid,
-                        parameters_version={
-                            n: p.uuid for n, p in self.parameters.items()
-                        },
-                        target_parameters_hash=self.parameters_hash,
-                    )
-                    logger.debug("send consistency update %s", cupd)
-                    await self.redis.xadd(
-                        RedisKeys.updates(),
-                        {"data": cupd.model_dump_json()},
-                    )
-                await asyncio.sleep(2)
-            except asyncio.exceptions.CancelledError:
-                break
 
     async def _update_processing_times(self, update: WorkerUpdate) -> None:
         if update.completed is None:
@@ -612,9 +463,6 @@ class Controller:
                     # all events done, send close
                     cupd = ControllerUpdate(
                         mapping_uuid=self.mapping.uuid,
-                        parameters_version={
-                            n: p.uuid for n, p in self.parameters.items()
-                        },
                         finished=True,
                     )
                     logger.debug("send finished update %s", cupd)
@@ -627,8 +475,6 @@ class Controller:
                 break
 
     async def close(self) -> None:
-        await cancel_and_wait(self.default_task)
-        await cancel_and_wait(self.consistent_task)
         await self.redis.delete(RedisKeys.updates())
         await self.redis.delete(RedisKeys.parameter_updates())
         logger.info("deleted updates redis stream")
@@ -639,14 +485,6 @@ class Controller:
         assigned = await self.redis.keys(RedisKeys.assigned("*"))
         if len(assigned) > 0:
             await self.redis.delete(*assigned)
-        params = await self.redis.keys(RedisKeys.parameters("*", "*"))
-        if len(params) > 0:
-            await self.redis.delete(*params)
-            logger.info("deleted parameters %s", params)
-        param_descr = await self.redis.keys(RedisKeys.parameter_description("*"))
-        if len(param_descr) > 0:
-            await self.redis.delete(*param_descr)
-            logger.info("deleted parameter descriptions %s", params)
         await cancel_and_wait(self.lock_task)
         await self.redis.delete(RedisKeys.lock())
         await self.redis.aclose()
@@ -872,26 +710,6 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/log_stream")
     async def get_log_stream(request: Request) -> StreamingResponse:
         return StreamingResponse(log_streamer(request.app.state.ctrl))
-
-    @app.post("/api/v1/parameter/{name}")
-    async def post_param(request: Request, name: ParameterName) -> HashDigest:
-        data = await request.body()
-        logger.info("got %s: %s (len %d)", name, data[:100], len(data))
-        u = await request.app.state.ctrl.set_param(name, data)
-        return u
-
-    @app.get("/api/v1/parameter/{name}")
-    async def get_param(request: Request, name: ParameterName) -> Response:
-        ctrl = request.app.state.ctrl
-        if name not in ctrl.parameters:
-            raise HTTPException(status_code=404, detail="Parameter not found")
-
-        data = ctrl.parameters[name].data
-        return Response(data, media_type="application/x.bytes")
-
-    @app.get("/api/v1/parameters")
-    async def param_descr(request: Request) -> list[ParameterType]:
-        return await request.app.state.ctrl.describe_parameters()
 
     routes_status(app)
     routes_legacy(app)

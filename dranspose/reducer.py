@@ -16,6 +16,7 @@ from dranspose.distributed import DistributedService, DistributedSettings
 from dranspose.event import ResultData
 from dranspose.helpers.h5dict import router
 from dranspose.helpers.utils import done_callback, cancel_and_wait
+from dranspose.parameters import DistributedModel
 from dranspose.protocol import (
     ReducerState,
     ZmqUrl,
@@ -23,7 +24,7 @@ from dranspose.protocol import (
     ReducerUpdate,
     DistributedStateEnum,
     StreamName,
-    ParameterUpdate,
+    ParameterUpdateResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,34 +54,22 @@ class Reducer(DistributedService):
 
         self.custom = None
         self.custom_context: dict[Any, Any] = {}
-        self.parameter_class: type | None = None
-        self.parameter_object = None
+        self.custom_parameters: DistributedModel | None = None
         if self._reducer_settings.reducer_class:
             try:
                 self.custom = utils.import_class(self._reducer_settings.reducer_class)
                 self._logger.info("custom reducer class %s", self.custom)
                 try:
-                    pcl = self.custom.parameter_class
-                    if issubclass(pcl, BaseModel):
-                        self.parameter_class = pcl
-                        self.parameter_object = pcl()
-                    else:
-                        self._logger.error("parameter_class is not a BaseModel")
-                    self._logger.info("parameter class is %s", pcl)
+                    if hasattr(self.custom, "parameter_class"):
+                        pcl = self.custom.parameter_class
+                        if issubclass(pcl, BaseModel):
+                            self.custom_parameters = DistributedModel(pcl, self.redis)
+                        else:
+                            self._logger.error("parameter_class is not a BaseModel")
+                        self._logger.info("parameter class is %s", pcl)
                 except Exception as e:
                     self._logger.warning(
                         "could not create parameter class %s", e.__repr__()
-                    )
-                try:
-                    self.param_descriptions = self.custom.describe_parameters()  # type: ignore[attr-defined]
-                except AttributeError:
-                    self._logger.info(
-                        "custom worker class has no describe_parameters staticmethod"
-                    )
-                except Exception as e:
-                    self._logger.error(
-                        "custom worker parameter descripition is broken: %s",
-                        e.__repr__(),
                     )
             except Exception as e:
                 self._logger.warning(
@@ -88,6 +77,8 @@ class Reducer(DistributedService):
                     e.__repr__(),
                     traceback.format_exc(),
                 )
+
+    # TODO: Maybe the reducer has to have a coroutine to assure that the distributed parameters are consistent
 
     async def run(self) -> None:
         self.work_task = asyncio.create_task(self.work())
@@ -103,7 +94,7 @@ class Reducer(DistributedService):
         self.reducer = None
         if self.custom:
             self.reducer = self.custom(
-                parameters=self.parameters,
+                parameters=self.custom_parameters.data,
                 context=self.custom_context,
                 state=self.state,
             )
@@ -116,7 +107,10 @@ class Reducer(DistributedService):
                 try:
                     loop = asyncio.get_event_loop()
                     await loop.run_in_executor(
-                        None, self.reducer.process_result, result, self.parameters
+                        None,
+                        self.reducer.process_result,
+                        result,
+                        self.custom_parameters,
                     )
                 except Exception as e:
                     self._logger.error(
@@ -214,13 +208,11 @@ class Reducer(DistributedService):
         await cancel_and_wait(self.timer_task)
         await cancel_and_wait(self.work_task)
         await cancel_and_wait(self.metrics_task)
+        await self.custom_parameters.aclose()
         await self.redis.delete(RedisKeys.config("reducer", self.state.name))
         await super().close()
         self.ctx.destroy(linger=0)
         self._logger.info("closed reducer")
-
-    async def get_params(self) -> Any:
-        return self.parameter_object
 
 
 @asynccontextmanager
@@ -240,32 +232,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 lock = app.state.reducer.reducer.publish_rlock
         return data, lock
 
-    if app.state.reducer.parameter_class is not None:
+    if app.state.reducer.custom_parameters is not None:
 
         async def set_params(
-            request: Request, data: Annotated[app.state.reducer.parameter_class, Body()]
-        ) -> dict[str, list[str]]:
+            request: Request,
+            data: Annotated[app.state.reducer.custom_parameters.model, Body()],
+        ) -> ParameterUpdateResponse:
             update_data = data.model_dump(exclude_unset=True)
-            logger.debug("update data %s", update_data)
-            update_json = data.model_dump_json(exclude_unset=True)
-            logger.info("update json %s", update_json)
-            request.app.state.reducer.parameter_object = (
-                request.app.state.reducer.parameter_object.model_copy(
-                    update=update_data
-                )
+            await request.app.state.reducer.custom_parameters.patch(update_data)
+            await request.app.state.reducer.publish_config()
+            resp = ParameterUpdateResponse(
+                updated_keys=list(update_data.keys()),
+                target_hash=request.app.state.reducer.custom_parameters.state.parameter_hash,
             )
-            update = ParameterUpdate(update=update_data)
-            await request.app.state.reducer.redis.xadd(
-                RedisKeys.parameter_updates(),
-                {"data": update.model_dump_json()},
-            )
-            return {"updated_keys": list(update_data.keys())}
+            return resp
+
+        async def get_params(
+            request: Request,
+        ) -> app.state.reducer.custom_parameters.model:
+            return request.app.state.reducer.custom_parameters.data
 
         app.add_api_route(
             "/api/v1/parameters",
-            app.state.reducer.get_params,
+            get_params,
             methods=["GET"],
-            response_model=app.state.reducer.parameter_class,
+            response_model=app.state.reducer.custom_parameters.model,
         )
         app.add_api_route("/api/v1/parameters", set_params, methods=["POST"])
 

@@ -13,9 +13,7 @@ from typing import ContextManager, Iterator, Any, Optional, IO, Tuple
 import cbor2
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from pydantic import TypeAdapter
 from pydantic_core import Url
-from starlette.requests import Request
 from starlette.responses import Response
 
 from dranspose.helpers import utils
@@ -30,8 +28,6 @@ from dranspose.helpers.jsonpath_slice_ext import NumpyExtentedJsonPathParser
 from dranspose.protocol import (
     WorkerName,
     HashDigest,
-    WorkParameter,
-    ParameterName,
     ReducerState,
     WorkerState,
 )
@@ -59,8 +55,6 @@ def get_internals(filename: os.PathLike[Any] | str) -> Iterator[InternalWorkerMe
 
 
 logger = logging.getLogger(__name__)
-
-ParamList = TypeAdapter(list[WorkParameter])
 
 reducer_app = FastAPI()
 
@@ -101,25 +95,13 @@ async def get_path(path: str) -> Any:
         raise HTTPException(status_code=400, detail="malformed path %s" % e.__repr__())
 
 
-@reducer_app.post("/api/v1/parameter/{name}")
-async def post_param(request: Request, name: ParameterName) -> HashDigest:
-    data = await request.body()
-    logger.info("got %s: %s (len %d)", name, data[:100], len(data))
-    param = WorkParameter(name=name, data=data)
-    if name in reducer_app.state.param_description:
-        param_desc = reducer_app.state.param_description[name]
-        param.value = param_desc.from_bytes(data)
-    reducer_app.state.parameters[name] = param
-    return HashDigest("")
+# TODO:
+# @reducer_app.post("/api/v1/parameter/{name}")
+# async def post_param(request: Request, name: ParameterName) -> HashDigest:
 
 
-@reducer_app.get("/api/v1/parameter/{name}")
-async def get_param(name: ParameterName) -> Response:
-    if name not in reducer_app.state.parameters:
-        raise HTTPException(status_code=404, detail="Parameter not found")
-
-    data = reducer_app.state.parameters[name].data
-    return Response(data, media_type="application/x.bytes")
+# @reducer_app.get("/api/v1/parameter/{name}")
+# async def get_param(name: ParameterName) -> Response:
 
 
 class Server(uvicorn.Server):
@@ -144,58 +126,38 @@ class Server(uvicorn.Server):
 
 def get_parameters(
     parameter_file: Optional[os.PathLike[Any] | str], workercls: type, reducercls: type
-) -> dict[ParameterName, WorkParameter]:
+) -> Any:
     parameters = {}
     logger.info("loading parameters from file %s", parameter_file)
     if parameter_file is not None:
         try:
-            with open(parameter_file) as f:
-                parameters = {
-                    ParameterName(p.name): p for p in ParamList.validate_json(f.read())
-                }
+            with open(parameter_file) as _:
+                parameters = {}
+                # parameters = {
+                #    ParameterName(p.name): p for p in ParamList.validate_json(f.read())
+                # }
         except UnicodeDecodeError:
             logger.info("parameter file is not a json, try pickle")
             try:
                 with open(parameter_file, "rb") as fb:
-                    plist = pickle.load(fb)
-                    parameters = {
-                        ParameterName(p.name): p
-                        for p in ParamList.validate_python(plist)
-                    }
+                    _ = pickle.load(fb)
+                    # parameters = {
+                    #    ParameterName(p.name): p
+                    #    for p in ParamList.validate_python(plist)
+                    # }
             except Exception as e:
                 logger.warning(
                     "parameter file is not a pickle: %s, try cbor", e.__repr__()
                 )
                 with open(parameter_file, "rb") as fb:
-                    plist = cbor2.load(fb)
-                    parameters = {
-                        ParameterName(p.name): p
-                        for p in ParamList.validate_python(plist)
-                    }
+                    _ = cbor2.load(fb)
+                    # parameters = {
+                    #    ParameterName(p.name): p
+                    #    for p in ParamList.validate_python(plist)
+                    # }
 
     logger.info("params from file %s", parameters)
 
-    param_description = {}
-    if hasattr(workercls, "describe_parameters"):
-        param_description.update({p.name: p for p in workercls.describe_parameters()})
-    if hasattr(reducercls, "describe_parameters"):
-        param_description.update({p.name: p for p in reducercls.describe_parameters()})
-    logger.info("parameter descriptions %s", param_description)
-
-    for p in parameters:
-        if p in param_description:
-            parameters[p].value = param_description[p].from_bytes(parameters[p].data)
-    logger.info("parsed params are %s", parameters)
-
-    for p in param_description:
-        if p not in parameters:
-            parameters[p] = WorkParameter(
-                name=p,
-                value=param_description[p].default,
-                data=param_description[p].to_bytes(param_description[p].default),
-            )
-
-    reducer_app.state.param_description = param_description
     logger.info("final params are %s", parameters)
     return parameters
 
@@ -214,7 +176,7 @@ def _work_event(
     index: int,
     reducer: Any,
     event: EventData,
-    parameters: dict[ParameterName, WorkParameter],
+    parameters: Any,
     tick: bool,
 ) -> None:
     data = worker.process_event(event, parameters, tick)
@@ -238,9 +200,7 @@ def _work_event(
     reducer.process_result(result, parameters)
 
 
-def _finish(
-    workers: list[Any], reducer: Any, parameters: dict[ParameterName, WorkParameter]
-) -> None:
+def _finish(workers: list[Any], reducer: Any, parameters: Any) -> None:
     for worker in workers:
         if hasattr(worker, "finish"):
             try:

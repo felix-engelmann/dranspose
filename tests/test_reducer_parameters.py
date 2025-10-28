@@ -6,7 +6,7 @@ import aiohttp
 import pytest
 from pydantic import BaseModel
 
-from dranspose.protocol import WorkerName, EnsembleState
+from dranspose.protocol import WorkerName, EnsembleState, ParameterUpdateResponse
 from dranspose.worker import Worker, WorkerSettings
 from tests.utils import wait_for_controller
 
@@ -61,6 +61,7 @@ async def test_params(
         logging.info("default params %s", params)
 
         newparam = PayloadParameters(file_blob=b"\x12" * 100, crazy={"one": {3: "as"}})
+
         res = await session.post(
             "http://localhost:5001/api/v1/parameters",
             json=newparam.model_dump(mode="json"),
@@ -120,12 +121,12 @@ async def test_params(
 
 
 @pytest.mark.asyncio
-async def est_transferclass() -> None:
+async def test_transferclass() -> None:
     logging.info("sig %s", PayloadParameters.__signature__)
 
 
 @pytest.mark.asyncio
-async def est_params_worker(
+async def test_params_worker(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[WorkerName | Worker], Awaitable[Worker]],
@@ -150,7 +151,16 @@ async def est_params_worker(
             json={"crazy": {"alpha": {1: "beta"}}},
         )
         assert res.status == 200
+        resp = ParameterUpdateResponse.model_validate_json(await res.content.read())
 
         st = await session.get("http://localhost:5000/api/v1/config")
         conf = EnsembleState.model_validate(await st.json())
-        logging.info("state %s", conf)
+        for w in conf.workers:
+            assert w.parameters["payload"].parameter_hash == resp.target_hash
+        assert conf.reducer.parameters["payload"].parameter_hash == resp.target_hash
+        logging.info("state %s", conf.model_dump_json(indent=2))
+
+
+@pytest.mark.asyncio
+async def test_distribution():
+    logging.info("schema: %s", PayloadParameters.model_json_schema())
