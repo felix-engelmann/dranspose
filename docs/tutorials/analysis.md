@@ -439,12 +439,12 @@ GROUP "/" {
 
 ## Processing Parameters
 
-The current worker calulates the mean of a fixed area (`[:2,8:]`). Changing requires updating the code and pushing a new image, which is time consuming.
+The current worker calculates the mean of a fixed area (`[:2,8:]`). Changing requires updating the code and pushing a new image, which is time-consuming.
 To provide flexibility, dranspose supports parameters, which can change at any time.
-Though, if you change them during an active scan, you get no guarantees on when which worker gets the new paramters.
+Though, if you change them during an active scan, you get no guarantees on when which worker gets the new parameters.
 
-To register parameters, the worker or reducer needs to implement a static `describe_parameters` method wich returns a list of `dranspose.parameters` instances.
-The paramter values, depending on their type, are available in the `parameters` dict and the `value` attribute:
+To register parameters, the worker or reducer needs to implement a static `describe_parameters` method which returns a list of `dranspose.parameters` instances.
+The parameter values, depending on their type, are available in the `parameters` dict and the `value` attribute:
 
 ```python
 import logging
@@ -551,7 +551,7 @@ GROUP "/" {
 For some applications the mean of a small rectangle might be sufficient, but more often it is interesting to analysse the full 2d image.
 One option is to azimuthally integrate the image to get the intensity on a radial.
 An approachable packet is the `azint` conda package.
-After installing it, it needs the detector geometry. Intially we will provide it fully manually by creating a `Detector` and a `Pony` instance.
+After installing it, it needs the detector geometry. Initially, we will provide it fully manually by creating a `Detector` and a `Poni` instance.
 
 After creating an `AzimuthalIntegrator` instance, we send the radial axis of *q* values to the reducer to save them to the h5 file and prepare the dimensions of the dataset with values, having the same length.
 
@@ -621,9 +621,9 @@ class TestWorker:
 ### Poni file sources
 
 There are multiple options on how to provide the geometry to build the poni file.
-The individual float values could be exposed as parameters, however that will be invonvenient for users used to poni files.
+The individual float values could be exposed as parameters, however that will be inconvenient for users used to poni files.
 There is a `BinaryParameter` available which holds the full content of a file. The advantage is that the workers don't need filesystem access to read the poni file.
-However, another process needs to upload the poni file, which is normally the tango device server displaying the paramters.
+However, another process needs to upload the poni file, which is normally the tango device server displaying the parameters.
 
 ## Writing the diffractograms
 

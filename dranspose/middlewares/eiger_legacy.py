@@ -24,10 +24,10 @@ def _get_json(frame: zmq.Frame | bytes) -> Any:
 
 def parse(data: StreamData) -> UnionType:
     """
-    Parses a eiger legacy packet, which returns a start,image or end message
+    Parses a Eiger legacy packet, which returns a start,image or end message
 
     Arguments:
-        data: a frame comming from a eiger legacy source
+        data: a frame coming from a Eiger legacy source
 
     Returns:
         a EigerLegacyPacket

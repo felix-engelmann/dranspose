@@ -68,8 +68,9 @@ class Reducer(DistributedService):
                             self._logger.error("parameter_class is not a BaseModel")
                         self._logger.info("parameter class is %s", pcl)
                 except Exception as e:
-                    self._logger.warning(
-                        "could not create parameter class %s", e.__repr__()
+                    self._logger.error(
+                        "custom worker parameter class is broken: %s",
+                        e.__repr__(),
                     )
             except Exception as e:
                 self._logger.warning(
@@ -110,7 +111,7 @@ class Reducer(DistributedService):
                         None,
                         self.reducer.process_result,
                         result,
-                        self.custom_parameters,
+                        self.custom_parameters.data,
                     )
                 except Exception as e:
                     self._logger.error(
@@ -139,7 +140,9 @@ class Reducer(DistributedService):
                 if hasattr(self.reducer, "timer"):
                     try:
                         loop = asyncio.get_event_loop()
-                        delay = await loop.run_in_executor(None, self.reducer.timer)
+                        delay = await loop.run_in_executor(
+                            None, self.reducer.timer, self.custom_parameters.data
+                        )
                     except Exception as e:
                         self._logger.error(
                             "custom reducer timer failed: %s\n%s",

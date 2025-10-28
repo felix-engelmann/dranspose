@@ -103,22 +103,19 @@ class DistributedService(abc.ABC):
         Background job in every distributed service to publish the service's configuration.
         It publishes the `state` every 1.3 seconds or faster if there are updates from the controller with a new trigger map or parameters.
         """
-        latest_controller = await self.redis.xrevrange(RedisKeys.updates(), count=1)
-        last_controller = 0
-        if len(latest_controller) > 0:
-            last_controller = latest_controller[0][0]
+        latest = await self.redis.xrevrange(RedisKeys.updates(), count=1)
+        last = 0
+        if len(latest) > 0:
+            last = latest[0][0]
         while True:
             await self.publish_config()
             try:
                 update_msgs = await self.redis.xread(
-                    {
-                        RedisKeys.updates(): last_controller,
-                    },
-                    block=1300,
+                    {RedisKeys.updates(): last}, block=1300
                 )
                 if RedisKeys.updates() in update_msgs:
                     update_msg = update_msgs[RedisKeys.updates()][0][-1]
-                    last_controller = update_msg[0]
+                    last = update_msg[0]
                     update = ControllerUpdate.model_validate_json(update_msg[1]["data"])
                     self._logger.debug("update type %s", update)
                     newuuid = update.mapping_uuid

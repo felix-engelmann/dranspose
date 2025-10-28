@@ -26,7 +26,7 @@ import redis.exceptions as rexceptions
 from importlib.metadata import version
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 
 from dranspose.protocol import (
@@ -476,7 +476,6 @@ class Controller:
 
     async def close(self) -> None:
         await self.redis.delete(RedisKeys.updates())
-        await self.redis.delete(RedisKeys.parameter_updates())
         logger.info("deleted updates redis stream")
         queues = await self.redis.keys(RedisKeys.ready("*"))
         if len(queues) > 0:
@@ -505,7 +504,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def routes_legacy(app: FastAPI) -> None:
-    @app.post("/api/v1/mapping")
+    @app.post("/api/v1/mapping", deprecated=True)
     async def set_mapping(
         request: Request,
         mapping: dict[StreamName, list[Optional[list[VirtualWorker]]]],
@@ -540,7 +539,7 @@ def routes_legacy(app: FastAPI) -> None:
         await ctrl.set_mapping(m)
         return m.uuid
 
-    @app.get("/api/v1/logs")
+    @app.get("/api/v1/logs", deprecated=True)
     async def get_logs(request: Request, level: str = "INFO") -> Any:
         data = await request.app.state.ctrl.redis.xrange("dranspose_logs", "-", "+")
         logs = []
@@ -558,7 +557,7 @@ def routes_legacy(app: FastAPI) -> None:
                 logs.append(entry[1])
         return logs
 
-    @app.post("/api/v1/sardana_hook")
+    @app.post("/api/v1/sardana_hook", deprecated=True)
     async def set_sardana_hook(
         request: Request, info: dict[Literal["streams"] | Literal["scan"], Any]
     ) -> UUID4 | str:
@@ -641,9 +640,9 @@ def create_app() -> FastAPI:
             os.path.join(os.path.dirname(__file__), "frontend", "index.html")
         )
 
-    @app.get("/api/v1/mapping")
+    @app.get("/api/v1/mapping", deprecated=True)
     async def get_mapping(request: Request) -> dict[str, Any]:
-        """alias for backwards compatability"""
+        """alias for backwards compatibility"""
         return await get_sequence(request)
 
     @app.get("/api/v1/sequence")
@@ -651,11 +650,75 @@ def create_app() -> FastAPI:
         ctrl = request.app.state.ctrl
         return {"parts": ctrl.mapping.parts, "sequence": ctrl.mapping.sequence}
 
+    complex_parts_example = {
+        "parts": {
+            "main": {
+                "eiger": [
+                    [{"tags": ["generic"], "constraint": 2}],
+                    [{"tags": ["generic"], "constraint": 4}],
+                    [{"tags": ["generic"], "constraint": 6}],
+                    [{"tags": ["generic"], "constraint": 8}],
+                ],
+                "orca": [
+                    [{"tags": ["generic"], "constraint": 3}],
+                    [{"tags": ["generic"], "constraint": 5}],
+                    [{"tags": ["generic"], "constraint": 7}],
+                    [{"tags": ["generic"], "constraint": 9}],
+                ],
+                "alba": [
+                    [
+                        {"tags": ["generic"], "constraint": 2},
+                        {"tags": ["generic"], "constraint": 3},
+                    ],
+                    [
+                        {"tags": ["generic"], "constraint": 4},
+                        {"tags": ["generic"], "constraint": 5},
+                    ],
+                    [
+                        {"tags": ["generic"], "constraint": 6},
+                        {"tags": ["generic"], "constraint": 7},
+                    ],
+                    [
+                        {"tags": ["generic"], "constraint": 8},
+                        {"tags": ["generic"], "constraint": 9},
+                    ],
+                ],
+                "slow": [
+                    None,
+                    None,
+                    None,
+                    [
+                        {"tags": ["generic"], "constraint": 8},
+                        {"tags": ["generic"], "constraint": 9},
+                    ],
+                ],
+            }
+        },
+        "sequence": ["main"],
+    }
+    simple_parts_example = {
+        "main": {
+            "orca": [
+                [{"tags": ["generic"], "constraint": 1}],
+                [{"tags": ["generic"], "constraint": 2}],
+                [{"tags": ["generic"], "constraint": 3}],
+            ],
+            "eiger": [
+                [{"tags": ["generic"], "constraint": 1}],
+                [{"tags": ["generic"], "constraint": 2}],
+                [{"tags": ["generic"], "constraint": 3}],
+            ],
+        }
+    }
+
     @app.post("/api/v1/sequence")
     async def set_sequence(
         request: Request,
-        parts: dict[MappingName, dict[StreamName, list[Optional[list[VirtualWorker]]]]],
-        sequence: list[MappingName],
+        parts: Annotated[
+            dict[MappingName, dict[StreamName, list[Optional[list[VirtualWorker]]]]],
+            Body(examples=[complex_parts_example, simple_parts_example]),
+        ],
+        sequence: Annotated[list[MappingName], Body(examples=[["main", "main"]])],
         all_wrap: bool = True,
     ) -> UUID4 | str:
         ctrl = request.app.state.ctrl

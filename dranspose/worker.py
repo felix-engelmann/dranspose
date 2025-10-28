@@ -112,8 +112,9 @@ class Worker(DistributedService):
                             self._logger.error("parameter_class is not a BaseModel")
                         self._logger.info("parameter class is %s", pcl)
                 except Exception as e:
-                    self._logger.warning(
-                        "could not create parameter class %s", e.__repr__()
+                    self._logger.error(
+                        "custom worker parameter class is broken: %s",
+                        e.__repr__(),
                     )
 
             except Exception as e:
@@ -453,7 +454,7 @@ class Worker(DistributedService):
                 raw_config = await self.redis.get(key)
                 if raw_config is None:
                     logging.warning(
-                        "ingester config key %s disappeard while updating", key
+                        "ingester config key %s disappeared while updating", key
                     )
                     continue
                 cfg = IngesterState.model_validate_json(raw_config)

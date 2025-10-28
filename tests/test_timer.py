@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import threading
+
 from typing import Callable, Optional, Awaitable, Any, Coroutine
 
 import h5pyd
@@ -21,11 +23,12 @@ from dranspose.protocol import (
     StreamName,
 )
 from dranspose.worker import Worker, WorkerSettings
+from dranspose.replay import replay
 from tests.utils import wait_for_controller, wait_for_finish, set_uniform_sequence
 
 
 @pytest.mark.asyncio
-async def test_empty_params(
+async def test_timer_params(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -88,30 +91,88 @@ async def test_empty_params(
                 f"file {list(f.keys())}",
             )
             logging.warning("version %s", list(f["params"].keys()))
+            assert f["params"]["roi1"][()] == b"bla"
+            assert f["worker_params"]["roi1"][()] == b"bla"
 
-            logging.warning("str %s", f["params"]["bytes_param"])
-            for t, v in [
-                (str, b""),
-                (bytes, b""),
-                (int, 0),
-                (float, 0.0),
-                (bool, False),
-            ]:
-                logging.warning("param %s", f["params"][f"{t.__name__}_param"])
-                assert f["params"][f"{t.__name__}_param"][()] == v
-
-            for t, v in [
-                (str, b""),
-                (bytes, b""),
-                (int, 0),
-                (float, 0.0),
-                (bool, False),
-            ]:
-                logging.info("work param %s", f["worker_params"][f"{t.__name__}_param"])
-                assert f["worker_params"][f"{t.__name__}_param"][()] == v
+        def work2() -> None:
+            f = h5pyd.File("http://localhost:5001/", "r")
+            logging.info(
+                f"file {list(f.keys())}",
+            )
+            logging.warning("version %s", list(f["params"].keys()))
+            assert f["params"]["roi1"][()] == b"new_value"
+            assert f["worker_params"]["roi1"][()] == b"bla"
 
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, work)
 
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/roi1",
+            data=b"new_value",
+        )
+        assert resp.status == 200
+
+        await asyncio.sleep(1.5)
+
+        await loop.run_in_executor(None, work2)
+
         context.destroy()
 
+
+@pytest.mark.asyncio
+async def test_timer_replay(
+    tmp_path: Any,
+) -> None:
+    stop_event = threading.Event()
+    done_event = threading.Event()
+
+    thread = threading.Thread(
+        target=replay,
+        args=(
+            "examples.params.worker:ParamWorker",
+            "examples.params.reducer:ParamReducer",
+            None,
+            "examples.dummy.source:FluorescenceSource",
+            None,
+        ),
+        kwargs={"port": 5010, "stop_event": stop_event, "done_event": done_event},
+    )
+    thread.start()
+
+    done_event.wait()
+
+    def work() -> None:
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info(
+            f"file {list(f.keys())}",
+        )
+        logging.warning("version %s", list(f["params"].keys()))
+        assert f["params"]["roi1"][()] == b"bla"
+        assert f["worker_params"]["roi1"][()] == b"bla"
+
+    def work2() -> None:
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info(
+            f"file {list(f.keys())}",
+        )
+        logging.warning("version %s", list(f["params"].keys()))
+        assert f["params"]["roi1"][()] == b"new_value"
+        assert f["worker_params"]["roi1"][()] == b"bla"
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work)
+
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post(
+            "http://localhost:5010/api/v1/parameter/roi1",
+            data=b"new_value",
+        )
+        assert resp.status == 200
+
+    await asyncio.sleep(1.5)
+
+    await loop.run_in_executor(None, work2)
+
+    stop_event.set()
+
+    thread.join()
