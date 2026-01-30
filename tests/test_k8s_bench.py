@@ -11,7 +11,7 @@ import aiohttp
 import numpy as np
 import pytest
 import zmq
-from psutil._common import snetio
+from psutil._ntuples import snetio
 
 from dranspose.protocol import EnsembleState, VirtualWorker, VirtualConstraint
 from dranspose.workload_generator import NetworkConfig, Statistics

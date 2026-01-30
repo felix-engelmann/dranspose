@@ -1,5 +1,7 @@
 import asyncio
-import pickle
+import logging
+
+import h5pyd
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 
 from dranspose.protocol import (
@@ -72,9 +74,12 @@ async def test_slowreduce(
         asyncio.create_task(stream_eiger(context, 9999, ntrig - 1, 0.1))
         await wait_for_finish()
 
-    async with aiohttp.ClientSession() as session:
-        st = await session.get("http://localhost:5001/api/v1/result/")
-        content = await st.content.read()
-        result = pickle.loads(content)[0]
-        assert result == {"map": {0: 1, 1: 1, 2: 1, 3: 1, 4: 1}}
-        assert len(result["map"].keys()) == ntrig + 1
+    def work() -> None:
+        f = h5pyd.File("http://localhost:5001/", "r")
+        logging.info("file %s", list(f["map"].keys()))
+        assert len(list(f["map"].keys())) == ntrig + 1
+        for evn in range(ntrig + 1):
+            assert f["map"][str(evn)][()] == 1
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, work)

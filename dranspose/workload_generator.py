@@ -14,7 +14,7 @@ import numpy as np
 import psutil
 import zmq.asyncio
 from fastapi import FastAPI, Request
-from psutil._common import snicaddr, snetio, snicstats
+from psutil._ntuples import snicaddr, snetio, snicstats
 from pydantic import BaseModel, Field, field_serializer
 from pydantic_core import Url
 

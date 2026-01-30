@@ -11,6 +11,10 @@ theme:
 plugins:
   - mkdocstrings
   - search
+  - swagger-ui-tag:
+      tryItOutEnabled: false
+      supportedSubmitMethods: []
+
 
 markdown_extensions:
   - admonition

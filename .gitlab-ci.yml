@@ -18,4 +18,4 @@ test-python311:
 
 .test-python:
   services:
-    - redis:latest
+    - docker.io/library/redis:latest

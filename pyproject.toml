@@ -24,9 +24,10 @@ dependencies = [
     # "requests",
     "pydantic",
     "pydantic-settings",
-    "jsonpath-ng",
-    "cbor2",
+    # limit cbor until https://github.com/agronholm/cbor2/issues/272 is resolved.
+    "cbor2 < 5.8",
     "redis-logs",
+    "h5py",
 ]
 dynamic = ["version"]
 
@@ -43,7 +44,7 @@ tests = [
     "pytest",
     "pytest-asyncio",
     "aiohttp",
-    "psutil",
+    "psutil >= 7.2.1",
     "types-psutil",
     "pytest-plt",
     "h5pyd",
@@ -53,9 +54,10 @@ docs = [
     "mkdocs",
     "mkdocstrings[python]",
     "mkdocs-material",
+    "mkdocs-swagger-ui-tag"
 ]
 bench = [
-    "psutil",
+    "psutil >= 7.2.1",
     "types-psutil",
 ]
 

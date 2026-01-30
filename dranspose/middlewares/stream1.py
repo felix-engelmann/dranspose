@@ -13,7 +13,7 @@ def parse(data: StreamData) -> UnionType:
     Parses a stream1 packet, which returns a start,image or end message
 
     Arguments:
-        data: a frame comming from a stream1 source
+        data: a frame coming from a stream1 source
 
     Returns:
         a Stream1Packet

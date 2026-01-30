@@ -1,12 +1,12 @@
 import asyncio
 import json
 import logging
-import pickle
 import threading
 from typing import Any
 
 import aiohttp
 import pytest
+import h5pyd
 
 from dranspose.replay import replay
 
@@ -38,16 +38,18 @@ async def test_replay(
     async with aiohttp.ClientSession() as session:
         while True:
             try:
-                await session.get("http://localhost:5010/api/v1/result/")
+                await session.get("http://localhost:5010/api/status/")
                 break
             except aiohttp.client_exceptions.ClientConnectorError:
                 pass
         await asyncio.sleep(1)
-        st = await session.get("http://localhost:5010/api/v1/result/")
-        content = await st.content.read()
-        result = pickle.loads(content)[0]
-        logging.warning("params in reducer is %s", result)
-        assert result["params"]["int_param"].value == 0
+
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info(
+            f"file {list(f.keys())}",
+        )
+        logging.warning("int_param %s", f["params"]["int_param"])
+        assert f["params"]["int_param"][()] == 0
 
         resp = await session.post(
             "http://localhost:5010/api/v1/parameter/int_param",
@@ -56,11 +58,13 @@ async def test_replay(
         assert resp.status == 200
 
         await asyncio.sleep(3)
-        st = await session.get("http://localhost:5010/api/v1/result/")
-        content = await st.content.read()
-        result = pickle.loads(content)[0]
-        logging.warning("params in reducer is %s", result)
-        assert result["params"]["int_param"].value == 42
+
+        f = h5pyd.File("http://localhost:5010/", "r")
+        logging.info(
+            f"file {list(f.keys())}",
+        )
+        logging.warning("int_param %s", f["params"]["int_param"])
+        assert f["params"]["int_param"][()] == 42
 
     done_event.wait()
 

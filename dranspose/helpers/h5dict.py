@@ -93,14 +93,14 @@ def _canonical_to_h5(canonical: str) -> H5Type | None:
 def _make_shape_type(obj: Any) -> tuple[H5Shape | None, H5Type | None]:
     h5shape: H5Shape | None = None
     h5type: H5Type | None = None
-    if type(obj) is int:
+    if isinstance(obj, int):
         h5shape = H5ScalarShape()
         h5type = H5IntType(base="H5T_STD_I64LE")
-    elif type(obj) is float:
+    elif isinstance(obj, float):
         h5shape = H5ScalarShape()
         h5type = H5FloatType(base="H5T_IEEE_F64LE")
 
-    elif type(obj) is str:
+    elif isinstance(obj, str):
         h5shape = H5ScalarShape()
         h5type = H5StrType()
 

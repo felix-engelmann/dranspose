@@ -16,7 +16,7 @@ class SlowReducer:
         # if result.payload:
         time.sleep(0.5)
         logger.info("slept for 500ms")
-        self.publish["map"][result.event_number] = 1
+        self.publish["map"][str(result.event_number)] = 1
         logger.info("updated publish to %s", self.publish)
 
     def finish(self, parameters=None):

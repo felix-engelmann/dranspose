@@ -13,7 +13,7 @@ A guarantee is that if the same virtual worker is responsible for two frames, th
 
 A [virtual worker][dranspose.protocol.VirtualWorker] hold a list of tags, which must be a subset of the tags held by the actual worker.
 
-An optional containt can be applied such that frames with the same constraint are delivered to the same worker.
+An optional constraint can be applied such that frames with the same constraint are delivered to the same worker.
 Note that for a new constraint, only the first VirtualWorker tags are considered as subsequent frames are necessarily delivered to the same actual worker with the same tags.
 If the constraint is None, the frame is delivered to all workers which satisfy the tags.
 
@@ -34,7 +34,7 @@ If the constraint is None, the frame is delivered to all workers which satisfy t
 * The last frame of *stream 1* and *stream 2* are delivered to the same worker
 * The second frame of *low* is deliverd to the same workers which are processing the second frame of *stream 1* and *stream 2*
 * The third frame of *low* is delivered to no workers, i.e. discarded
-* The thrid, fourth and fifth event has no frame from *slow*, this is useful for mixing streams with different sample frequencies.
+* The third, fourth and fifth event has no frame from *slow*, this is useful for mixing streams with different sample frequencies.
 
 ## Trigger map format
 
@@ -44,7 +44,7 @@ The type of a trigger map is
 Dict[StreamName, List[Optional[List[VirtualWorker]]]]
 ```
 
-This is an example with te generic workers only.
+This is an example with the generic workers only.
 ```json
 {
     "eiger": [

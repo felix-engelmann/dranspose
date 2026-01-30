@@ -18,7 +18,7 @@ def parse(
     Parses a Xspress3 packet, which either gives a start/end message or a tuple with a spectra array
 
     Arguments:
-        data: a frame comming from the Xspress3 tango device
+        data: a frame coming from the Xspress3 tango device
 
     Returns:
         an XspressPacket

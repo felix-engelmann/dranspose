@@ -28,7 +28,7 @@ jobs:
             docs/seminar*/main.tex
             docs/nobugs*/main.tex
           work_in_root_file_dir: true
-      - run: pip install mkdocs mkdocs-material mkdocstrings[python]
+      - run: pip install ".[docs]"
       - run: mkdocs build
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3

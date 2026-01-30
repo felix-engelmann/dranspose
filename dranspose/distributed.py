@@ -182,7 +182,7 @@ class DistributedService(abc.ABC):
                                             Parameter.validate_json(desc)
                                         )
                                         self._logger.info(
-                                            "set paremter has a description %s",
+                                            "set parameter has a description %s",
                                             param_desc,
                                         )
                                         self.parameters[
@@ -192,6 +192,11 @@ class DistributedService(abc.ABC):
                                             "parsed parameter value %s",
                                             self.parameters[name].value,
                                         )
+                            except ConnectionError as e:
+                                self._logger.warning(
+                                    "cannot connect to fetch parameters %s",
+                                    e.__repr__(),
+                                )
                             except Exception as e:
                                 self._logger.error(
                                     "failed to get parameters %s", e.__repr__()

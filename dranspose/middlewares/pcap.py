@@ -12,7 +12,7 @@ def parse(data: StreamData) -> UnionType:
     Parses a pcap packet
 
     Arguments:
-        data: a frame comming from the pcap tango device
+        data: a frame coming from the pcap tango device
 
     Returns:
         a PCAPPacket

@@ -47,7 +47,7 @@ class Dumper:
                 default=message_encoder,
             )
         except Exception as e:
-            self._logger.error("cound not dump %s", e.__repr__())
+            self._logger.error("could not dump %s", e.__repr__())
         self._logger.debug("written dump")
 
     def close(self) -> None:

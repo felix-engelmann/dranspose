@@ -1,6 +1,6 @@
 # Application Development
 
-Unlike sequential processing of data, dranspose leverages parallel processing to achieve the throughput necesary for live processing.
+Unlike sequential processing of data, dranspose leverages parallel processing to achieve the throughput necessary for live processing.
 
 We use the *map reduce* programming model for distributing work.
 Parallel workers unfortunately have to work independently. Therefore, they only have access
@@ -9,7 +9,7 @@ to a single event at a time. They may store local state, but don't have access t
 For data analysis which has to cross all events, there is a secondary *reduce* step which can only cope with reduced data, but gets all events delivered.
 
 A lot of common analysis tasks are easily mapped to this programming model.
-The map phase performs the heavy lifting, e.g. analysing images and then forwards a spectrum to the reducer which only averages the sprectra or appends them to a list.
+The map phase performs the heavy lifting, e.g. analysing images and then forwards a spectrum to the reducer which only averages the spectra or appends them to a list.
 
 ## Using `dranspose`
 
@@ -57,7 +57,7 @@ class FluorescenceWorker:
 
 ```
 The `process_event` function gets an [EventData](../reference/protocols/events.md) object which contains all required streams for the current event.
-The first step should be to check that the required streams for the analyis are present.
+The first step should be to check that the required streams for the analysis are present.
 ```python
     def process_event(self, event: EventData, parameters=None, *args, **kwargs):
         logger.debug("using parameters %s", parameters)
@@ -67,7 +67,7 @@ The first step should be to check that the required streams for the analyis are 
             )
             return
 ```
-Many streams have the same packet structure and therefore `dranspose` include [middlewares](../reference/middlewares.md) to autmatically parse the frames to python objects.
+Many streams have the same packet structure and therefore `dranspose` include [middlewares](../reference/middlewares.md) to automatically parse the frames to python objects.
 ```python
         try:
             con = contrast.parse(event.streams["contrast"])
