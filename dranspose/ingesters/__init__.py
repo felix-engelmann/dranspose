@@ -10,6 +10,10 @@ from dranspose.ingesters.zmqpull_single import (  # noqa: F401
     ZmqPullSingleIngester,
     ZmqPullSingleSettings,
 )
+from dranspose.ingesters.stins_parallel import (  # noqa: F401
+    StinsParallelIngester,
+    StinsParallelSettings,
+)
 from dranspose.ingesters.zmqpull_eiger_legacy import (  # noqa: F401
     ZmqPullEigerLegacyIngester,
     ZmqPullEigerLegacySettings,
