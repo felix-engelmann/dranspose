@@ -121,10 +121,10 @@ def uniform_sequence(streams: set[StreamName], ntrig: int) -> dict[str, Any]:
     )
 
 
-async def set_sequence(sequence: dict[Any, Any]) -> str:
+async def set_sequence(sequence: dict[Any, Any], all_wrap: bool = True) -> str:
     async with aiohttp.ClientSession() as session:
         resp = await session.post(
-            "http://localhost:5000/api/v1/sequence/", json=sequence
+            f"http://localhost:5000/api/v1/sequence/?all_wrap={all_wrap}", json=sequence
         )
         if resp.status != 200:
             print("sent", sequence)

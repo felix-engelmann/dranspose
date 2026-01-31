@@ -1,3 +1,4 @@
+import logging
 import pickle
 import cbor2
 
@@ -291,15 +292,19 @@ def test_albaem_stream() -> None:
 
 def test_eiger_legacy_stream() -> None:
     with open("tests/data/eiger-small.cbors", "rb") as f:
+        count = 0
         while True:
             try:
                 frames = cbor2.load(f)
                 pkg = EigerLegacyPacket.validate_json(frames[0])
+                logging.debug("pkg %s", pkg)
                 if isinstance(pkg, EigerLegacyHeader):
                     assert pkg.header_detail == "all"
                 elif isinstance(pkg, EigerLegacyImage):
                     assert pkg.frame >= 0
                 else:
                     assert pkg.series == 6
+                count += 1
             except EOFError:
                 break
+        assert count == 5

@@ -38,7 +38,7 @@ class TestReducer:
     ) -> None:
         logging.info("parameters are %s", parameters)
         self.publish["results"][str(result.event_number)] = {
-            k: json.loads(v.frames[0]) if v.typ == "STINS" else "blob"
+            k: json.loads(v.frames[0]) if v.typ in ["STINS", "EIGER_LEGACY"] else "blob"
             for k, v in result.payload[0].streams.items()
         }
         self.publish["parameters"][str(result.event_number)] = parameters
