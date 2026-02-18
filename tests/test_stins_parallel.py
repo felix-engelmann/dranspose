@@ -205,7 +205,7 @@ async def test_stream1(
 
 
 @pytest.mark.asyncio
-async def est_virtualds(
+async def test_virtualds(
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -218,7 +218,7 @@ async def est_virtualds(
             settings=WorkerSettings(
                 worker_name=WorkerName("Weven"),
                 worker_tags={WorkerTag("even")},
-                worker_class="tests.test_stins_parallel:VirtualWorker",
+                worker_class="tests.aux_payloads:TestWorker",
             ),
         )
     )
@@ -227,7 +227,7 @@ async def est_virtualds(
             settings=WorkerSettings(
                 worker_name=WorkerName("Wodd"),
                 worker_tags={WorkerTag("even")},
-                worker_class="tests.test_stins_parallel:VirtualWorker",
+                worker_class="tests.aux_payloads:TestWorker",
             ),
         )
     )
@@ -250,7 +250,9 @@ async def est_virtualds(
         )
     )
 
-    await wait_for_controller(streams={StreamName("eiger")}, workers={WorkerName("w1")})
+    await wait_for_controller(
+        streams={StreamName("eiger")}, workers={WorkerName("Wodd"), WorkerName("Weven")}
+    )
 
     ntrig = 10
     await set_sequence(
