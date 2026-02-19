@@ -1,6 +1,5 @@
 from typing import Any, Optional
 import os
-import uuid
 import logging
 
 import h5py
@@ -8,11 +7,12 @@ import numpy as np
 
 from dranspose.event import EventData
 from dranspose.parameters import (
+    ParameterType,
     StrParameter,
     # BinaryParameter,
     # ParameterBase
 )
-from dranspose.protocol import StreamName, ParameterName, ParameterType, WorkParameter
+from dranspose.protocol import StreamName, ParameterName, WorkParameter, WorkerState
 from dranspose.data.eiger_legacy import (
     EigerLegacyEnd,
     EigerLegacyImage,
@@ -24,9 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class WriterWorker:
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, state: WorkerState, **kwargs: Any) -> None:
         self._fh: Optional[h5py.File] = None
-        self.uuid = None
+        self.name = state.name
+        # do not change stream name once established
+        # self.stream_name = StreamName(parameters[("stream_name")].data)
         self.stream_name = StreamName("eiger")
         self._dset_name = f"/entry/instrument/{self.stream_name}/data"
 
@@ -45,18 +47,18 @@ class WriterWorker:
             else:
                 group.create_dataset(key, data=value)
 
-    def open_file(self, meta_header, meta_info):
+    def open_file(self, meta_header: dict, meta_info: dict):
+        logger.error("open_file args: %s, %s", meta_header, meta_info)
         # here is what the worker does
         # queue.put([meta_header, meta_info])
         # this is how the writer treats it:
         # parts = writer_queue.get()
         # header = parts[0]
         # self._handle_start(header, parts, worker_queue)
-        self.uuid = uuid.uuid4()  # use shortuuid?
-        ret = {"uuid": self.uuid}
-        filename = meta_header["filename"]
+        ret = {"name": self.name}
+        filename = meta_header.get("filename", "")
         saveraw = meta_info.get("save_raw", True)
-        logger.info("Original parameters %s %s" % filename, saveraw)
+        logger.info("Original parameters %s %s", filename, saveraw)
         # framesperfile = meta_info.get("nframes_per_file", 0)
         # pre_generate_files = meta_info.get("pre_generate_files", False)
         # expected_data = meta_info.get("expected_data", {})
@@ -68,7 +70,7 @@ class WriterWorker:
         # _nframes_overlay = meta_info.get("nframes_overlay", 0)
         if filename and filename.startswith("/data") and saveraw:
             base, ext = os.path.splitext(filename)
-            filename = f"{base}_{self.uuid}{ext}"
+            filename = f"{base}_{self.name}{ext}"
             if os.path.isfile(filename):
                 logger.error("cannot append to existing file")
                 self._fh = None
@@ -80,7 +82,7 @@ class WriterWorker:
                     self._fh = None
         else:
             self._fh = None
-            logger.info("no file opened")
+            logger.info("no file opened. filename: %s save_raw: %s", filename, saveraw)
         if self._fh is not None:
             ret["filename"] = filename
             ret["save_raw"] = True
@@ -113,10 +115,6 @@ class WriterWorker:
     ):
         ret = {}
 
-        # do not change stream name once established
-        # if self.stream_name is None:
-        #     self.stream_name = StreamName(parameters[("stream_name")].data)
-        #     self._dset_name = f"/entry/instrument/{self.stream_name}/data"
         if self.stream_name in event.streams:
             acq = parse(event.streams[self.stream_name])
             if isinstance(acq, EigerLegacyHeader):
@@ -133,13 +131,15 @@ class WriterWorker:
                     "ntrigger",
                     "trigger_mode",
                 ]
-                meta_header = acq.appendix.copy()
+                meta_header = acq.appendix
                 meta_info = {key: acq.info[key] for key in meta_keys}
+                print("open_file args: %s, %s", meta_header, meta_info)
                 ret["header"] = self.open_file(meta_header, meta_info)
             elif isinstance(acq, EigerLegacyImage):
-                pass
+                acq.buffer = b"some data removed"
             elif isinstance(acq, EigerLegacyEnd):
                 if self._fh is not None:
                     self._fh.close()
+            logger.info("parsed packet %s", acq)
 
         return ret
