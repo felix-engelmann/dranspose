@@ -4,6 +4,8 @@ import logging
 
 import h5py
 import numpy as np
+from bitshuffle import decompress_lz4
+import zmq
 
 from dranspose.event import EventData
 from dranspose.parameters import (
@@ -221,6 +223,24 @@ class WriterWorker:
                 pos = self.write_frame(acq, frame_n)
                 if pos is not None:
                     ret["frame"] = {"frame_number": frame_n, "position": pos}
+                if "bs" in acq.data["encoding"]:
+                    # test decode
+                    bufframe = acq.data["buffer"]
+                    if isinstance(bufframe, zmq.Frame):
+                        bufframe = bufframe.bytes
+                    logger.info(
+                        "decompress_lz4 buf %s %s", acq.data["shape"], acq.data["type"]
+                    )
+                    img = decompress_lz4(
+                        bufframe, acq.data["shape"], dtype=acq.data["type"]
+                    )
+                    logger.info("img %s %s", img.shape, img.dtype)
+
+                acq.data["buffer"] = b"omissis"
+                logger.info("parsed packet %s", acq.config)
+                logger.info("enc %s", acq.data)
+                logger.info("shape %s", acq.data["shape"][::-1])
+                logger.info("type %s", acq.data["type"])
 
         return ret
 
