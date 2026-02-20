@@ -11,6 +11,7 @@ import pytest
 import zmq.asyncio
 import zmq
 from pydantic_core import Url
+import aiohttp
 
 from dranspose.ingester import Ingester
 
@@ -44,6 +45,7 @@ from tests.utils import (
 
 @pytest.mark.asyncio
 async def test_writer(
+    tmp_path: Any,
     controller: None,
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
@@ -93,6 +95,15 @@ async def test_writer(
         streams={StreamName("eiger")}, workers={WorkerName("w1"), WorkerName("w2")}
     )
 
+    filename = tmp_path / "test.h5"
+    async with aiohttp.ClientSession() as session:
+        resp = await session.post(
+            "http://localhost:5000/api/v1/parameter/filename",
+            data=f"{filename}",
+        )
+        assert resp.status == 200
+        await resp.json()
+
     ntrig = 4
     seq = uniform_sequence(streams={StreamName("eiger")}, ntrig=ntrig)
     start_part = {"eiger": [[vworker()]]}
@@ -130,8 +141,9 @@ async def test_writer(
 
     def work() -> None:
         publish = h5pyd.File("http://localhost:5001/", "r")
-        logging.info("workers: %s", publish["workers"])
+        logging.info("workers: %s", list(publish["workers"].keys()))
         assert "w1" in publish["workers/w1/filename"][()].decode("utf-8")
+        assert "w2" in publish["workers/w2/filename"][()].decode("utf-8")
         # The last message is lost with the parallel ingester for Stream1
         # assert f[f"results/{ntrig}/eiger/htype"][()] == b"series_end"
         # for i in range(1, ntrig):
