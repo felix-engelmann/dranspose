@@ -161,6 +161,9 @@ class WorkParameter(BaseModel):
         return new_args
 
 
+Parameters = dict[ParameterName, WorkParameter]
+
+
 class WorkAssignment(BaseModel):
     event_number: EventNumber
     assignments: dict[StreamName, list[WorkerName]]
