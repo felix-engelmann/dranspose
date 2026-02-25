@@ -40,7 +40,7 @@ def parse(data: StreamData) -> UnionType:
         packet.appendix = _get_json(data.frames[8])
 
     if isinstance(packet, EigerLegacyImage):
-        assert data.length == 5
+        assert data.length >= 4
         info = _get_json(data.frames[1])
         buffer = data.frames[2]
         if isinstance(buffer, zmq.Frame):
