@@ -9,6 +9,7 @@ import socket
 import struct
 import threading
 import time
+import itertools
 from asyncio import StreamReader, StreamWriter, Task
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -34,6 +35,7 @@ from aiohttp import ClientConnectionError
 from fastapi import FastAPI
 from pydantic import HttpUrl
 from pydantic_core import Url
+import zipfile
 
 from dranspose.controller import app
 from dranspose.distributed import DistributedService
@@ -464,6 +466,61 @@ async def stream_eiger() -> (
         await socket.close()
 
     return _make_eiger
+
+
+@pytest_asyncio.fixture
+async def stream_eiger_dump() -> Callable[
+    [
+        zmq.Context[Any],
+        os.PathLike[Any] | str,
+        str,
+        int,
+        float,
+        int,
+        Optional[int],
+    ],
+    Coroutine[Any, Any, None],
+]:
+    async def _make_dump(
+        ctx: zmq.Context[Any],
+        filename: os.PathLike[Any] | str,
+        dst_file: str,
+        port: int,
+        frame_time: float = 0.1,
+        typ: int = zmq.PUSH,
+        end: Optional[int] = None,
+    ) -> None:
+        socket: zmq.Socket[Any] = ctx.socket(typ)
+        socket.bind(f"tcp://*:{port}")
+
+        with zipfile.ZipFile(filename) as zf:
+            for file in zf.namelist():
+                if file.endswith(".cbors"):  # optional filtering by filetype
+                    with zf.open(file) as f:
+                        for i in itertools.count():
+                            if end is not None and i >= end:
+                                break
+                            try:
+                                dump = cbor2.load(f)
+                                frames = list(dump.value[1].values())[0].value[1]
+                                logging.info("%s - send frames %s", i, frames[0])
+                                hdr = json.loads(frames[0])
+                                if hdr["htype"] == "dheader-1.0":
+                                    appendix = json.loads(frames[8])
+                                    logging.info("appendix is %s", appendix)
+                                    appendix["filename"] = dst_file
+                                    frames[8] = json.dumps(appendix).encode("utf8")
+                                await socket.send_multipart(frames)
+                                await asyncio.sleep(frame_time)
+                            except EOFError:
+                                logging.warning("end of file reached")
+                                break
+
+                    break
+
+        socket.close()
+
+    return _make_dump
 
 
 @pytest_asyncio.fixture
