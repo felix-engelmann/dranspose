@@ -2,10 +2,10 @@ from typing import Any, Optional
 import os
 import logging
 
+# from dataclasses import dataclass
+
 import h5py
 import numpy as np
-from bitshuffle import decompress_lz4
-import zmq
 
 from dranspose.event import EventData
 from dranspose.parameters import (
@@ -51,6 +51,25 @@ def _create_dataset_nofill(group, name, shape, maxshape, dtype, chunks=None):
     return dset
 
 
+# @dataclass
+# class Header:
+#     worker_name: str
+#     writer_filename: str
+#     master_filename: str
+
+# @dataclass
+# class FrameInfo:
+#     worker_name: str
+#     frame_number: int
+#     frame_pos: int
+
+# @dataclass
+# class FramesInfo:
+#     worker_name: str
+#     frame_numbers: list[int]
+#     frame_pos: list[int]
+
+
 class WriterWorker:
     def __init__(
         self, parameters: Parameters, state: WorkerState, **kwargs: Any
@@ -64,6 +83,7 @@ class WriterWorker:
         )  # StreamName(parameters["stream_name"].value)
         self._dset_name = f"/entry/instrument/{self.stream_name}/data"
         self._number_dset_name = None
+        self.ret_buffer = []
 
     @staticmethod
     def describe_parameters() -> list[ParameterType]:
@@ -89,6 +109,7 @@ class WriterWorker:
             filename = meta_header.get("filename", "")
         saveraw = meta_info.get("save_raw", True)
         logger.info("Original parameters %s %s", filename, saveraw)
+        ret["master_filename"] = filename
         if filename and saveraw:
             base, ext = os.path.splitext(filename)
             filename = f"{base}_{self.name}{ext}"
@@ -109,7 +130,6 @@ class WriterWorker:
             )
         if self._fh is not None:
             ret["filename"] = filename
-            ret["save_raw"] = True
             end = self._dset_name.rfind("/")
             group_name = self._dset_name[:end]
             group = self._fh.create_group(group_name)
@@ -126,7 +146,6 @@ class WriterWorker:
             )
         else:
             ret["filename"] = ""
-            ret["save_raw"] = False
         return ret
 
     def write_frame(self, acq, evt_n) -> None:
@@ -223,29 +242,42 @@ class WriterWorker:
                 pos = self.write_frame(acq, frame_n)
                 if pos is not None:
                     ret["frame"] = {"frame_number": frame_n, "position": pos}
-                if "bs" in acq.data["encoding"]:
-                    # test decode
-                    bufframe = acq.data["buffer"]
-                    if isinstance(bufframe, zmq.Frame):
-                        bufframe = bufframe.bytes
-                    logger.info(
-                        "decompress_lz4 buf %s %s", acq.data["shape"], acq.data["type"]
-                    )
-                    img = decompress_lz4(
-                        bufframe, acq.data["shape"], dtype=acq.data["type"]
-                    )
-                    logger.info("img %s %s", img.shape, img.dtype)
+                # if "bs" in acq.data["encoding"]:
+                #     from bitshuffle import decompress_lz4
+                #     import zmq
+                #     # test decode
+                #     bufframe = acq.data["buffer"]
+                #     if isinstance(bufframe, zmq.Frame):
+                #         bufframe = bufframe.bytes
+                #     logger.info(
+                #         "decompress_lz4 buf %s %s", acq.data["shape"], acq.data["type"]
+                #     )
+                #     img = decompress_lz4(
+                #         bufframe, acq.data["shape"], dtype=acq.data["type"]
+                #     )
+                #     logger.info("img %s %s", img.shape, img.dtype)
 
                 acq.data["buffer"] = b"omissis"
                 logger.info("parsed packet %s", acq.config)
                 logger.info("enc %s", acq.data)
                 logger.info("shape %s", acq.data["shape"][::-1])
                 logger.info("type %s", acq.data["type"])
+            logger.info("ret %s", ret)
 
+        # FIXME make a list of frame number and another of positions,
+        # so the reducer can just zip them
+
+        # self.ret_buffer.append(ret)
+        # if tick:
+        #     ret = self.ret_buffer
+        #     self.ret_buffer = []
+        #     return ret
+        # else:
+        #     return
         return ret
 
 
-def finalize(self, *args, **kwargs):
+def finish(self, *args, **kwargs):
     # close the file
     if self._fh is not None:
         self._fh.close()
