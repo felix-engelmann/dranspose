@@ -1,9 +1,11 @@
 import asyncio
 import logging
 import os
-from pathlib import PosixPath
+
+# from pathlib import PosixPath
 from typing import Awaitable, Callable, Any, Coroutine, Optional
 import h5pyd
+import h5py
 
 # import numpy as np
 
@@ -50,8 +52,13 @@ async def test_writer(
     reducer: Callable[[Optional[str]], Awaitable[None]],
     create_worker: Callable[[Worker], Awaitable[Worker]],
     create_ingester: Callable[[Ingester], Awaitable[Ingester]],
-    stream_cbors: Callable[
-        [zmq.Context[Any], int, os.PathLike[Any] | str, float, int],
+    stream_eiger_dump: Callable[
+        [
+            zmq.Context[Any],
+            os.PathLike[Any] | str,
+            str,
+            int,
+        ],
         Coroutine[Any, Any, None],
     ],
 ) -> None:
@@ -104,8 +111,8 @@ async def test_writer(
         assert resp.status == 200
         await resp.json()
 
-    ntrig = 4
-    seq = uniform_sequence(streams={StreamName("eiger")}, ntrig=ntrig)
+    nmsg = 4
+    seq = uniform_sequence(streams={StreamName("eiger")}, ntrig=nmsg)
     start_part = {"eiger": [[vworker()]]}
     seq["parts"]["start"] = start_part
     seq["sequence"].insert(0, MappingName("start"))
@@ -114,42 +121,48 @@ async def test_writer(
 
     with zmq.asyncio.Context() as context:
         asyncio.create_task(
-            stream_cbors(
+            stream_eiger_dump(
                 context,
+                "tests/data/eiger_legacy_dump.zip",
+                str(filename),
                 9999,
-                PosixPath("tests/data/eiger-small.cbors"),
-                0.1,
-                zmq.PUSH,
-                begin=0,
+                end=nmsg,
             )
         )
-
         content = await wait_for_finish()
 
         assert content == {
-            "last_assigned": ntrig,
-            "completed_events": ntrig,
-            "total_events": ntrig,
+            "last_assigned": nmsg,
+            "completed_events": nmsg,
+            "total_events": nmsg,
             "finished": True,
         }
 
         logging.info("proc1 ev %d", ing1.state.processed_events)
         logging.info("proc2 ev %d", ing2.state.processed_events)
-        assert ing1.state.processed_events < ntrig
-        assert ing2.state.processed_events < ntrig
-        assert ing1.state.processed_events + ing2.state.processed_events == ntrig
+        assert ing1.state.processed_events < nmsg
+        assert ing2.state.processed_events < nmsg
+        assert ing1.state.processed_events + ing2.state.processed_events == nmsg
 
     def work() -> None:
         publish = h5pyd.File("http://localhost:5001/", "r")
         logging.info("workers: %s", list(publish["workers"].keys()))
         assert "w1" in publish["workers/w1/filename"][()].decode("utf-8")
-        assert "w2" in publish["workers/w2/filename"][()].decode("utf-8")
+        w_fname = publish["workers/w2/filename"][()].decode("utf-8")
+        w_frames = publish["frames/w2"][()].shape[0]
+
+        with h5py.File(w_fname, "r") as f:
+            assert w_frames == f["/entry/instrument/eiger/data"].shape[0]
+            assert f["/entry/instrument/eiger/data"].shape[1:] == (1065, 1030)
+
         # The last message is lost with the parallel ingester for Stream1
         # assert f[f"results/{ntrig}/eiger/htype"][()] == b"series_end"
         # for i in range(1, ntrig):
         #     # assert f[f"results/{i}/eiger/msg_number"][()] == i
         #     assert publish[f"results/{i}/eiger/htype"][()] == b"dimage-1.0"
         #     assert publish[f"results/{i}/eiger/frame"][()] == i - 1
+        # from time import sleep
+        # sleep(3600)
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
