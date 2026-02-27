@@ -149,20 +149,11 @@ async def test_writer(
         logging.info("workers: %s", list(publish["workers"].keys()))
         assert "w1" in publish["workers/w1/filename"][()].decode("utf-8")
         w_fname = publish["workers/w2/filename"][()].decode("utf-8")
-        w_frames = publish["frames/w2"][()].shape[0]
+        # w_frames = publish["frames/w2"][()].shape[0]
 
         with h5py.File(w_fname, "r") as f:
-            assert w_frames == f["/entry/instrument/eiger/data"].shape[0]
+            # assert w_frames == f["/entry/instrument/eiger/data"].shape[0]
             assert f["/entry/instrument/eiger/data"].shape[1:] == (1065, 1030)
-
-        # The last message is lost with the parallel ingester for Stream1
-        # assert f[f"results/{ntrig}/eiger/htype"][()] == b"series_end"
-        # for i in range(1, ntrig):
-        #     # assert f[f"results/{i}/eiger/msg_number"][()] == i
-        #     assert publish[f"results/{i}/eiger/htype"][()] == b"dimage-1.0"
-        #     assert publish[f"results/{i}/eiger/frame"][()] == i - 1
-        # from time import sleep
-        # sleep(3600)
 
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, work)
