@@ -51,6 +51,23 @@ def _create_dataset_nofill(group, name, shape, maxshape, dtype, chunks=None):
     return dset
 
 
+def get_meta_info(info):
+    meta_keys = [
+        "count_time",
+        "countrate_correction_applied",
+        "countrate_correction_count_cutoff",
+        "photon_energy",
+        "threshold_energy",
+        "flatfield_correction_applied",
+        "virtual_pixel_correction_applied",
+        "pixel_mask_applied",
+        "nimages",
+        "ntrigger",
+        "trigger_mode",
+    ]
+    return {key: info[key] for key in meta_keys}
+
+
 # @dataclass
 # class Header:
 #     worker_name: str
@@ -62,12 +79,6 @@ def _create_dataset_nofill(group, name, shape, maxshape, dtype, chunks=None):
 #     worker_name: str
 #     frame_number: int
 #     frame_pos: int
-
-# @dataclass
-# class FramesInfo:
-#     worker_name: str
-#     frame_numbers: list[int]
-#     frame_pos: list[int]
 
 
 class WriterWorker:
@@ -110,6 +121,8 @@ class WriterWorker:
         saveraw = meta_info.get("save_raw", True)
         logger.info("Original parameters %s %s", filename, saveraw)
         ret["master_filename"] = filename
+        ret["dataset_name"] = self._dset_name
+        ret["meta_info"] = meta_info
         if filename and saveraw:
             base, ext = os.path.splitext(filename)
             filename = f"{base}_{self.name}{ext}"
@@ -149,22 +162,10 @@ class WriterWorker:
         return ret
 
     def write_frame(self, acq, evt_n) -> None:
-        # compression = "bslz4" if "bs" in acq.data["encoding"] else "none"
-        # header = {
-        #     "htype": "image",
-        #     "msg_number": next(self._msg_number),
-        #     "frame": header["frame"],
-        #     "shape": acq.data["shape"][::-1],
-        #     "type": acq.data["type"],
-        #     "compression": compression,
-        # }
         _shape = acq.data["shape"][::-1]
         _type = acq.data["type"]
-        if self._fh is None:
-            return
-        fh = self._fh
-        # FIXME just save the dsets as members
-        dset = fh.get(self._dset_name)
+        # FIXME just save the dset as a member
+        dset = self._fh.get(self._dset_name)
         if not dset:
             logger.debug("dataset %s does not exist, creating it", self._dset_name)
             chunks = (1, *acq.data["shape"][::-1])
@@ -177,7 +178,7 @@ class WriterWorker:
 
             if compression is None:
                 dset = _create_dataset_nofill(
-                    fh["/"],
+                    self._fh["/"],
                     name=self._dset_name,
                     shape=(0, *_shape),
                     maxshape=(h5py.h5s.UNLIMITED, *_shape),
@@ -185,7 +186,7 @@ class WriterWorker:
                     chunks=chunks,
                 )
             else:
-                dset = fh.create_dataset(
+                dset = self._fh.create_dataset(
                     self._dset_name,
                     dtype=_type,
                     shape=(0, *_shape),
@@ -196,7 +197,7 @@ class WriterWorker:
                 )
                 logger.info("created dataset %s", self._dset_name)
 
-        ndset = fh.get(self._number_dset_name)
+        ndset = self._fh.get(self._number_dset_name)
         length = ndset.shape[0]
         ndset.resize(length + 1, axis=0)
         ndset[length] = int(evt_n)
@@ -206,7 +207,7 @@ class WriterWorker:
         offsets[1] = 0  # ???
         dset.id.write_direct_chunk(offsets, acq.data["buffer"])
         logger.debug("wrote frame at offsets %s", offsets)
-        return n
+        return {"frame_number": evt_n, "position": n, "shape": _shape, "dtype": _type}
 
     def process_event(
         self,
@@ -221,48 +222,19 @@ class WriterWorker:
         if self.stream_name in event.streams:
             acq = parse(event.streams[self.stream_name])
             if isinstance(acq, EigerLegacyHeader):
-                meta_keys = [
-                    "count_time",
-                    "countrate_correction_applied",
-                    "countrate_correction_count_cutoff",
-                    "photon_energy",
-                    "threshold_energy",
-                    "flatfield_correction_applied",
-                    "virtual_pixel_correction_applied",
-                    "pixel_mask_applied",
-                    "nimages",
-                    "ntrigger",
-                    "trigger_mode",
-                ]
                 meta_header = acq.appendix
-                meta_info = {key: acq.info[key] for key in meta_keys}
+                meta_info = get_meta_info(acq.info)
                 ret["header"] = self.open_file(meta_header, meta_info, parameters)
             elif isinstance(acq, EigerLegacyImage):
-                frame_n = event.event_number - 1
-                pos = self.write_frame(acq, frame_n)
-                if pos is not None:
-                    ret["frame"] = {"frame_number": frame_n, "position": pos}
-                # if "bs" in acq.data["encoding"]:
-                #     from bitshuffle import decompress_lz4
-                #     import zmq
-                #     # test decode
-                #     bufframe = acq.data["buffer"]
-                #     if isinstance(bufframe, zmq.Frame):
-                #         bufframe = bufframe.bytes
-                #     logger.info(
-                #         "decompress_lz4 buf %s %s", acq.data["shape"], acq.data["type"]
-                #     )
-                #     img = decompress_lz4(
-                #         bufframe, acq.data["shape"], dtype=acq.data["type"]
-                #     )
-                #     logger.info("img %s %s", img.shape, img.dtype)
-
-                acq.data["buffer"] = b"omissis"
-                logger.info("parsed packet %s", acq.config)
-                logger.info("enc %s", acq.data)
-                logger.info("shape %s", acq.data["shape"][::-1])
-                logger.info("type %s", acq.data["type"])
-            logger.info("ret %s", ret)
+                if self._fh is not None:
+                    ret["frame"] = self.write_frame(acq, event.event_number - 1)
+                # acq.data["buffer"] = b"omissis"
+                # logger.info("parsed packet %s", acq.config)
+                # logger.info("enc %s", acq.data)
+                # logger.info("shape %s", acq.data["shape"][::-1])
+                # logger.info("type %s", acq.data["type"])
+                ret = None
+            # logger.info("ret %s", ret)
 
         # FIXME make a list of frame number and another of positions,
         # so the reducer can just zip them
