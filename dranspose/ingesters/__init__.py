@@ -14,6 +14,10 @@ from dranspose.ingesters.stins_parallel import (  # noqa: F401
     StinsParallelIngester,
     StinsParallelSettings,
 )
+from dranspose.ingesters.stream1_parallel import (  # noqa: F401
+    Stream1ParallelIngester,
+    Stream1ParallelSettings,
+)
 from dranspose.ingesters.zmqpull_eiger_legacy import (  # noqa: F401
     ZmqPullEigerLegacyIngester,
     ZmqPullEigerLegacySettings,

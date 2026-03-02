@@ -13,6 +13,10 @@ from dranspose.ingesters.zmqpull_eiger_legacy import ZmqPullEigerLegacySettings
 from dranspose.protocol import StreamName, EventNumber
 
 
+class Stream1ParallelSettings(ZmqPullEigerLegacySettings):
+    pass
+
+
 class Stream1ParallelIngester(StinsParallelIngester):
     def __init__(self, settings: Optional[ZmqPullEigerLegacySettings] = None) -> None:
         if settings is not None:
