@@ -18,7 +18,7 @@ class Stream1ParallelSettings(ZmqPullEigerLegacySettings):
 
 
 class Stream1ParallelIngester(StinsParallelIngester):
-    def __init__(self, settings: Optional[ZmqPullEigerLegacySettings] = None) -> None:
+    def __init__(self, settings: Optional[Stream1ParallelSettings] = None) -> None:
         if settings is not None:
             self._streaming_settings = settings
         else:
