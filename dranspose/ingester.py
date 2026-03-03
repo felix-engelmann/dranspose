@@ -1,5 +1,7 @@
 import asyncio
 import time
+import string
+import random
 import os
 from io import BufferedWriter
 from typing import AsyncGenerator, Optional, Awaitable, Any, Iterator
@@ -64,11 +66,14 @@ class IngesterSettings(DistributedSettings):
     @model_validator(mode="before")
     @classmethod
     def create_default_name(cls, data: Any) -> Any:
+        randid = "".join([random.choice(string.ascii_letters) for _ in range(10)])
         if isinstance(data, dict):
             if "ingester_name" not in data and "ingester_streams" in data:
                 if isinstance(data["ingester_streams"], list):
                     data["ingester_name"] = (
-                        "_".join(map(str, data["ingester_streams"])) + "-ingester"
+                        "_".join(map(str, data["ingester_streams"]))
+                        + "-ingester-"
+                        + randid
                     )
         return data
 
