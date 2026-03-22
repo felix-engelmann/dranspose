@@ -201,6 +201,8 @@ def replay(args: argparse.Namespace) -> None:
         args.port,
         keepalive,
         args.nworkers,
+        latency=args.latency,
+        loop=args.loop,
     )
 
 
@@ -305,6 +307,15 @@ def create_parser() -> argparse.ArgumentParser:
         help="number of workers to distribute events to",
         default=2,
         type=int,
+    )
+    parser_replay.add_argument(
+        "--latency",
+        help="time in seconds between replay frames",
+        default=0,
+        type=float,
+    )
+    parser_replay.add_argument(
+        "--loop", action="store_true", help="continuously loop over replay data"
     )
 
     return parser

@@ -9,6 +9,7 @@ import threading
 import time
 import traceback
 from typing import ContextManager, Iterator, Any, Optional, IO, Tuple
+import itertools
 
 import cbor2
 import uvicorn
@@ -22,6 +23,7 @@ from dranspose.helpers import utils
 from dranspose.event import (
     InternalWorkerMessage,
     EventData,
+    EventNumber,
     ResultData,
     message_tag_hook,
 )
@@ -257,7 +259,8 @@ def replay(
     broadcast_first: bool = True,
     done_event: threading.Event | None = None,
     start_event: threading.Event | None = None,
-    latency: float | None = None,
+    latency: float = 0,
+    loop: bool = False,
 ) -> None:
     if source is not None:
         sourcecls = utils.import_class(source)
@@ -267,6 +270,8 @@ def replay(
         gens = [get_internals(f) for f in zmq_files]
     else:
         gens = []
+    if loop:
+        gens = list(map(itertools.cycle, gens))
 
     workercls = utils.import_class(wclass)
     logger.info("custom worker class %s", workercls)
@@ -299,15 +304,15 @@ def replay(
         reducer_app, port=port or 5000, host="localhost", log_level="info"
     )
     server = Server(config)
-    # server.run()
-
     first = True
+    last_output_event_number = -1
 
     with server.run_in_thread(port):
         cache = [None for _ in gens]
         last_tick = 0.0
         if start_event is not None:
             start_event.wait()
+
         while True:
             try:
                 internals = [
@@ -316,6 +321,7 @@ def replay(
                 if len(internals) == 0:
                     break
                 lowestevn = min([ev.event_number for ev in internals])
+
                 lowinternals = []
                 cache = internals
                 for idx, ie in enumerate(internals):
@@ -323,6 +329,10 @@ def replay(
                         lowinternals.append(ie)
                         cache[idx] = None
                 event = EventData.from_internals(lowinternals)
+                if loop:
+                    if last_output_event_number > event.event_number:
+                        event.event_number = EventNumber(last_output_event_number + 1)
+                last_output_event_number = event.event_number
 
                 dst_worker_ids = [random.randint(0, len(workers) - 1)]
                 if first and broadcast_first:
@@ -347,8 +357,10 @@ def replay(
                         reducer_app.state.parameters,
                         tick,
                     )
-                if latency is not None:
-                    time.sleep(latency)
+                time.sleep(latency)
+                if stop_event is not None:
+                    if stop_event.is_set():
+                        raise StopIteration()
             except StopIteration:
                 logger.debug("end of replay, calling finish")
                 _finish(workers, reducer, reducer_app.state.parameters)
@@ -366,4 +378,3 @@ def replay(
             stop_event.wait()
         except KeyboardInterrupt:
             pass
-        logger.info("replay finished")

@@ -47,7 +47,7 @@ async def dump_data(
     await create_worker(WorkerName("w3"))
 
     p_eiger = tmp_path / "eiger_dump.cbors"
-    print(p_eiger, type(p_eiger))
+    logging.info("%s %s", p_eiger, type(p_eiger))
 
     await create_ingester(
         ZmqPullSingleIngester(
@@ -178,6 +178,77 @@ async def test_replay(
         None,
         par_file,
     )
+
+
+@pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
+@pytest.mark.asyncio
+async def test_replay_looping(
+    controller: None,
+    reducer: Callable[[Optional[str]], Awaitable[None]],
+    create_worker: Callable[[WorkerName], Awaitable[Worker]],
+    create_ingester: Callable[[Ingester], Awaitable[Ingester]],
+    stream_eiger: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_orca: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    stream_small: Callable[[zmq.Context[Any], int, int], Coroutine[Any, Any, None]],
+    tmp_path: Any,
+) -> None:
+    p_eiger, p_prefix, uuid = await dump_data(
+        reducer,
+        create_worker,
+        create_ingester,
+        stream_eiger,
+        stream_orca,
+        stream_small,
+        tmp_path,
+    )
+    # read dump
+
+    par_file = generate_params(tmp_path)
+    stop_event = threading.Event()
+
+    thread = threading.Thread(
+        target=replay,
+        args=(
+            "tests.aux_payloads:TestWorker",
+            "tests.aux_payloads:TestReducer",
+            [p_eiger, f"{p_prefix}orca-ingester-{uuid}.cbors"],
+            None,
+            par_file,
+        ),
+        kwargs={"port": 5010, "stop_event": stop_event, "loop": True, "latency": 0.1},
+    )
+    thread.start()
+
+    async def check_poll_results() -> None:
+        logging.info("Starting to poll hdf5-rest output with h5pyd")
+        await asyncio.sleep(2)
+        # NOTE: See https://github.com/felix-engelmann/dranspose/pull/58#discussion_r2861877247
+        #       the results have length 11, though the stream seems to be length 10
+        single_run_len_results = 11
+        max_wait_time = 5
+        wait_step_duration = 0.5
+        wait_total_steps = int((max_wait_time // wait_step_duration) + 1)
+        for _ in range(wait_total_steps):
+            f = h5pyd.File("http://localhost:5010/", "r", timeout=5)
+            len_results = len(f.get("results", []))
+            logging.info("Length of results: %s", len_results)
+
+            if len_results > 2 * single_run_len_results:
+                return
+            await asyncio.sleep(wait_step_duration)
+        assert False, "Results never had more than 10 entries"
+
+    try:
+        await check_poll_results()
+    except Exception as err:
+        raise Exception from err
+    finally:
+        logging.info("shut down server")
+        stop_event.set()
+        await asyncio.sleep(0.1)
+        thread.join()
+        await asyncio.sleep(0.1)
+        logging.info("thread joined")
 
 
 @pytest.mark.skipif("config.getoption('rust')", reason="rust does not support dumping")
